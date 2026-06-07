@@ -21,7 +21,7 @@ Seguirás versionando con Git lo que hagas (ya sabes cómo, desde la Fase 1).
 | 1 | [¿Qué es .NET y qué es compilar?](01-que-es-dotnet-y-compilar.md) | Entender la plataforma antes de usarla | 20 min |
 | 2 | [Tu primera aplicación de consola](02-tu-primera-app-de-consola.md) | Crear, compilar y ejecutar un programa | 35 min |
 | 3 | [Trabajar con datos: las empresas](03-trabajar-con-datos.md) | Modelar y listar empresas en memoria | 35 min |
-| 4 | [Leer un archivo y buscar](04-leer-archivo-y-buscar.md) | Leer datos externos y manejar errores | 35 min |
+| 4 | [Consultas y métodos sobre los datos](04-consultas-y-metodos.md) | Buscar, contar y organizar en métodos | 35 min |
 
 ---
 

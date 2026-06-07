@@ -158,4 +158,4 @@ Lee el error (archivo + línea). Lo más común: una coma de más o de menos en 
 
 ---
 
-**➡️ Siguiente:** [Leer un archivo y buscar](04-leer-archivo-y-buscar.md)
+**➡️ Siguiente:** [Consultas y métodos sobre los datos](04-consultas-y-metodos.md)
