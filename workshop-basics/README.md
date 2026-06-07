@@ -4,10 +4,6 @@ Una guía práctica, paso a paso, para pasar de *"copio archivos al servidor y r
 
 ---
 
-## ¿Para quién es este taller?
-
-Para personas que **se defienden con el computador y la terminal básica**, pero que **no han trabajado con desarrollo de software moderno**: desarrolladores que empiezan, personal de infraestructura que despliega de forma manual, o cualquiera que quiera entender cómo nace y vive una aplicación de verdad.
-
 **No damos por sabido nada de desarrollo.** Cada herramienta y cada concepto — qué es .NET, qué es Git, qué es HTTP, qué es Docker — se explica antes de usarse. Si entiendes qué es un archivo, una carpeta y cómo abrir una terminal, puedes hacer este taller.
 
 ---
