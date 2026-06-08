@@ -19,6 +19,8 @@ Tu API vive en una caja (Fase 8.2) y necesita otra caja: la base de datos. Levan
 - les crea una **red privada** para que se encuentren por su nombre,
 - respeta el orden (que la base de datos esté lista antes que la API).
 
+> 🧠 **Un límite que conviene conocer desde ya:** `docker compose` orquesta contenedores en **una sola máquina**. Cuando un sistema necesita repartirse en **varias máquinas**, con réplicas y auto-recuperación, se usan orquestadores más potentes como **Docker Swarm** o **Kubernetes**. Es un tema avanzado que excede este taller (aparece en la ruta DevOps del cierre); para todo lo que haremos aquí, compose es exactamente lo que necesitamos.
+
 ### Volúmenes: datos que sobreviven al contenedor
 
 En la Fase 6 viste que borrar el contenedor de la base de datos borraba los datos. Un **volumen** es un almacenamiento gestionado por Docker que vive **fuera** del contenedor: aunque borres y recrees el contenedor, el volumen (y sus datos) permanece. Es la pieza que faltaba para una base de datos confiable.

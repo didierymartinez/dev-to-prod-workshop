@@ -64,7 +64,7 @@ Este taller te dio una **base completa y transversal**. Ahora tienes el criterio
 - **Frontend:** frameworks modernos (React, Vue, Angular), TypeScript, diseño de interfaces.
 - **Backend:** arquitecturas avanzadas, microservicios, colas de mensajes, seguridad y rendimiento.
 - **Datos:** SQL avanzado, modelado, análisis de datos, *data warehousing*, *business intelligence*.
-- **DevOps / Nube:** Kubernetes, infraestructura como código (Terraform), observabilidad, CI/CD avanzado, seguridad en la nube.
+- **DevOps / Nube:** **orquestación de contenedores en varias máquinas** (Docker Swarm y, más allá, Kubernetes — el paso natural después de `docker compose` cuando necesitas réplicas y alta disponibilidad), infraestructura como código (Terraform), observabilidad, CI/CD avanzado, seguridad en la nube.
 - **Inteligencia artificial:** uso de APIs de modelos, RAG, agentes.
 
 Ninguno te será ajeno: en este taller tocaste un poco de todos. Elige el que más te haya gustado y profundiza — ya sabes cómo encaja en el panorama completo.
