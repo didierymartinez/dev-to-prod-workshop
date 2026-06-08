@@ -22,7 +22,7 @@ Porque entender qué pasa "por dentro" de un despliegue te hace mejor profesiona
 | 4 | [Instalar Docker y desplegar a mano](04-desplegar-a-mano.md) | Tu app corriendo en el servidor | 40 min |
 | 5 | [El dolor del despliegue manual](05-el-dolor-manual.md) | Sentir por qué hay que automatizar | 25 min |
 
-> Necesitarás **Azure CLI** instalado (Fase 0) y una cuenta de Azure.
+> Necesitarás **Azure CLI** instalado (Fase 0) y una **cuenta de Azure**. Si no tienes una, créala gratis en [azure.microsoft.com/free](https://azure.microsoft.com/free) (pide una tarjeta solo para verificación; las VMs de la serie B que usamos cuestan centavos y las apagaremos). Confirma que tienes una suscripción activa con `az account show` antes de empezar.
 
 ---
 

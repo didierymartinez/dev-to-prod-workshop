@@ -70,7 +70,15 @@ Desglose:
 - `app.MapGet("/", () => "...")` define un endpoint: *"cuando llegue un **GET** a la dirección `/`, responde este texto"*.
 - `app.Run()` **arranca el servidor** y lo deja escuchando.
 
-### Paso 4: Ejecutar el servidor
+### Paso 4: Fijar el puerto y ejecutar
+
+Por defecto, .NET elige un puerto **al azar** cada vez que arrancas. Para que coincida con **todo el taller** (el frontend, Postman y Docker usarán el **5000**), fíjalo una vez: abre `src/GestionEmpresas.Api/Properties/launchSettings.json` y deja la línea `"applicationUrl"` así (si ves más de un perfil, ponlo igual en todos):
+
+```json
+"applicationUrl": "http://localhost:5000",
+```
+
+Ahora arranca el servidor:
 
 ```bash
 cd src/GestionEmpresas.Api
@@ -81,13 +89,15 @@ Fíjate en la salida. Verás una línea como:
 ```
 Now listening on: http://localhost:5000
 ```
-Ese es **tu servidor**, escuchando en tu máquina en el puerto 5000. (El número puede variar; usa el que te muestre.)
+Ese es **tu servidor**, escuchando en tu máquina en el puerto **5000** (el que fijaste).
+
+> 🧠 `launchSettings.json` solo afecta a `dotnet run` en tu máquina; al empaquetar con Docker (Fase 8) el puerto se configura aparte. Solo cambia esa línea; no necesitas entender el resto del archivo. *(Alternativa rápida, sin editar el archivo: arranca siempre con `dotnet run --urls http://localhost:5000`.)*
 
 > 🧠 **`localhost`** significa "este mismo computador". El servidor solo es accesible desde tu máquina por ahora. En la Fase 9 lo pondremos en internet.
 
 ### Paso 5: Probarlo
 
-Deja el servidor corriendo. Abre el navegador en `http://localhost:5000` (con tu puerto). Verás tu mensaje:
+Deja el servidor corriendo. Abre el navegador en `http://localhost:5000`. Verás tu mensaje:
 ```
 API de Gestión de Empresas funcionando 🚀
 ```
@@ -100,7 +110,7 @@ Para **detener** el servidor, vuelve a la terminal y pulsa `Ctrl + C`.
 
 ## ✅ Compruébalo
 
-- [ ] `dotnet run` muestra "Now listening on: http://localhost:..."
+- [ ] `dotnet run` muestra "Now listening on: http://localhost:5000".
 - [ ] El navegador, en esa dirección, muestra tu mensaje.
 - [ ] Sabes detener el servidor con `Ctrl + C`.
 - [ ] Puedes explicar qué hace `app.MapGet("/", ...)` y `app.Run()`.

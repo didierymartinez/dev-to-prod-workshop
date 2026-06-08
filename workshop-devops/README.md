@@ -26,7 +26,8 @@ Al terminar el básico, tu aplicación funcionaba en internet. Pero quedaron fra
 
 ```
 • La infraestructura se creó a mano (comandos sueltos): no es reproducible.
-• Corre en una sola máquina: no escala y cada despliegue la tumba un momento.
+• Las máquinas son estáticas: no hay un clúster que escale ni se recupere solo.
+• Cada despliegue tumba la app un momento (downtime).
 • Los secretos viven en archivos .env en el servidor.
 • No sabes qué pasa adentro: estás ciego salvo por "docker logs".
 • Hay un solo entorno: se despliega directo a producción.

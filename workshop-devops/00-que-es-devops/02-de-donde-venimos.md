@@ -18,23 +18,26 @@ Al terminar el básico, tu app `gestion-empresas` estaba así:
 
 ```
    Internet
-      │  :80
+      │ :80
       ▼
-┌──────────────── vm-app (Azure, creada a mano con "az") ────────────────┐
-│   Gateway nginx  ──►  API .NET (contenedor)  ──►  PostgreSQL (contenedor)│
-│                                                    + volumen de datos    │
-└──────────────────────────────────────────────────────────────────────────┘
-   Despliegue: GitHub Actions construye la imagen → GHCR → SSH → compose up
+┌──────── vm-app (pública, creada a mano con "az") ────────┐
+│   Gateway nginx  ──►  API .NET (contenedor)              │
+└──────────────────────────────│───────────────────────────┘
+                                │ red privada
+┌──────── vm-db (privada, SIN IP pública) ─────────────────┐
+│              PostgreSQL (contenedor + volumen)           │
+└───────────────────────────────────────────────────────────┘
+   Infra creada a mano con "az". Despliegue: GitHub Actions → GHCR → SSH → compose
 ```
 
-Funciona y se actualiza solo con cada `push`. Lograste muchísimo. Pero mirémoslo con ojos de quien tiene que **operar** esto en serio.
+Funciona y se actualiza solo con cada `push`. Lograste muchísimo: incluso separaste la base de datos en su propia máquina privada y pusiste un gateway. Pero mirémoslo con ojos de quien tiene que **operar** esto en serio.
 
 ### Las fragilidades (y dónde las resolvemos)
 
 | Lo que quedó frágil | Por qué es un problema | Lo resolvemos en |
 |---|---|---|
 | La infra se creó **a mano** (`az vm create`, `az ... open-port`…) | No es reproducible: ¿podrías recrearla idéntica en 6 meses? ¿Qué configuración tiene? Si alguien la cambia a mano, nadie se entera | **Fase 1 — IaC con Terraform** |
-| Todo corre en **una sola máquina** | Si esa máquina muere, se cae todo. No puedes repartir la carga ni recuperarte solo | **Fase 2 — Orquestación (Swarm)** |
+| Las máquinas son **estáticas**: no hay un clúster | Aunque separaste la BD, las VMs no escalan, no reparten carga ni se recuperan solas si una cae | **Fase 2 — Orquestación (Swarm)** |
 | Cada despliegue **tumba la app** un momento | Los usuarios ven errores cada vez que actualizas | **Fase 3 — Despliegues sin downtime** |
 | Secretos en archivos **`.env`** en el servidor | Frágiles, fáciles de filtrar, difíciles de rotar | **Fase 4 — Secretos y configuración** |
 | Estás **ciego**: solo `docker logs` | No sabes si la app está lenta, saturada o a punto de caerse, hasta que se cae | **Fase 5 — Observabilidad** |

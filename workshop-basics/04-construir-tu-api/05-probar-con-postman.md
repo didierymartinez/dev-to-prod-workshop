@@ -18,7 +18,7 @@ En Postman, una **colección** agrupa peticiones guardadas. Creas la petición u
 
 ### Alternativa: archivo `.http` en VS Code
 
-Si prefieres no salir del editor, la extensión **REST Client** (que instalaste en la Fase 0... o instálala ahora) permite escribir las peticiones en un archivo de texto `.http` y ejecutarlas con un clic. Tiene la ventaja de que **vive junto al código**, en el repositorio.
+Si prefieres no salir del editor, la extensión **REST Client** de VS Code (instálala desde la pestaña de extensiones si no la tienes) permite escribir las peticiones en un archivo de texto `.http` y ejecutarlas con un clic. Tiene la ventaja de que **vive junto al código**, en el repositorio.
 
 ---
 
@@ -104,7 +104,7 @@ Abre el **Pull Request** en GitHub y fusiónalo; luego vuelve a `main` y sincron
 ## 🆘 Si algo salió mal
 
 **Todas las peticiones fallan con "could not connect".**
-El servidor no está corriendo o usas un puerto distinto. Arráncalo (`dotnet run`) y usa el puerto que muestre.
+El servidor no está corriendo. Arráncalo (`dotnet run`) y confirma que dice `Now listening on: http://localhost:5000` (lo fijaste en la lección 4.1).
 
 **El puerto cambió respecto a antes.**
 .NET puede asignar puertos distintos. Ajusta las URLs de la colección al puerto actual, o fija el puerto (lo veremos al contenerizar, en la Fase 8).

@@ -6,7 +6,7 @@
 
 ## 🎉 Lo que lograste
 
-Empezaste con una hoja de cálculo desordenada y un programa que solo corría en tu terminal. Mira dónde estás ahora:
+Empezaste con un programa que solo corría en tu terminal. Mira dónde estás ahora:
 
 ```
 Empezaste:                           Terminaste:
@@ -27,7 +27,7 @@ Pasaste de *"copio archivos al servidor y rezo"* a un **flujo profesional y auto
 
 ## 🎯 Las 7 preguntas que ahora puedes responder
 
-Al inicio del taller (en el [README](../README.md)) planteamos 7 preguntas. Compruébate: ¿puedes responder cada una con tus palabras?
+Estas 7 preguntas resumen lo esencial del taller. Compruébate: ¿puedes responder cada una con tus palabras?
 
 1. **¿Qué es una API y por qué dos programas se "hablan" por HTTP?** → Fases 3 y 4.
 2. **¿Cómo una página web muestra datos que vienen de otro programa?** → Fase 5 (`fetch`).
