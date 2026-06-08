@@ -53,6 +53,8 @@ cd ..               # sube un nivel (a la carpeta que contiene la actual)
 
 > 💡 **Truco que ahorra errores:** escribe `cd ` y luego **arrastra** una carpeta desde el explorador hasta la terminal. Se pega la ruta completa sola.
 
+> 🧭 **Si un comando falla con "no se encontró el proyecto" o "no such file":** casi siempre estás en la carpeta equivocada. Usa `pwd` para ver dónde estás y `cd` para ir a la correcta. En este taller, muchos comandos se ejecutan desde la **raíz del proyecto** (`gestion-empresas/`); cuando una lección diga `cd ../..`, es para volver a esa raíz desde la carpeta del código.
+
 ### Paso 4: Crear una carpeta (`mkdir`)
 
 Navega hasta donde creaste la carpeta `taller` en la Lección 0.1 y entra en ella:

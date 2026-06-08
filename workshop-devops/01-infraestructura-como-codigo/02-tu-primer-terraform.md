@@ -38,7 +38,7 @@ terraform apply   → ejecuta el plan: crea/cambia los recursos de verdad.
 
 ### Paso 0: Empezar limpio
 
-Desde ahora, **Terraform es el dueño de tu infraestructura**. Si todavía tienes recursos creados a mano en el básico, bórralos para empezar de cero (y no chocar con nombres repetidos):
+Desde ahora, **Terraform es el dueño de tu infraestructura**. Si todavía tienes recursos del básico, bórralos para empezar de cero (y no chocar con nombres repetidos). Esto elimina **ambas VMs y la base de datos** del básico — pero tu **código sigue a salvo en GitHub**, y muy pronto recrearás la infraestructura con Terraform:
 
 ```bash
 az group delete --name rg-gestion-empresas --yes --no-wait
@@ -186,4 +186,4 @@ Ejecuta `git status` antes del `commit`. Si ves `.terraform/` o `.tfstate`, revi
 
 ---
 
-**➡️ Siguiente:** Declarar el servidor *(se construirá tras validar el estilo de estas dos lecciones)*.
+**➡️ Siguiente:** [Declarar el servidor](03-declarar-el-servidor.md)

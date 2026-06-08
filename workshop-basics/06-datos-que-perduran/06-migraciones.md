@@ -76,6 +76,8 @@ public class Empresa
 ```
 
 > 🧠 Fíjate en el `?` de `string? Email`: significa que es **opcional** (puede no tener valor). Es importante: las empresas que **ya existen** en la base no tienen email. Al agregar la columna, en ellas quedará vacía (`null`) — y como es opcional, no hay problema. Si la hiciéramos obligatoria, la migración fallaría al no saber qué poner en las filas existentes.
+>
+> 💡 `Email` nos sirve aquí para **practicar la migración**: por ahora se guarda en la base pero no se muestra ni se captura en la web. Mostrarlo en el panel (Fase 5) y en el formulario es un buen ejercicio para cuando termines.
 
 ### Paso 3: Generar la segunda migración
 

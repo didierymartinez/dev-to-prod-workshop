@@ -39,7 +39,7 @@ El egresado del básico tiene su app en Azure (2 VMs, gateway nginx, CI/CD por G
 | Fragilidad al terminar el básico | Lo que resolvemos | Fase |
 |---|---|---|
 | La infra se creó **a mano** con comandos `az` sueltos | Infraestructura como Código (Terraform) | 1 |
-| La app corre en **una sola máquina**; no escala ni se recupera sola | Orquestación (Docker Swarm) | 2 |
+| Las máquinas son **estáticas**: no hay clúster que escale ni se recupere solo | Orquestación (Docker Swarm) | 2 |
 | Cada despliegue causa **downtime** | Despliegues sin caídas | 3 |
 | Secretos en `.env` y en el servidor | Secretos y configuración gestionados | 4 |
 | Estás **ciego** en producción (solo `docker logs`) | Observabilidad | 5 |

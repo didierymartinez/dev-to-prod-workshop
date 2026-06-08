@@ -132,7 +132,7 @@ cd src/GestionEmpresas.Api
 dotnet run
 ```
 
-Abre el navegador en `http://localhost:5000/empresas` (con tu puerto). Verás las tres empresas en JSON — **tu propia API entregando datos**, igual que la de práctica de la Fase 3, pero hecha por ti.
+Abre el navegador en `http://localhost:5000/empresas`. Verás las tres empresas en JSON — **tu propia API entregando datos**, igual que la de práctica de la Fase 3, pero hecha por ti.
 
 ### Paso 5: Guardar el avance
 

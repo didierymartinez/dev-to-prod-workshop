@@ -125,11 +125,11 @@ Crea `src/GestionEmpresas.Api/appsettings.Development.json`:
 }
 ```
 
-> ⚠️ Este archivo **ya está ignorado por Git** (la regla `appsettings.*.json` del `.gitignore` que creaste en la Fase 2). Por eso la contraseña no llegará a GitHub. Comprueba con `git status` que **no** aparece.
+> ⚠️ Este archivo **ya está ignorado por Git** (la regla `appsettings.*.json` del `.gitignore` que creaste en la Fase 2). Por eso la contraseña no llegará a GitHub. Comprueba con `git status` que **no** aparece — es normal y a propósito: lo ignoramos para que la contraseña nunca se suba.
 
 ### Paso 5: El cambio clave en `Program.cs`
 
-Aquí está el premio. En `Program.cs`, agrega el registro del DbContext y **cambia una línea**: la que decide qué implementación del repositorio usar.
+Aquí está el premio. En `Program.cs` solo vas a **agregar** el registro del DbContext y **cambiar una línea** (la que decide qué repositorio usar). **No reemplaces todo el archivo**: tus endpoints de la lección 6.4 se quedan intactos — abajo, el `// …` marca dónde siguen, sin tocarlos.
 
 ```csharp
 using GestionEmpresas.Api.Data;
@@ -165,7 +165,7 @@ app.UseCors("PermitirFrontend");
 // ⬇️ TUS ENDPOINTS NO CAMBIAN NI UNA LÍNEA ⬇️
 app.MapGet("/", () => "API de Gestión de Empresas funcionando 🚀");
 app.MapGet("/empresas", (IEmpresaRepositorio repo) => repo.ObtenerTodas());
-// … (GET/{nit}, POST, DELETE siguen exactamente igual que en 6.4) …
+// … AQUÍ SIGUEN TUS ENDPOINTS POST, GET /empresas/{nit} y DELETE de la 6.4, SIN CAMBIOS (no los borres) …
 
 app.Run();
 ```

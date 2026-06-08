@@ -25,7 +25,7 @@ https://jsonplaceholder.typicode.com/users
 
 ### La respuesta viene en JSON
 
-Lo que la API devuelve es **JSON** — el mismo formato que ya usaste en la Fase 2 para tu archivo de empresas. Datos estructurados, legibles por programas y por humanos.
+Lo que la API devuelve es **JSON** — un formato de datos estructurado, legible tanto por programas como por personas. Es el formato en el que viaja casi toda la información por la web.
 
 ---
 
