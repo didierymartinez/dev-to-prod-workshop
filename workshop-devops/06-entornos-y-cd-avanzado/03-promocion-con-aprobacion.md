@@ -54,6 +54,8 @@ En la Fase 10 del básico guardaste `VM_HOST`/`VM_USER`/`VM_SSH_KEY` como secret
 
 > 🧠 El **mismo nombre** de secreto (`MANAGER_HOST`) tiene un **valor distinto** en cada entorno. El job de staging lee el de staging; el de producción, el de producción. GitHub elige según el `environment:` del job. (Puedes borrar ya los viejos `VM_*` del repositorio.)
 
+> 💡 ¿**Cuál** llave va en `SSH_KEY`? La **privada** cuya pública inyectó Terraform en las VMs (la de `var.ssh_public_key_path`, normalmente `~/.ssh/id_rsa.pub` que traes del básico). Pega el contenido completo de `~/.ssh/id_rsa`, con sus líneas `-----BEGIN…-----END-----`. Como ambos entornos usan esa misma pública, el mismo valor sirve para staging y para prod.
+
 ### Paso 3: Que el `stack.yml` use la etiqueta de imagen variable
 
 En tu `stack.yml`, cambia la imagen de la API para que tome la etiqueta de una variable (con `latest` como respaldo):
@@ -174,7 +176,7 @@ git push
 
 En la pestaña **Actions**, abre la ejecución:
 1. `construir-publicar` → verde.
-2. `desplegar-staging` → verde. Comprueba `http://<IP-staging>:5000/empresas`.
+2. `desplegar-staging` → verde. Comprueba `http://<IP-staging>:5000/empresas`. Si el job sale verde pero la app **no responde**, lo más común es que la imagen siga **privada** (hazla pública en GHCR, como en el básico) o que falte el `docker secret db_password` en ese clúster (ver el Paso 5 de la lección 6.2).
 3. `desplegar-produccion` → aparece **Waiting** / *Review deployments*. Pulsa **Review deployments**, marca `production` y **Approve and deploy**.
 4. Tras aprobar, prod despliega la **misma** imagen. Comprueba `http://<IP-produccion>:5000/empresas`.
 

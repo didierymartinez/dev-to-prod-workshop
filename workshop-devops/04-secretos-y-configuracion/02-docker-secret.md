@@ -53,7 +53,7 @@ Desglose:
 - En el **clúster**, el secreto está en `/run/secrets/db_password`; lo leemos y componemos la connection string.
 - En **tu máquina** (sin Swarm, sin ese archivo), seguimos usando `appsettings.Development.json` como hasta ahora — local no cambia.
 
-Republica la imagen (push → tu pipeline del básico, o `docker build` + `docker push` manual), como hiciste en la Fase 3.
+Republica la imagen como en la **Fase 3** — y recuerda el procedimiento **completo** de allí: (1) reconstruir y publicar a GHCR (con tu pipeline o `docker build` + `docker push` manual) **y** (2) actualizar el servicio en el clúster con `docker service update --image ghcr.io/TU_USUARIO/gestion-empresas-api:latest --force gestion_api`. Si haces el push manual y **olvidas** el `--force`, el clúster seguirá corriendo la imagen vieja y no sabrás por qué.
 
 ### Paso 3: Ajustar el stack para usar el secreto
 

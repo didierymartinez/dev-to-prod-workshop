@@ -52,6 +52,9 @@ Vamos a **matar una réplica** y ver si Swarm la revive. Primero, encuentra una 
 ```bash
 docker ps --filter "name=gestion_api" --format "{{.ID}}  {{.Names}}"
 ```
+
+> 💡 `docker ps` solo muestra los contenedores de **este** nodo (el manager). Para ver **todas** las réplicas del clúster usa `docker service ps gestion_api`. Si `docker ps` sale vacío, es que las réplicas cayeron en el worker: mata cualquiera que veas `Running` en el manager (o repite el truco entrando al worker).
+
 Copia el ID de un contenedor y **mátalo** (simula un fallo):
 ```bash
 docker rm -f <ID_DEL_CONTENEDOR>

@@ -170,17 +170,19 @@ exit
 
 ### Paso 6: Disparar una alerta de verdad
 
-Abre el túnel SSH alcanzando también Alertmanager (otra terminal local):
+Necesitarás **dos terminales** en tu máquina:
 
-```bash
-ssh -L 9090:localhost:9090 -L 9093:localhost:9093 azureuser@$(cd infra && terraform output -raw ip_publica)
-```
+1. **El túnel** — déjalo abierto y no escribas nada más en él. Cierra el túnel de la lección anterior (Ctrl+C) y abre este, que cubre Grafana, Prometheus y Alertmanager a la vez:
+   ```bash
+   ssh -L 3000:localhost:3000 -L 9090:localhost:9090 -L 9093:localhost:9093 azureuser@$(cd infra && terraform output -raw ip_publica)
+   ```
+2. **Una sesión SSH normal al manager** (en **otra** terminal), donde provocarás el fallo bajando la API a cero réplicas:
+   ```bash
+   ssh azureuser@$(cd infra && terraform output -raw ip_publica)
+   docker service scale gestion_api=0
+   ```
 
-Ahora **provoca el fallo** bajando la API a cero réplicas (en el manager, por SSH):
-
-```bash
-docker service scale gestion_api=0
-```
+> 💡 Cada lección de esta fase amplió el túnel con más `-L`. Por eso conviene **cerrar el anterior y abrir el nuevo** con todos los puertos que necesitas; si no, perderías acceso a Grafana (3000) o a Prometheus (9090).
 
 Observa el flujo, sin tocar nada más:
 

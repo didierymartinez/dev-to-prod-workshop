@@ -110,7 +110,8 @@ while IFS= read -r hit; do
   prov_found=$((prov_found + 1))
 done < <(
   for pat in "${PROVISIONAL_PATTERNS[@]}"; do
-    grep -rn "$pat" "$DIR" --include="*.md" 2>/dev/null
+    # -w (palabra completa): evita falsos positivos como "TODO" dentro de "METODO"/"TODOS"
+    grep -rnw "$pat" "$DIR" --include="*.md" 2>/dev/null
   done
 )
 if [[ "$prov_found" -eq 0 ]]; then

@@ -87,7 +87,7 @@ terraform apply -var-file=prod.tfvars
 terraform output -raw ip_publica       # ← IP del manager de PRODUCCIÓN (anótala)
 ```
 
-> 💰 Acabas de pedir un **segundo clúster**. Si solo quieres practicar el pipeline contra staging por ahora, puedes **destruir** prod (`terraform workspace select prod && terraform destroy -var-file=prod.tfvars`) y recrearlo cuando vayas a aprobar el despliegue real (próxima lección). El estado del workspace se conserva aunque destruyas los recursos.
+> 💰 Acabas de pedir un **segundo clúster**. Si solo quieres practicar el pipeline contra staging por ahora, puedes **destruir** prod (`terraform workspace select prod && terraform destroy -var-file=prod.tfvars`) y recrearlo cuando vayas a aprobar el despliegue real (próxima lección). El estado del workspace se conserva aunque destruyas los recursos. **Eso sí:** al recrearlo tendrás que **rehacer el setup de Swarm y el secreto** (ver la nota del Paso 5) antes de poder aprobar el deploy en 6.3. Si solo quieres ver el flujo, deja la aprobación pendiente sin recrear prod.
 
 ### Paso 5: Moverte entre entornos
 
@@ -99,7 +99,12 @@ terraform workspace select prod        # cambiar a prod
 
 Cada `select` apunta Terraform al estado de ese entorno. **Siempre** confirma dónde estás con `terraform workspace show` antes de un `apply` o un `destroy` — es el equivalente a mirar bien antes de cruzar.
 
-> 🧠 En estos dos entornos tienes que **rehacer el setup de Swarm** que aprendiste en las fases 2-5 (iniciar el clúster, desplegar `stack.yml`, crear el `docker secret`…). Para el taller basta con dejarlos listos en **staging**; el pipeline de la próxima lección se encargará del despliegue de la app.
+> 🧠 **Importante — qué prepara cada quién:** el pipeline de la próxima lección despliega la **app**, pero **tú** preparas cada clúster **una sola vez** antes del primer despliegue. En el manager de cada entorno (para el taller, al menos en **staging**) repite el setup de las fases 2-5:
+> 1. Instala Docker e inicia el clúster: `docker swarm init` + unir el worker (Fase 2.2).
+> 2. Crea el secreto de la BD: `printf "Clave_Servidor_2024" | docker secret create db_password -` (Fase 4.2).
+> 3. *(Opcional para esta fase)* despliega el stack de observabilidad (Fase 5).
+>
+> Es decir: el `docker stack deploy` de la app lo hará el pipeline; el clúster, el secreto y la observabilidad son setup **tuyo**, una vez por clúster.
 
 ### Paso 6: Guardar el avance
 

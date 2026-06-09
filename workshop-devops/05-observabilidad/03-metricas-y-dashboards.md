@@ -37,7 +37,9 @@ Prometheus (stack `obs`) necesita alcanzar a la API (stack `gestion`). Para eso,
 
 ## 🛠️ Manos a la obra
 
-> 💰 **Recursos:** esta lección suma varios contenedores. Si tus nodos son `Standard_B1s` (1 GB), pueden quedarse cortos. Recomendado: aplica `prod.tfvars` (`Standard_B2s`) de la Fase 4 —`cd infra && terraform apply -var-file=prod.tfvars`— o baja temporalmente la API a 1 réplica: `docker service scale gestion_api=1`.
+> 💰 **Recursos:** esta lección suma varios contenedores. Si tus nodos son `Standard_B1s` (1 GB), pueden quedarse cortos. La opción **más segura** es bajar temporalmente la API a 1 réplica: `docker service scale gestion_api=1`.
+>
+> ⚠️ Cambiar el `vm_size` (p. ej. a `Standard_B2s` con `prod.tfvars`) suele obligar a Azure a **recrear las VMs** — perderías el clúster Swarm que iniciaste en la Fase 2 (tendrías que rehacer `swarm init`/`join` y redesplegar los stacks). Para esta fase, prefiere **escalar réplicas hacia abajo** antes que redimensionar.
 
 ### Paso 1: Que la API exponga sus métricas
 
@@ -53,11 +55,19 @@ En `src/GestionEmpresas.Api/Program.cs`, arriba con los demás `using`:
 using Prometheus;
 ```
 
-Y en la configuración del *pipeline* HTTP (después de construir `app`, junto a tus otros `app.Use...`):
+Y en la configuración del *pipeline* HTTP, **después** de `var app = builder.Build();` y junto a tus otros `app.Use...`. Para que veas **dónde** encajan exactamente, en contexto (no borres lo tuyo, solo agrega las dos líneas marcadas):
 
 ```csharp
-app.UseHttpMetrics();   // mide cada petición: cuántas, cuánto tardan, con qué código
-app.MapMetrics();       // publica las métricas en /metrics para que Prometheus las lea
+var app = builder.Build();
+
+// … tu configuración de siempre (UseCors, aplicar migraciones, etc.) …
+
+app.UseHttpMetrics();   // ← AGREGA: mide cada petición (cuántas, cuánto tardan, con qué código)
+app.MapMetrics();       // ← AGREGA: publica las métricas en /metrics para Prometheus
+
+// … tus endpoints (app.MapGet("/empresas", …), app.MapHealthChecks("/health"), …) …
+
+app.Run();
 ```
 
 > 🧠 Esto **convive** con el endpoint `/health` que tu imagen tiene desde la Fase 3: son cosas distintas. `/health` le dice a **Swarm** si debe reiniciar una réplica; `/metrics` le da a **Prometheus** los números. No se pisan.
