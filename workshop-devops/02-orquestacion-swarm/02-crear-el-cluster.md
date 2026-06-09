@@ -136,6 +136,8 @@ terraform apply
 
 ### Paso 3: Instalar Docker en ambos nodos
 
+> 💡 Los comandos `terraform` y `ssh` de esta lección se ejecutan **desde la carpeta `infra/`** (donde vive tu estado de Terraform). Si abriste una terminal nueva, haz `cd infra` primero — si no, `terraform output` no encontrará el estado.
+
 Las VMs vienen vacías. Instala Docker en **cada** nodo (igual que en el básico). Primero el **manager**:
 
 ```bash
@@ -156,13 +158,21 @@ exit
 
 ### Paso 4: Iniciar el clúster en el manager
 
-Entra al manager y crea el clúster, anunciando su **IP privada** (por la que los nodos se hablan):
+Primero, en **tu máquina** (no dentro de la VM), obtén la **IP privada** del manager —la necesitarás en el comando de abajo— y anótala:
+
+```bash
+cd infra
+terraform output -raw ip_privada_manager      # ej: 10.0.1.4 — cópiala
+```
+
+Ahora entra al manager y crea el clúster, anunciando esa IP privada (por la que los nodos se hablan):
 
 ```bash
 ssh azureuser@$(terraform output -raw ip_publica)
-# usa la IP privada del manager (output ip_privada_manager)
-docker swarm init --advertise-addr <IP_PRIVADA_MANAGER>
+docker swarm init --advertise-addr <IP_PRIVADA_MANAGER>   # pega la IP que anotaste, ej: 10.0.1.4
 ```
+
+> 💡 Esa IP privada (`10.0.x.x`) vive **dentro** de la red de Azure; por eso la consultas con Terraform desde tu máquina, no dentro de la VM (allí no tienes Terraform).
 La salida te da el comando para unir workers, con un **token**. Cópialo completo; se ve así:
 ```
 docker swarm join --token SWMTKN-1-xxxx... <IP_PRIVADA_MANAGER>:2377

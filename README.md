@@ -24,7 +24,7 @@ FUNDAMENTOS
        git → API/HTTP → frontend → datos → Docker → servidor → CI/CD → arquitectura
 
 OPERACIÓN
-  ②  DevOps — Operar en producción                     🔨 en construcción
+  ②  DevOps — Operar en producción                     ✅ completo
        IaC (Terraform) · Swarm · sin-downtime · secretos · observabilidad · entornos · DevSecOps
 
 ARQUITECTURA Y DISEÑO
@@ -61,7 +61,7 @@ Cada taller declara su **prerequisito**. Sigue la ruta que te interese; todas pa
 | # | Taller | Estado | Carpeta |
 |---|--------|--------|---------|
 | ① | [Básico — El ciclo de vida del software](workshop-basics/README.md) | ✅ Completo | `workshop-basics/` |
-| ② | [DevOps — Operar en producción](workshop-devops/README.md) | 🔨 En construcción (fases 0-2 de 8) | `workshop-devops/` |
+| ② | [DevOps — Operar en producción](workshop-devops/README.md) | ✅ Completo | `workshop-devops/` |
 | ③ | Estilos y diseño arquitectónico | 📋 Planeado | — |
 | ④ | EDA + Event Sourcing | ♻️ A reconstruir | carpeta nueva (la actual `eventsourcing-workshops-basics/` queda como guía) |
 | ⑤ | Microservicios | 📋 Planeado | — |

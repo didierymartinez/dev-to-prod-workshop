@@ -37,6 +37,8 @@ Esto aplica a todo lo que construiste: la identidad de la VM (solo leer secretos
 
 ## 🛠️ Manos a la obra
 
+> 🧠 Esta lección toca **tres capas**: Terraform (Pasos 1-2), C# (Paso 3) y la config del stack (Paso 4). Ve **paso a paso** y no mezcles; cada uno es pequeño.
+
 ### Paso 1: Darle una identidad a la VM (Terraform)
 
 En `infra/main.tf`, dentro del recurso `azurerm_linux_virtual_machine "app"`, agrega un bloque `identity`:
@@ -65,6 +67,8 @@ En el `azurerm_key_vault "kv"` de la Fase 4, agrega una **segunda** `access_poli
   }
 ```
 
+> 🧠 El `identity[0]` toma la **primera** identidad del bloque que agregaste en el Paso 1: Terraform expone las identidades como una lista, y `[0]` es su primer (y único) elemento.
+
 Y expón la URL del cofre como salida, para configurársela a la app:
 
 ```hcl
@@ -90,7 +94,7 @@ dotnet add package Azure.Identity
 dotnet add package Azure.Security.KeyVault.Secrets
 ```
 
-En `src/GestionEmpresas.Api/Program.cs`, amplía la lógica que resuelve la contraseña para que, **si hay un Key Vault configurado**, la lea de ahí con la identidad de la máquina:
+En `src/GestionEmpresas.Api/Program.cs`, **reemplaza** la lógica de la contraseña que tenías de la Fase 4 (la del operador `File.Exists(...) ? ... : ...`) por esta versión, que antepone el Key Vault. Solo cambias **ese** bloque; tus endpoints y tu `app.Run()` no se tocan:
 
 ```csharp
 using Azure.Identity;

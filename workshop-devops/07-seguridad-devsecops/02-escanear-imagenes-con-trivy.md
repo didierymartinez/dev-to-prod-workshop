@@ -114,6 +114,8 @@ Total: 2 (HIGH: 2, CRITICAL: 0)
 
 Si hay `HIGH`/`CRITICAL` con arreglo, **el job falla** y el despliegue no ocurre. Si todo está limpio, sigue al despliegue como siempre.
 
+> 💡 **Para ver la compuerta actuar** (opcional): si tu imagen sale limpia, baja un momento el umbral a `severity: 'LOW,MEDIUM,HIGH,CRITICAL'` y quita `ignore-unfixed: true`; casi seguro aparecerá algún hallazgo y verás el job **fallar en rojo**. Luego revierte los dos cambios. Así compruebas que la red de seguridad no es solo teórica.
+
 ### Paso 4: Responder a un hallazgo
 
 Cuando Trivy te frene, tienes opciones (de mejor a peor):

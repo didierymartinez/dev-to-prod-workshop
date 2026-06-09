@@ -87,6 +87,10 @@ terraform init      # descarga el provider random (es nuevo)
 terraform apply
 ```
 
+> 💡 Tres términos nuevos de Azure: el **tenant** es tu organización/directorio en Azure; el **object_id** es el identificador de **tu usuario** dentro de él; y `sku_name = "standard"` es el plan (nivel) del cofre. El `data "azurerm_client_config"` simplemente le pregunta a Azure "¿quién soy yo?", para darte permiso a ti.
+
+> ⚠️ **Si tu suscripción usa el modelo RBAC** en Key Vault (común en cuentas nuevas) en vez de *access policies*, el bloque `access_policy` no te dará acceso y verás "Forbidden" en el Paso 2. En ese caso, asígnate el rol *Key Vault Secrets Officer* sobre el cofre (portal de Azure → el Key Vault → Access control (IAM) → Add role assignment).
+
 ### Paso 2: Guardar el secreto en el cofre
 
 Con el cofre creado, guarda la contraseña como un secreto:

@@ -91,6 +91,8 @@ export DB_PASSWORD="Clave_Servidor_2024"
 docker stack deploy -c stack.yml gestion
 ```
 
+> 💡 El `export` solo dura en **esta** terminal. Si cierras la sesión SSH y vuelves a entrar, repítelo antes de cualquier `docker stack deploy` (si no, la contraseña iría vacía).
+
 Swarm crea los servicios. La API (imagen pública en GHCR) y PostgreSQL se descargan y arrancan.
 
 ### Paso 4: Ver los servicios y sus réplicas
