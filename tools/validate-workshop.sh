@@ -111,7 +111,8 @@ while IFS= read -r hit; do
 done < <(
   for pat in "${PROVISIONAL_PATTERNS[@]}"; do
     # -w (palabra completa): evita falsos positivos como "TODO" dentro de "METODO"/"TODOS"
-    grep -rnw "$pat" "$DIR" --include="*.md" 2>/dev/null
+    # Excluye los docs de planeación (MAPA/METODO): ahí "por construir" es intencional (listan secciones futuras), no un olvido.
+    grep -rnw "$pat" "$DIR" --include="*.md" --exclude="MAPA.md" --exclude="METODO.md" 2>/dev/null
   done
 )
 if [[ "$prov_found" -eq 0 ]]; then

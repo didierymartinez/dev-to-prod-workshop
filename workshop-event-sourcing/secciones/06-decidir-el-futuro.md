@@ -10,60 +10,35 @@ Que la `Empresa` **emita sus propios hechos** —protegiendo sus reglas— en ve
 
 Aquí hay un detalle sutil del event sourcing: la `Empresa` es la **dueña de las reglas** de su historia, pero **no guarda la lista de eventos**. No le "metemos" un hecho a la fuerza; le **pedimos** que haga algo, y ella, a cambio, **devuelve** el hecho que ocurrió. Otro se encargará de guardarlo.
 
-Por ahora, en el camino feliz, le agregamos métodos que devuelven el hecho correspondiente (los `record` de eventos ya existen desde la §02):
+Empecemos por el camino feliz (los `record` de eventos ya existen desde §02).
+
+> 🛠️ **Inténtalo tú.** Añade a tu `Empresa` tres métodos que **devuelvan** el hecho correspondiente: `CambiarPlan(string nuevoPlan)` → un `PlanCambiado`; `Suspender(string motivo)` → un `EmpresaSuspendida`; `Reactivar()` → un `EmpresaReactivada`. **Clave:** que **no toquen ninguna propiedad** — solo **devuelven** el hecho.
+
+<details>
+<summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```csharp
 public class Empresa : AggregateRoot
 {
-    // … propiedades y el switch Aplicar de antes …
+    // … propiedades y el switch Aplicar de §03, sin cambios …
 
     public PlanCambiado      CambiarPlan(string nuevoPlan) => new(nuevoPlan);
     public EmpresaSuspendida Suspender(string motivo)      => new(motivo);
     public EmpresaReactivada Reactivar()                   => new();
 }
 ```
+</details>
 
 Fíjate en algo importante: `CambiarPlan` **no** toca la propiedad `Plan`. Solo **devuelve** el hecho `PlanCambiado`. El estado cambia únicamente cuando ese hecho se **aplica** (el `switch Aplicar` que ya tienes) al reproducir la historia. Decidir y aplicar son dos cosas separadas — recuérdalo, es la columna vertebral del patrón.
 
-## Enseñarle al `EventStream` a escribir
+## El `EventStream` ya sabe guardar
 
-El `EventStream<T>` hasta ahora solo **leía** (`Get`). Ahora que la empresa produce hechos nuevos, el stream necesita la capacidad inversa: **guardar**. Le añadimos `Append`, que envuelve el hecho en su sobre (con la siguiente `Version`) y se lo entrega al almacén:
-
-```csharp
-// 🔁 Amplía tu EventStream<T> de la §05: lleva la cuenta de la versión y gana el método Append
-public class EventStream<T> where T : AggregateRoot, new()
-{
-    private readonly IEventStore _store;
-    private readonly string _aggregateId;
-    private int _version;   // ← en qué versión va el stream
-
-    public EventStream(IEventStore store, string aggregateId)
-    {
-        _store = store;
-        _aggregateId = aggregateId;
-    }
-
-    public T Get()
-    {
-        var entidad = new T { Id = _aggregateId };
-        var eventos = _store.GetEvents(_aggregateId).ToList();
-        entidad.Load(eventos.Select(e => e.EventData));
-        _version = eventos.Count == 0 ? 0 : eventos[^1].Version;   // recordamos la última versión
-        return entidad;
-    }
-
-    public void Append(object hecho)
-    {
-        _version++;   // el hecho nuevo va en la siguiente versión
-        _store.AppendEvent(new(_aggregateId, _version, DateTime.UtcNow, hecho));
-    }
-}
-```
+No hay que tocar el stream: el de la §05 ya es **simétrico** —`Get()` lee, `Append()` escribe (él le pone la `Version` al hecho y lo archiva)—. Lo que faltaba era **quién produce** el hecho que se va a guardar. Hasta ahora lo fabricábamos a mano; desde esta sección, lo produce la **empresa**. El ciclo completo queda así:
 
 ## El ciclo de vida: cargar → actuar → guardar
 
 ```csharp
-var stream = new EventStream<Empresa>(store, "emp-7");
+var stream = store.AbrirStream<Empresa>("emp-7");
 
 var empresa = stream.Get();                       // 1. CARGAR (rehidratar desde el almacén)
 Console.WriteLine($"[antes] plan {empresa.Plan}");
@@ -71,7 +46,7 @@ Console.WriteLine($"[antes] plan {empresa.Plan}");
 var hecho = empresa.CambiarPlan("Enterprise");    // 2. ACTUAR (la empresa decide y emite el hecho)
 stream.Append(hecho);                             // 3. GUARDAR (el stream lo archiva)
 
-var verificacion = new EventStream<Empresa>(store, "emp-7").Get();   // recargamos desde cero
+var verificacion = store.AbrirStream<Empresa>("emp-7").Get();   // recargamos desde cero
 Console.WriteLine($"[después] plan {verificacion.Plan}");
 // [después] plan Enterprise
 ```
@@ -105,34 +80,41 @@ stream.Append(empresa.Suspender("falta de pago"));
 // nada lo impide, porque CambiarPlan emite sin mirar el estado.
 ```
 
-El agregado es el **guardián de las reglas**, así que la defensa nace **dentro** de la `Empresa`, mirando su estado **antes** de emitir:
+El agregado es el **guardián de las reglas**, así que la defensa nace **dentro** de la `Empresa`, mirando su estado **antes** de emitir.
+
+> 🛠️ **Inténtalo tú.** **🔁 Modifica** los dos métodos que ya escribiste (no crees otra clase): que `CambiarPlan` **lance** una excepción `ReglaDeNegocioException` si la empresa está `Suspendida` (la operación es **inválida**), y que `Suspender` **devuelva `null`** si ya está `Suspendida` (es **redundante**, no un error → su tipo de retorno pasa a `EmpresaSuspendida?`). *(`Reactivar()` queda igual.)*
+
+<details>
+<summary>👉 Muéstrame una forma de hacerlo</summary>
+
+Primero, la excepción (al final, con las demás clases):
 
 ```csharp
 public class ReglaDeNegocioException(string mensaje) : Exception(mensaje);
+```
 
-public class Empresa : AggregateRoot
+Y en tu `Empresa`, **reemplaza** esos dos métodos:
+
+```csharp
+public PlanCambiado CambiarPlan(string nuevoPlan)
 {
-    // … propiedades (Plan, Suspendida, …) y el switch Aplicar …
+    // (a) VALIDACIÓN — la operación es inválida → se RECHAZA (es un error)
+    if (Suspendida)
+        throw new ReglaDeNegocioException("No se puede cambiar el plan de una empresa suspendida.");
 
-    public PlanCambiado CambiarPlan(string nuevoPlan)
-    {
-        // (a) VALIDACIÓN — la operación es inválida → se RECHAZA (es un error)
-        if (Suspendida)
-            throw new ReglaDeNegocioException("No se puede cambiar el plan de una empresa suspendida.");
+    return new PlanCambiado(nuevoPlan);
+}
 
-        return new PlanCambiado(nuevoPlan);
-    }
+public EmpresaSuspendida? Suspender(string motivo)
+{
+    // (b) IDEMPOTENCIA — operación válida pero redundante → NO-OP (no es un error)
+    if (Suspendida)
+        return null;   // ya está suspendida: no emitimos un hecho duplicado
 
-    public EmpresaSuspendida? Suspender(string motivo)
-    {
-        // (b) IDEMPOTENCIA — operación válida pero redundante → NO-OP (no es un error)
-        if (Suspendida)
-            return null;   // ya está suspendida: no emitimos un hecho duplicado
-
-        return new EmpresaSuspendida(motivo);
-    }
+    return new EmpresaSuspendida(motivo);
 }
 ```
+</details>
 
 > [!IMPORTANT]
 > 🏷️ **Dos motivos distintos para NO emitir un hecho — no los confundas:**
@@ -144,9 +126,9 @@ public class Empresa : AggregateRoot
 > [!NOTE]
 > 🌱 **Semilla — devolver el hecho en vez de publicarlo.** Fíjate: `Suspender` **devuelve** el hecho; no lo guarda ni lo publica por su cuenta. Es deliberado: mantiene el método **puro** (no esconde envíos ni inyecta el almacén) y deja a la vista *qué* produce con solo leerlo. Las librerías que adoptaremos elevan esto a patrón (te dejan **devolver** los hechos y ellas los guardan/publican). Lo verás a fondo en el Aggregate Handler.
 
-## 🧪 Pruébalo desde ya
+## 🧪 Pruébalo desde ya (solo léelo por ahora)
 
-`Suspender` y `CambiarPlan` son **funciones puras**: reciben un estado (la historia previa) y devuelven un hecho (o lo rechazan). Eso significa que **ya puedes probarlas** sin base de datos ni mocks. Adopta el hábito desde aquí (en un proyecto de pruebas; lo formalizaremos en su sección):
+`Suspender` y `CambiarPlan` son **funciones puras**: reciben un estado (la historia previa) y devuelven un hecho (o lo rechazan). Eso significa que se pueden probar **sin base de datos ni mocks**. Aquí **no** vamos a montar el proyecto de pruebas todavía (lo haremos en su propia sección, con la librería de aserciones); **lee** este bloque solo para ver la **forma** —*Given* (historia previa) → *When* (actuar) → *Then* (verificar el hecho)—, no para ejecutarlo aún:
 
 ```csharp
 // montamos una empresa desde su historia previa (Given) — sin base de datos, en memoria
@@ -157,8 +139,8 @@ static Empresa Construir(params object[] historia)
     return empresa;
 }
 
-var activa     = Construir(new EmpresaRegistrada("emp-7", "Constructora Andes", "Básico"));
-var suspendida = Construir(new EmpresaRegistrada("emp-7", "Constructora Andes", "Básico"),
+var activa     = Construir(new EmpresaRegistrada("Constructora Andes", "Básico"));
+var suspendida = Construir(new EmpresaRegistrada("Constructora Andes", "Básico"),
                            new EmpresaSuspendida("falta de pago"));
 
 // suspender una empresa activa emite el hecho
@@ -179,6 +161,9 @@ act.Should().Throw<ReglaDeNegocioException>();                              // �
 ### El Descubrimiento
 
 El flujo del dominio queda claro: **cargar** (rehidratar el pasado) → **actuar** (pedirle al agregado que decida y **emita** un hecho) → **guardar** (archivar ese hecho). La empresa no guarda su lista ni cambia su estado al decidir: solo **emite** lo que pasó, y protege sus reglas **antes** de emitir — distinguiendo lo **inválido** (se rechaza) de lo **redundante** (se ignora). Eso que escribiste es el `decide`, gemelo del `evolve`.
+
+> [!NOTE]
+> 🌱 **Semilla — el agregado terminará GUARDÁNDOSE sus propios hechos.** Hoy `CambiarPlan` **devuelve** el hecho y el handler lo archiva (`stream.Append(hecho)`). Funciona y deja todo a la vista. Pero las herramientas de producción usan otro modelo: el agregado **se aplica el hecho a sí mismo y lo recuerda** en una lista de *cambios sin confirmar*, y al final **un solo paso** los persiste todos juntos (en una transacción). Cuando adoptemos la herramienta **invertiremos** esto —de "devolver y que otro guarde" a "el agregado acumula y un middleware persiste"—; esa será una de las refactorizaciones que lleven tu motor a la **forma de producción**. Por ahora, devolver el hecho es el peldaño correcto.
 
 ---
 
