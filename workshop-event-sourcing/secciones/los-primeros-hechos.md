@@ -161,6 +161,16 @@ No guardaste el estado: lo **reconstruiste** a partir de los hechos. Un `record`
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · Los primeros hechos" \
+  -m "Reto: intenta evento.Plan = 'x' sobre un record. ¿Qué dice el compilador, y por qué un hecho del pasado no debe poder cambiar?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 Un **hecho** es un `record` inmutable; una secuencia ordenada de hechos es un **Stream** (la fuente de la verdad); y recorrer ese stream aplicando cada hecho —el paso `evolve`— para recalcular el estado es el **Replay**. Reconstruir, no guardar.

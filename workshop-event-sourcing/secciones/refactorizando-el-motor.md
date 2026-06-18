@@ -214,6 +214,16 @@ En tres saltos —separar, subir a una base, y rutear por tipo— pasaste de un 
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · Refactorizando el motor" \
+  -m "Con mis palabras: ¿por qué el motor (Load) vive en la base AggregateRoot y el Aplicar en cada entidad? ¿Qué ganó el switch frente al if?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 El motor de replay (recorrer la historia y aplicar cada hecho) es **igual para toda entidad**, así que vive una sola vez en una **clase base abstracta `AggregateRoot`**; lo propio de cada una —cómo aplica sus hechos— se resuelve con un **`switch` por tipo** (pattern matching), no con un `if` que crece.

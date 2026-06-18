@@ -224,6 +224,16 @@ Queda una fragilidad: este almacén vive en RAM —**si el servidor se reinicia,
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · El almacén en memoria" \
+  -m "Reto: abre dos streams de la misma empresa, Get en ambos, Append en ambos. ¿Qué excepción salta y por qué? ¿Qué tres caras tiene el mismo id?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 Un **almacén** (`InMemoryEventStore`: un cajón de sobres por id) custodia las historias de **muchas** empresas; el **`EventStream`** —que ahora te **entrega** el almacén— lee (`Get`) y escribe (`Append`) la de una; el **handler** la busca por **id**; y al guardar se verifica la **versión esperada** (**concurrencia optimista**) para que dos escrituras simultáneas no se pisen.

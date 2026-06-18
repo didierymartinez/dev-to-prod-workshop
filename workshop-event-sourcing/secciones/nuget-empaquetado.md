@@ -67,6 +67,16 @@ Y un manifiesto, `paquetes-nuget.yml` —que vive en la **raíz de `.github/`** 
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git commit --allow-empty -m "ES · Empaquetar como NuGet" \
+  -m "Con mis palabras: ¿por qué AssemblyVersion va fija en 0.0.0.0 y la versión real en FileVersion? ¿Qué es LOCKSTEP?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 La plantilla se distribuye como **varios paquetes NuGet** con versionado **LOCKSTEP** (una versión por release, un tag), un `Directory.Build.props` compartido que **desacopla** `AssemblyVersion` de `PackageVersion` (para evitar referencias horneadas a versiones inexistentes), `PackageId`=nombre-del-proyecto con la versión inyectada por el workflow, y `PrivateAssets="all"` para no filtrar dependencias — todo publicado por un `release-nuget.yml` manual que delega en un reusable de la organización.

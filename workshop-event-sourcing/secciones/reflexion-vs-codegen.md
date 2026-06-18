@@ -51,6 +51,16 @@ Sin código nuevo — asegúrate de que el mecanismo quedó:
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git commit --allow-empty -m "ES · Reflexión vs codegen" \
+  -m "Con mis palabras: ¿por qué Wolverine/Marten generan código en vez de reflexionar en cada llamada? ¿Dónde SÍ encaja la reflexión?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 Wolverine y Marten no usan **reflexión por llamada** (lenta, falla tarde): en el arranque **generan código C# legible** que llama tus `Handle`/`Apply` directo (`UseRuntimeCompilation`) — el rendimiento de lo escrito a mano, auditable y sin caja negra; la reflexión queda para los tests.

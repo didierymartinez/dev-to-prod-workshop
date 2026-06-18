@@ -111,6 +111,16 @@ Console.WriteLine($"publicados: {bus.Publicados}, pendientes: {almacen.Pendiente
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · Outbox e Inbox" \
+  -m "Con mis palabras: explica el problema de la doble escritura (BD + broker). ¿Por qué el outbox transaccional lo resuelve?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 Guardar el hecho y publicarlo son **dos escrituras** que no pueden ser atómicas (la *doble escritura*); el **outbox** las une —el mensaje se guarda en la misma transacción y un **relay** lo envía, reintentando— y el **inbox** evita procesarlo dos veces, dándote entrega confiable; Marten+Wolverine lo traen con `UseDurableOutbox`/`UseDurableInbox` (activado por `IntegrateWithWolverine`).

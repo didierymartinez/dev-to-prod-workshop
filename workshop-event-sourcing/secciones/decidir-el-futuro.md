@@ -178,6 +178,16 @@ Pero ese ciclo **cargar → actuar → guardar** está suelto en el `Program.cs`
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · Decidir el futuro" \
+  -m "Reto: llama CambiarPlan sobre una empresa suspendida. ¿Qué pasa? ¿Por qué CambiarPlan NO toca la propiedad Plan (decidir != aplicar)?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 El agregado **decide** (estado + intención → hecho) protegiendo sus reglas, y solo **emite** el hecho; el `EventStream` lo **guarda** (`Append`); el estado cambia al **aplicarlo** en el replay. Rechazar lo inválido es **validación**; ignorar lo redundante es **idempotencia**.

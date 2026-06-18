@@ -67,6 +67,16 @@ Cuando salga una mejora de Marten/Wolverine, decide con criterio:
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git commit --allow-empty -m "ES · Las dos vertientes" \
+  -m "Con mis palabras: ¿por qué la plantilla usa su capa propia en vez de FetchForWriting nativo, y qué cuesta?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 Hay **dos vertientes**: la **nativa** (`FetchForWriting`/`[Aggregate]`: menos código y concurrencia gratis) y la **capa del equipo** (`IEventStore`+`AggregateStreamAsync`+UoW: más código, pero testeable sin BD, con separación público/privado y control del UoW/tenancy) — y tu trabajo es **dominar ambas y traducir entre ellas** para mantener la plantilla al día sin perder lo que su capa le da.

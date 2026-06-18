@@ -39,8 +39,11 @@ El camino, a grandes rasgos: **el diario vs la foto** → construir el motor a m
 
 - **Saber programar en C#** (variables, clases, control de flujo). El taller básico u otro equivalente basta.
 - **.NET 10 SDK** (usamos C# 14). Nada más por ahora: las herramientas que necesiten instalación (Docker para PostgreSQL, un broker de mensajes) se traen **cuando un problema las pide**, no antes.
+- **Git + una cuenta de GitHub** — llevarás tu progreso como una **bitácora** de commits (ver abajo).
 
 > 💰 **Costos:** el taller corre **local** (PostgreSQL y el broker se levantan en Docker, sin costo) hasta donde llega; lo que costaría dinero en la nube se trata aparte.
+
+> 📓 **Tu bitácora en Git/GitHub.** Cada sección cierra con un bloque **📓 Registra tu avance**: un `commit` (+ `push`) que deja tu paso en el repo. El **mensaje del commit es tu repaso** — trae una pregunta o un pequeño reto (*"¿qué pasa si intentas `evento.Plan = 'x'`?"*) que **respondes con tus palabras**. Así tu GitHub queda como el diario de lo que aprendiste — muy en el espíritu del taller. El primer commit (crear el repo) está en [El diario de una empresa](secciones/el-diario-de-una-empresa.md).
 
 ---
 

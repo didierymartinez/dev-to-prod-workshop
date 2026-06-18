@@ -141,6 +141,16 @@ Pero hoy los hechos que anotas los **fabricas a mano**, sin que nadie vigile las
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · El flujo de vida" \
+  -m "Reto: intenta new EventStream<string>(). ¿Por qué no compila? Y hoy, ¿quién decide qué hechos se anotan?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 La historia de una empresa se envuelve en un **`EventStream<T>`** genérico (un **Repositorio**) que es **dueño** de la lista de hechos: anotas con `Append` y lees con `.Get()` (que instancia y rehidrata), sin que la lista cruda ande suelta.

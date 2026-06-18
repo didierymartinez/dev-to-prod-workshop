@@ -100,6 +100,16 @@ dotnet test
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · Given-When-Then" \
+  -m "Reto: escribe un test Given->When->Then de un comando y ponlo en verde. ¿Por qué Then compara HECHOS y no filas?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 En Event Sourcing un test es **Given** (hechos previos) → **When** (un comando) → **Then** (los hechos emitidos), no filas de una tabla; una `CommandHandlerTestBase` sobre el `TestStore` ([El TestStore](teststore.md)) lo hace legible con AwesomeAssertions (`BeEquivalentTo`), prueba el dominio **sin BD ni mocks** (porque es puro), y la plantilla añade `ThenIsPublished…` para afirmar lo publicado.

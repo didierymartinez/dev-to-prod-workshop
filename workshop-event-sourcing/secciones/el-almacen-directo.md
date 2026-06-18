@@ -208,6 +208,16 @@ Console.WriteLine($"{empresa!.Nombre}: plan {empresa.Plan}, {(empresa.Suspendida
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · El almacén directo" \
+  -m "Con mis palabras: ¿qué hace la Unit of Work que el EventStream-ventana no? ¿Por qué un solo SaveChangesAsync en vez de drenar a mano?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 El `EventStream`-ventana se jubila: le hablas **directo** al almacén (`StartStream` para nacer, `GetAggregateRootAsync` para cargar) y una **Unit of Work** —las dos listas que recuerdan lo que tocaste— lo persiste todo con un solo **`SaveChangesAsync`**; el handler vuelve a *cargar, decidir, guardar*, sin plomería — la forma exacta que Marten y Wolverine industrializan a continuación.

@@ -85,6 +85,16 @@ public static class QueryableExtensions
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · Extension members" \
+  -m "Con mis palabras: ¿qué le aporta el bloque extension(...) de C#14 a la API de la plantilla?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 Toda la capa de extensiones del equipo usa el idioma de **C# 14** *extension members* —`extension<T>(IQueryable<T>) where T : notnull { … }`, que declara el receptor y las restricciones **una vez** para varios miembros en vez de repetir `this`—; reconocerlo es lo que te deja leer y mantener la plantilla (y lo ves en `QueryableExtensions`, `TaskAggregateRootExtensions` y cada `*Extensions.cs`).

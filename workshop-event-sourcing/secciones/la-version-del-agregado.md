@@ -108,6 +108,16 @@ Console.WriteLine($"tras decidir: versión {empresa.Version}, {empresa.Uncommitt
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · La versión del agregado" \
+  -m "Reto: intenta emp.Version = 5. ¿Compila? ¿Por qué Load sube Version pero Raise no?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 La **versión** deja de estar atrapada en el `EventStream` y pasa a vivir en el agregado (`AggregateRoot.Version`, que sube **un hecho persistido a la vez** en el `Load`, no con `Raise`): el agregado sabe **en qué versión cargó**, que es exactamente lo que la **concurrencia optimista** compara al escribir — y el hogar donde Marten la pondrá.

@@ -76,6 +76,16 @@ Ahora **el mismo** código de dominio resuelve el tenant tanto en un endpoint HT
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · El tenant viaja con el mensaje" \
+  -m "Con mis palabras: cuando no hay un HTTP request (un daemon de fondo), ¿cómo llega el tenant al handler?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 Fuera de una petición HTTP (en el daemon) no hay headers, pero el tenant **viajó en el sobre** del mensaje ([Senders y el sobre](senders-y-sobre.md)): Wolverine lo propaga al `IMessageContext`, un `WolverineMessageContextTenantResolver` lo lee, y un **proxy** elige —por presencia de `HttpContext`— entre ese resolver y el de headers, dando **una sola** `ITenantResolver` que sirve en HTTP y en segundo plano.

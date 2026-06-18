@@ -114,6 +114,16 @@ Console.WriteLine($"{emp!.Nombre}, plan {emp.Plan}, suspendida={emp.Suspendida}"
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · El TestStore" \
+  -m "Reto: siembra dos hechos, rehidrata y verifica el estado SIN base de datos. ¿Por qué aquí la reflexión SÍ es buena elección?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 Como tus handlers dependen de `IEventStore`, los pruebas con un **`TestStore` en memoria** que siembra hechos previos (Given), expone los nuevos (Then) y rehidrata **reproduciéndolos por reflexión** —rápido, determinista, sin Postgres— justo el doble de test que trae la plantilla.

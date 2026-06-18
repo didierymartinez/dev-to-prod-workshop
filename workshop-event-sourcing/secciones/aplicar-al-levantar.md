@@ -119,6 +119,16 @@ Console.WriteLine($"después: {emp.Plan}");   // sin recargar
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · Aplicar al levantar" \
+  -m "Con mis palabras: ¿por qué Raise ahora también aplica? ¿Por qué los Apply(T) son públicos y por tipo, y no un switch con dynamic?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 `Raise` pasa a **encolar y aplicar** (el estado refleja la decisión al instante, y una segunda decisión ve el estado fresco), y la mutación de cada hecho se muda a un `Apply(TipoConcreto)` **público** que el `switch` solo enruta — la forma exacta con la que la herramienta rehidrata por convención.

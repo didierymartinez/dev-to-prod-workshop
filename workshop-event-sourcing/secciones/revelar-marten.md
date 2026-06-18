@@ -166,6 +166,16 @@ Verás una fila por hecho, con su `version`, el `type` (`empresa_registrada`, `p
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · Revelar Marten" \
+  -m "Con mis palabras: ¿qué método tuyo se volvió qué llamada de Marten? ¿Por qué el reveal fue 1:1 y no un rediseño?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 Como tu motor ya tenía la forma del canon, adoptar Marten es **extraer `IEventStore`** y escribir un `MartenEventStore` que **mapea 1:1** tus métodos a Marten (`AggregateStreamAsync`/`StartStream`/`Append`/`SaveChangesAsync`) — un **swap de una línea** en el registro, con el dominio intacto, y tus hechos viviendo ya en `mt_events` (JSONB) sobre Postgres.

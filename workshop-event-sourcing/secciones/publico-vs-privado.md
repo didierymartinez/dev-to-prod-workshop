@@ -82,6 +82,16 @@ Console.WriteLine($"privados: {emp.GetPrivateEvents().Length}");
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · Público vs privado" \
+  -m "Con mis palabras: ¿qué distingue un IPublicEvent de un IPrivateEvent, y qué decide REALMENTE su destino?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 No todo hecho cruza la frontera: con **interfaces marcadoras vacías** (`IPublicEvent`/`IPrivateEvent`) etiquetas los que sí —el compilador lo entiende y vive con el tipo— y el agregado los **separa** con `OfType<T>()` (`GetPublicEvents`/`GetPrivateEvents`); la mayoría de eventos no marca nada y solo vive en el stream.

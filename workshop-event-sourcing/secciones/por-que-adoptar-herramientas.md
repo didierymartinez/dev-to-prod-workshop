@@ -114,6 +114,16 @@ Sin código — asegúrate de que el criterio quedó:
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git commit --allow-empty -m "ES · Adoptar una herramienta" \
+  -m "Con mis palabras: nombra 3 dolores que Marten/Wolverine te resuelven. ¿Por qué adoptar aquí NO es cargo-cult (las 4 condiciones)?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 Construiste un motor de Event Sourcing completo y lo **entiendes por dentro**; eso te da el derecho a **adoptar** Marten (tu event store) y Wolverine (tu mediador) con criterio y no por moda — pero primero vas a **afinar tu motor a su forma de producción** para que la adopción sea un intercambio 1:1, no un rediseño.
