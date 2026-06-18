@@ -210,9 +210,15 @@ Console.WriteLine($"{empresa!.Nombre}: plan {empresa.Plan}, {(empresa.Suspendida
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 ¿Qué hace la Unit of Work que el `EventStream`-ventana no? ¿Por qué un solo `SaveChangesAsync` en vez de drenar a mano?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · El almacén directo" \
-  -m "Con mis palabras: ¿qué hace la Unit of Work que el EventStream-ventana no? ¿Por qué un solo SaveChangesAsync en vez de drenar a mano?"
+git add .
+git commit -m "ES · El almacén directo" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

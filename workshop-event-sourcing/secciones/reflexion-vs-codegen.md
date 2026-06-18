@@ -53,9 +53,14 @@ Sin código nuevo — asegúrate de que el mecanismo quedó:
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 ¿Por qué Wolverine/Marten generan código en vez de reflexionar en cada llamada? ¿Dónde SÍ encaja la reflexión?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git commit --allow-empty -m "ES · Reflexión vs codegen" \
-  -m "Con mis palabras: ¿por qué Wolverine/Marten generan código en vez de reflexionar en cada llamada? ¿Dónde SÍ encaja la reflexión?"
+git commit --allow-empty -m "ES · Reflexión vs codegen" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

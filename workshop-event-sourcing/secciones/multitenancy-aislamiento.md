@@ -72,9 +72,15 @@ Console.WriteLine($"streams totales: {store.Total}");
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 ¿Por qué la llave de un agregado multi-tenant es `(tenant, id)` y no solo `id`?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · Multi-tenancy" \
-  -m "Con mis palabras: ¿por qué la llave de un agregado multi-tenant es (tenant, id) y no solo id?"
+git add .
+git commit -m "ES · Multi-tenancy" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

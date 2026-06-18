@@ -78,9 +78,15 @@ Ahora **el mismo** código de dominio resuelve el tenant tanto en un endpoint HT
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 Cuando no hay un HTTP request (un daemon de fondo), ¿cómo llega el tenant al handler?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · El tenant viaja con el mensaje" \
-  -m "Con mis palabras: cuando no hay un HTTP request (un daemon de fondo), ¿cómo llega el tenant al handler?"
+git add .
+git commit -m "ES · El tenant viaja con el mensaje" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

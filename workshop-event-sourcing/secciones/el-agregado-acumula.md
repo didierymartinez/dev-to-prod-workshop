@@ -178,9 +178,15 @@ Console.WriteLine($"{empresa.Nombre}: plan {empresa.Plan}, {(empresa.Suspendida 
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 **Reto:** suspende dos veces la misma empresa. ¿Cuántos hechos quedan y por qué? ¿Por qué el `if (hecho is not null)` desapareció del handler?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · El agregado que acumula" \
-  -m "Reto: suspende dos veces la misma empresa. ¿Cuántos hechos quedan y por qué? ¿Por qué el if(hecho is not null) desapareció del handler?"
+git add .
+git commit -m "ES · El agregado que acumula" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

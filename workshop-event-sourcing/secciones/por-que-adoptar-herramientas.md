@@ -116,9 +116,14 @@ Sin código — asegúrate de que el criterio quedó:
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 Nombra 3 dolores que Marten/Wolverine te resuelven. ¿Por qué adoptar aquí NO es cargo-cult (las 4 condiciones)?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git commit --allow-empty -m "ES · Adoptar una herramienta" \
-  -m "Con mis palabras: nombra 3 dolores que Marten/Wolverine te resuelven. ¿Por qué adoptar aquí NO es cargo-cult (las 4 condiciones)?"
+git commit --allow-empty -m "ES · Adoptar una herramienta" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

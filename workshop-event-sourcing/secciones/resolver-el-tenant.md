@@ -77,9 +77,15 @@ services.AddScoped<ITenantResolver, TrustedHeadersTenantResolver>();
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 ¿Por qué el tenant se RESUELVE de un header confiable y no se pide como parámetro?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · Resolver el tenant" \
-  -m "Con mis palabras: ¿por qué el tenant se RESUELVE de un header confiable y no se pide como parámetro?"
+git add .
+git commit -m "ES · Resolver el tenant" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

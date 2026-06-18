@@ -146,9 +146,15 @@ Es hora de conectar Postgres de verdad.
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 Distingue DIP / IoC / DI / contenedor. ¿Qué problema resuelve el contenedor que el `new` a mano no?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · Inyección de Dependencias" \
-  -m "Con mis palabras: distingue DIP / IoC / DI / contenedor. ¿Qué problema resuelve el contenedor que el new a mano no?"
+git add .
+git commit -m "ES · Inyección de Dependencias" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

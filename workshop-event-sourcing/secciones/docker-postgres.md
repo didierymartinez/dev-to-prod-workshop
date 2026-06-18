@@ -125,9 +125,15 @@ Es hora de dejar de construir y empezar a **adoptar**. En la próxima sección d
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 ¿Cuál es el 'muro' que hace que escribir el store de Postgres a mano no valga la pena?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · Docker y PostgreSQL" \
-  -m "Con mis palabras: ¿cuál es el 'muro' que hace que escribir el store de Postgres a mano no valga la pena?"
+git add .
+git commit -m "ES · Docker y PostgreSQL" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

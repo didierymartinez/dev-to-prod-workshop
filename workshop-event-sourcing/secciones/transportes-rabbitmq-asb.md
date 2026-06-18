@@ -91,9 +91,15 @@ options.PublishMessage<EmpresaSuspendida>().ToAzureServiceBusTopic("empresas").U
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 **Reto:** levanta RabbitMQ, publica un `IPublicEvent` y míralo en el panel (`localhost:15672`). ¿Qué pasa si un evento público NO tiene ruta declarada?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · Transportes (RabbitMQ y ASB)" \
-  -m "Reto: levanta RabbitMQ, publica un IPublicEvent y míralo en el panel (localhost:15672). ¿Qué pasa si un evento público NO tiene ruta declarada?"
+git add .
+git commit -m "ES · Transportes (RabbitMQ y ASB)" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

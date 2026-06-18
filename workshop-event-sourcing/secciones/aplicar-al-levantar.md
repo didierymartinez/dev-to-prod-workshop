@@ -121,9 +121,15 @@ Console.WriteLine($"después: {emp.Plan}");   // sin recargar
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 ¿Por qué `Raise` ahora también aplica? ¿Por qué los `Apply(T)` son públicos y por tipo, y no un `switch` con `dynamic`?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · Aplicar al levantar" \
-  -m "Con mis palabras: ¿por qué Raise ahora también aplica? ¿Por qué los Apply(T) son públicos y por tipo, y no un switch con dynamic?"
+git add .
+git commit -m "ES · Aplicar al levantar" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

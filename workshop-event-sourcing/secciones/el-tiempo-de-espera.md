@@ -190,9 +190,15 @@ Ahora las interfaces ya no mienten: dicen la verdad sobre la espera. Pero queda 
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 ¿Por qué `await` no es 'otro hilo' ni 'más rápido'? ¿Qué ganas, y qué pasa con `.Result` en ASP.NET Core?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · El tiempo de espera" \
-  -m "Con mis palabras: ¿por qué await no es 'otro hilo' ni 'más rápido'? ¿Qué ganas, y qué pasa con .Result en ASP.NET Core?"
+git add .
+git commit -m "ES · El tiempo de espera" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

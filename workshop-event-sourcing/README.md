@@ -43,7 +43,7 @@ El camino, a grandes rasgos: **el diario vs la foto** → construir el motor a m
 
 > 💰 **Costos:** el taller corre **local** (PostgreSQL y el broker se levantan en Docker, sin costo) hasta donde llega; lo que costaría dinero en la nube se trata aparte.
 
-> 📓 **Tu bitácora en Git/GitHub.** Cada sección cierra con un bloque **📓 Registra tu avance**: un `commit` (+ `push`) que deja tu paso en el repo. El **mensaje del commit es tu repaso** — trae una pregunta o un pequeño reto (*"¿qué pasa si intentas `evento.Plan = 'x'`?"*) que **respondes con tus palabras**. Así tu GitHub queda como el diario de lo que aprendiste — muy en el espíritu del taller. El primer commit (crear el repo) está en [El diario de una empresa](secciones/el-diario-de-una-empresa.md).
+> 📓 **Tu bitácora en Git/GitHub.** Cada sección cierra con un bloque **📓 Registra tu avance**: un `commit` (+ `push`) que deja tu paso en el repo. La sección te plantea una **pregunta o un reto** (💭, p. ej. *"¿qué pasa si intentas `evento.Plan = 'x'`?"*) y **tú escribes la respuesta, con tus palabras, en el mensaje del commit** — no se copia un comando hecho: reemplazas un placeholder con lo que entendiste. Así tu GitHub queda como el diario de lo que aprendiste, muy en el espíritu del taller. El primer commit (crear el repo) está en [El diario de una empresa](secciones/el-diario-de-una-empresa.md).
 
 ---
 

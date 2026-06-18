@@ -64,9 +64,14 @@ Registras ese upcaster en Marten (es **su** mecanismo; lo configuras tú) y, de 
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 El día que un evento cambie de forma, ¿cómo lees los viejos sin romperte? (upcasting)
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git commit --allow-empty -m "ES · Versionado y upcasting" \
-  -m "Con mis palabras: el día que un evento cambie de forma, ¿cómo lees los viejos sin romperte? (upcasting)"
+git commit --allow-empty -m "ES · Versionado y upcasting" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

@@ -69,9 +69,14 @@ Y un manifiesto, `paquetes-nuget.yml` —que vive en la **raíz de `.github/`** 
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 ¿Por qué `AssemblyVersion` va fija en `0.0.0.0` y la versión real en `FileVersion`? ¿Qué es LOCKSTEP?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git commit --allow-empty -m "ES · Empaquetar como NuGet" \
-  -m "Con mis palabras: ¿por qué AssemblyVersion va fija en 0.0.0.0 y la versión real en FileVersion? ¿Qué es LOCKSTEP?"
+git commit --allow-empty -m "ES · Empaquetar como NuGet" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

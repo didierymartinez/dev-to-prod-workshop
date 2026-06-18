@@ -110,9 +110,15 @@ Console.WriteLine($"tras decidir: versión {empresa.Version}, {empresa.Uncommitt
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 **Reto:** intenta `emp.Version = 5`. ¿Compila? ¿Por qué `Load` sube `Version` pero `Raise` no?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · La versión del agregado" \
-  -m "Reto: intenta emp.Version = 5. ¿Compila? ¿Por qué Load sube Version pero Raise no?"
+git add .
+git commit -m "ES · La versión del agregado" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

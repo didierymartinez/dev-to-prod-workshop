@@ -69,9 +69,14 @@ Cuando salga una mejora de Marten/Wolverine, decide con criterio:
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 ¿Por qué la plantilla usa su capa propia en vez de `FetchForWriting` nativo, y qué cuesta?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git commit --allow-empty -m "ES · Las dos vertientes" \
-  -m "Con mis palabras: ¿por qué la plantilla usa su capa propia en vez de FetchForWriting nativo, y qué cuesta?"
+git commit --allow-empty -m "ES · Las dos vertientes" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

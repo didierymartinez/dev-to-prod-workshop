@@ -139,9 +139,15 @@ Esto reemplaza tu [El Command Handler](el-command-handler.md) + [Inyección de D
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 Si el middleware no comitea, ¿quién llama a `SaveChanges`? ¿Por qué hay que instalar `WolverineFx.RuntimeCompilation`?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · Revelar Wolverine" \
-  -m "Con mis palabras: si el middleware no comitea, ¿quién llama a SaveChanges? ¿Por qué hay que instalar WolverineFx.RuntimeCompilation?"
+git add .
+git commit -m "ES · Revelar Wolverine" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 
