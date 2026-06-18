@@ -93,7 +93,7 @@ Console.WriteLine($"{nombre}: plan {plan}, {(suspendida ? "suspendida" : "activa
 > Fíjate: **ninguna** de esas respuestas estaba guardada. El plan "Premium", el estado "suspendida", el conteo… **todo salió de reproducir los hechos**. A ese proceso —leer los eventos uno por uno para reconstruir el estado— la industria lo llama **Replay** (o *rehidratar* el estado).
 
 > [!NOTE]
-> 🌱 **Semilla — esto que escribiste es una función pura llamada `evolve`.** Fíjate en la forma: tomaste un *estado* y un *hecho*, y produjiste un *nuevo estado* — sin tocar base de datos, ni red, ni reloj. Esa receta `(estado, hecho) → nuevo estado` tiene nombre en Event Sourcing: **`evolve`** (su gemela, `decide`, aparecerá cuando emitamos hechos). Que sea **pura** es oro: se prueba sin mocks ni infraestructura. Cuando lleguemos a las librerías de verdad, verás que reusan *exactamente* este `evolve` que hiciste a mano.
+> 🌱 **Semilla — esa receta tiene nombre: `evolve`.** No escribiste una función aparte: escribiste un `foreach` (el **Replay** que recién nombramos). Pero fíjate en **cada vuelta** del bucle: tomas el estado que llevas y un hecho, y produces el estado siguiente. Ese **paso** —`(estado, hecho) → nuevo estado`— es lo que en Event Sourcing se llama **`evolve`** (su gemela, `decide`, aparecerá cuando emitamos hechos). En §03 le daremos forma de **método propio** (lo llamaremos `Aplicar`); las librerías de verdad reusan *exactamente* esta receta. Y es **pura**: cada paso depende solo del estado y el hecho que recibe —no toca base de datos, ni red, ni reloj—, así que el estado siempre se recalcula igual y se prueba sin mocks ni infraestructura.
 
 ## De variables sueltas a una clase dueña de la empresa
 
@@ -148,7 +148,7 @@ Esa clase que es **dueña** de la coherencia de la empresa, y el **único punto 
 
 ### El Descubrimiento
 
-No guardaste el estado: lo **reconstruiste** a partir de los hechos. Un `record` por hecho (inmutable, el pasado en piedra), un **Stream** ordenado como fuente de la verdad, y un **Replay** que pliega esos hechos en el estado de hoy. Esa función `(estado, hecho) → nuevo estado` —que escribiste tú— se llama **`evolve`**, y vive dentro de un **Aggregate Root**.
+No guardaste el estado: lo **reconstruiste** a partir de los hechos. Un `record` por hecho (inmutable, el pasado en piedra), un **Stream** ordenado como fuente de la verdad, y un **Replay** que pliega esos hechos en el estado de hoy. Cada **paso** de ese pliegue —tomar el estado y un hecho para producir el siguiente, `(estado, hecho) → nuevo estado`— se llama **`evolve`**, y vive dentro de un **Aggregate Root**.
 
 ---
 
@@ -163,7 +163,7 @@ No guardaste el estado: lo **reconstruiste** a partir de los hechos. Un `record`
 
 ## 🧠 En una frase
 
-Un **hecho** es un `record` inmutable; una secuencia ordenada de hechos es un **Stream** (la fuente de la verdad); y leer ese stream para recalcular el estado —la función `evolve`— es el **Replay**. Reconstruir, no guardar.
+Un **hecho** es un `record` inmutable; una secuencia ordenada de hechos es un **Stream** (la fuente de la verdad); y recorrer ese stream aplicando cada hecho —el paso `evolve`— para recalcular el estado es el **Replay**. Reconstruir, no guardar.
 
 ---
 
