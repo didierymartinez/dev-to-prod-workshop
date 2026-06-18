@@ -98,9 +98,7 @@ public class EventStream<T> where T : AggregateRoot, new()
 ```
 
 > [!NOTE]
-> **¿Qué es ese `<T>` y el `where`?**
-> El `<T>` (de *Type*) es un **hueco para un tipo** que rellenas al usar la clase: `EventStream<Empresa>` significa "un stream de empresas". Así **una sola clase** sirve para cualquier agregado.
-> La parte `where T : AggregateRoot, new()` son **restricciones**: le exigen a `T` dos cosas — que sea un `AggregateRoot` (para poder llamarle `.Load(...)`) y que tenga un **constructor sin parámetros** (eso significa `new()`), para poder crear uno vacío con `new T()`.
+> **¿Y ese `where T : AggregateRoot, new()`?** Es la **restricción especial** que prometimos: sobre el `T` del 💡 de arriba, le exige dos cosas — que sea un `AggregateRoot` (para poder llamarle `.Load(...)`) y que tenga un **constructor sin parámetros** (eso significa `new()`, para crear uno vacío con `new T()`). Sin esas dos garantías, el compilador no te dejaría usar `.Load` ni `new T()` dentro de la clase.
 
 Y arriba, **reemplaza** tu `var historia = …; var empresa = new Empresa(historia);` por el stream: créalo, **anota** los hechos con `Append`, y luego pídele la empresa con `Get`:
 
@@ -119,16 +117,16 @@ Console.WriteLine($"{empresa.Nombre}: plan {empresa.Plan}");
 > ```
 > (Esta historia es corta —solo registro y cambio de plan—, por eso no aparece "suspendida".) Y revisa que ya **no** quede ni `EventStreamDeEmpresa` ni la `new List<object>{ … }` armada a mano: ahora los hechos entran **uno a uno por `Append`**.
 
+Quien consume ya **no sabe ni le importa** cómo se guarda ni cómo se rehidrata: `Append` para anotar, `.Get()` para recibir la `Empresa` lista — la lista cruda nunca sale a la luz. Ese patrón —un envoltorio que esconde la **lista de eventos** y te entrega el objeto— se llama **Repositorio**: `EventStream<T>` y "Repositorio" son el **mismo objeto** visto desde dos ángulos — *event stream* por la historia que envuelve, *repositorio* por la forma de esconderla y entregarte la empresa.
+
+> [!NOTE]
+> 🌱 **Semilla — los genéricos no son solo "ahorrar código".** Sin `<T>` tendrías que devolver `object` y andar casteando por todos lados (con riesgo de reventar en ejecución). Con `EventStream<Empresa>`, el compilador **sabe** que `Get()` devuelve una `Empresa`: autocompletado, seguridad de tipos, cero sorpresas. Esta misma firma —genérico con restricción a `AggregateRoot`— es **exactamente** la que usan las librerías que adoptaremos para cargar agregados. La estás construyendo a mano.
+
 ### Por ahora, los hechos los pones tú (a mano)
 
 Detente en cómo usaste `Append`. Así como `Get` te **guía** a reconstruir la empresa (le pides la entidad y él reproduce la historia), `Append` es la **otra mitad** del ciclo: escribir. Pero fíjate **quién decide qué se anota**: **tú**. Fabricaste cada hecho a mano (`new EmpresaRegistrada(...)`, `new PlanCambiado("Premium")`) y se lo entregaste al stream. Y el stream **anota lo que le des, sin preguntar** — no valida reglas ni decide nada: solo guarda lo que le pasas.
 
 O sea, ahora mismo estás **insertando los hechos arbitrariamente, desde afuera**. Hazte la pregunta incómoda: ¿quién garantiza que esa empresa *puede* cambiar de plan, o que no la estás suspendiendo dos veces? Hoy, **nadie**. Está bien para *este* paso —queríamos aislar el ciclo **escribir → leer**—, pero **decidir** qué hechos ocurren (con sus reglas) es responsabilidad de la **propia empresa**. Esa responsabilidad se la daremos en la próxima sección; por ahora, tú pones los hechos.
-
-Con eso, quien consume ya **no sabe ni le importa** cómo se guarda ni cómo se rehidrata: `Append` para anotar, `.Get()` para recibir la `Empresa` lista — la lista cruda nunca sale a la luz. Ese patrón —un envoltorio que esconde la **lista de eventos** y te entrega el objeto— se llama **Repositorio**. O sea: `EventStream<T>` y "Repositorio" son el **mismo objeto** visto desde dos ángulos — *event stream* por la historia que envuelve, *repositorio* por la forma de esconderla y entregarte la empresa.
-
-> [!NOTE]
-> 🌱 **Semilla — los genéricos no son solo "ahorrar código".** Sin `<T>` tendrías que devolver `object` y andar casteando por todos lados (con riesgo de reventar en ejecución). Con `EventStream<Empresa>`, el compilador **sabe** que `Get()` devuelve una `Empresa`: autocompletado, seguridad de tipos, cero sorpresas. Esta misma firma —genérico con restricción a `AggregateRoot`— es **exactamente** la que usan las librerías que adoptaremos para cargar agregados. La estás construyendo a mano.
 
 ---
 
