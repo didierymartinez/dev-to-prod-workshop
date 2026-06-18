@@ -1,0 +1,78 @@
+# 32 · Empaquetar y publicar como NuGet
+
+Lo que construiste —las abstracciones (`IEventStore`, `AggregateRoot`, los eventos), las utilidades de test (`TestStore`, la base Given-When-Then), las extensiones— no vive en **una** app: es una **librería** que todos los servicios del equipo consumen. Para distribuirla, se empaqueta como **NuGet**. Y empaquetar **varios** paquetes que dependen entre sí tiene una trampa de versiones que vale la pena entender — porque tú la vas a mantener.
+
+## 🎯 El Objetivo
+
+Entender cómo el equipo empaqueta y publica sus librerías: versionado **LOCKSTEP**, el `Directory.Build.props` compartido, y el workflow de publicación.
+
+## El dolor: versionar varios paquetes interdependientes
+
+`Abstractions`, `CritterStack`, `Testing.Utilities`… son paquetes separados que **dependen entre sí**. Si cada uno lleva su propia versión, mantener la matriz de compatibilidad (¿`CritterStack` 2.3 con `Abstractions` 1.9?) se vuelve una pesadilla. La salida del equipo: **LOCKSTEP** — **todos** los paquetes salen con **una misma versión** por release, y un solo tag `v*`. Las dependencias internas se resuelven solas porque comparten versión.
+
+## El `Directory.Build.props` compartido
+
+Una sutileza real (y un bug clásico de .NET): si horneas la versión del paquete en el `AssemblyVersion`, una referencia compilada puede apuntar a una versión de ensamblado que **no existe** en runtime → `FileNotFoundException` ([dotnet/sdk#12322](https://github.com/dotnet/sdk/issues/12322)). La solución del equipo: **desacoplar** `AssemblyVersion` (fijo) de `PackageVersion` (el que sube el release). Vive una vez, en la raíz:
+
+```xml
+<!-- Directory.Build.props (raíz): política de versionado para TODOS los proyectos -->
+<Project>
+  <PropertyGroup>
+    <AssemblyVersion>0.0.0.0</AssemblyVersion>
+    <FileVersion Condition="'$(Version)' != ''">$([System.Text.RegularExpressions.Regex]::Replace($(Version),'[-+].*$',''))</FileVersion>
+  </PropertyGroup>
+</Project>
+```
+
+Fíjate qué **NO** está aquí: ni `Version` ni `PackageId` horneados. El `PackageId` = el **nombre del proyecto**, y la `Version` la **inyecta el workflow** al empaquetar (`dotnet pack -p:Version=X`). El `.csproj` de cada paquete solo declara sus metadatos (Title, Authors, Description, README, Icon) y sus dependencias — con un detalle clave:
+
+```xml
+<PackageReference Include="Marten" Version="..." PrivateAssets="all" />
+<!-- PrivateAssets=all: tu paquete USA Marten, pero NO se lo impone como dependencia al consumidor -->
+```
+
+`PrivateAssets="all"` es lo que viste en §31: la `Linq.Extensions` delega en Marten, pero quien instala tu paquete **no** hereda Marten.
+
+## El workflow de publicación
+
+La publicación es **manual** (por `workflow_dispatch`), versionado LOCKSTEP, y delegada a un workflow **reusable de la organización**:
+
+```yaml
+# release-nuget.yml — disparo manual
+on:
+  workflow_dispatch:
+    inputs:
+      bump_type: { type: choice, options: [patch, minor, major], default: minor }
+      version:   { description: "X.Y.Z (obligatoria en el primer release)" }
+jobs:
+  release:
+    uses: Cosmos-SincoERP/.github/.github/workflows/_reusable-nuget-publish-batch.yml@v1
+    secrets: inherit   # la NUGET_API_KEY viaja por secrets:inherit
+```
+
+Y un manifiesto, `paquetes-nuget.yml` —que vive en la **raíz de `.github/`** (es un manifiesto, **no** un workflow: no lo busques dentro de `.github/workflows/`)—, es la **única fuente de verdad** de qué se publica (lista `package_id` + `project_path` por paquete; los proyectos de test **no** se listan). Una versión, un tag `v<MAJOR.MINOR.PATCH>`, todos los paquetes a la vez.
+
+> [!NOTE]
+> 🌱 **Semilla — esto es el puente al taller de DevOps.** Empaquetar y publicar es **CI/CD**: workflows de GitHub Actions, secretos, versionado, releases. El taller de DevOps lo cubre a fondo (pipelines reutilizables, `secrets: inherit`, entornos con aprobación). Aquí solo necesitas saber **cómo está empaquetada la plantilla** que mantienes: LOCKSTEP + `Directory.Build.props` + `release-nuget.yml`.
+
+---
+
+## ✅ Compruébalo
+
+- [ ] Explicas el versionado **LOCKSTEP** (todos los paquetes una versión por release, un tag) y por qué evita la matriz de compatibilidad.
+- [ ] Sabes por qué se **desacopla** `AssemblyVersion` (fijo `0.0.0.0`) de `PackageVersion` (referencias horneadas → fallo en runtime, dotnet/sdk#12322).
+- [ ] Sabes que `PackageId` = nombre del proyecto y la `Version` la inyecta el workflow (`-p:Version=X`), no el `.csproj`.
+- [ ] Explicas `PrivateAssets="all"`: usas una dependencia sin imponérsela al consumidor.
+- [ ] Sabes que la publicación es manual (`workflow_dispatch`), delegada a un reusable de la organización, con `paquetes-nuget.yml` como fuente de verdad.
+
+---
+
+## 🧠 En una frase
+
+La plantilla se distribuye como **varios paquetes NuGet** con versionado **LOCKSTEP** (una versión por release, un tag), un `Directory.Build.props` compartido que **desacopla** `AssemblyVersion` de `PackageVersion` (para evitar referencias horneadas a versiones inexistentes), `PackageId`=nombre-del-proyecto con la versión inyectada por el workflow, y `PrivateAssets="all"` para no filtrar dependencias — todo publicado por un `release-nuget.yml` manual que delega en un reusable de la organización.
+
+---
+
+[⬅️ Volver: El idioma de la plantilla (extension members)](./31-extension-members.md)
+
+[➡️ Siguiente: Capstone — un bounded context de punta a punta](./33-capstone.md)

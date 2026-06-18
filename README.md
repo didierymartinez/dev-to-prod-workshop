@@ -30,8 +30,8 @@ OPERACIÓN
 ARQUITECTURA Y DISEÑO
   ③  Estilos y diseño arquitectónico                   📋 planeado
        monolito → capas → hexagonal → cuándo (y cuándo NO) microservicios
-  ④  EDA + Event Sourcing                              ♻️ a reconstruir
-       eventos · mensajería · event store · proyecciones · CQRS
+  ④  EDA + Event Sourcing                              ✅ completo
+       eventos · event store · agregados · CQRS · mensajería (outbox) · multi-tenancy · Critter Stack
   ⑤  Microservicios                                    📋 planeado
        descomposición · comunicación · resiliencia · sagas
 
@@ -63,7 +63,7 @@ Cada taller declara su **prerequisito**. Sigue la ruta que te interese; todas pa
 | ① | [Básico — El ciclo de vida del software](workshop-basics/README.md) | ✅ Completo | `workshop-basics/` |
 | ② | [DevOps — Operar en producción](workshop-devops/README.md) | ✅ Completo | `workshop-devops/` |
 | ③ | Estilos y diseño arquitectónico | 📋 Planeado | — |
-| ④ | EDA + Event Sourcing | ♻️ A reconstruir | carpeta nueva (la actual `eventsourcing-workshops-basics/` queda como guía) |
+| ④ | [EDA + Event Sourcing (Critter Stack)](workshop-event-sourcing/README.md) | ✅ Completo | `workshop-event-sourcing/` (34 secciones; la vieja `eventsourcing-workshops-basics/` quedó como guía) |
 | ⑤ | Microservicios | 📋 Planeado | — |
 | ⑥ | Observabilidad | 📋 Planeado | — |
 | ⑦ | DevOps avanzado | 📋 Planeado | — |
