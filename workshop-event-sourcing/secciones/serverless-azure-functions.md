@@ -99,9 +99,14 @@ Esta sección no se "corre" sin una Azure Function real (cuesta y excede el tall
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 ¿Por qué el outbox durable NO funciona en una Azure Function, y qué se usa en su lugar?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git commit --allow-empty -m "ES · Serverless (Azure Functions)" \
-  -m "Con mis palabras: ¿por qué el outbox durable NO funciona en una Azure Function, y qué se usa en su lugar?"
+git commit --allow-empty -m "ES · Serverless (Azure Functions)" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

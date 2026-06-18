@@ -226,9 +226,15 @@ Queda una fragilidad: este almacén vive en RAM —**si el servidor se reinicia,
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 **Reto:** abre dos streams de la misma empresa, `Get` en ambos, `Append` en ambos. ¿Qué excepción salta y por qué? ¿Qué tres caras tiene el mismo id?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · El almacén en memoria" \
-  -m "Reto: abre dos streams de la misma empresa, Get en ambos, Append en ambos. ¿Qué excepción salta y por qué? ¿Qué tres caras tiene el mismo id?"
+git add .
+git commit -m "ES · El almacén en memoria" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

@@ -66,12 +66,15 @@ Sin código todavía — solo asegúrate de que la intuición quedó:
 
 ## 📓 Registra tu avance (empieza tu bitácora)
 
-Vas a llevar tu progreso en **Git/GitHub**: cada sección cierra con un commit, y el **mensaje es tu repaso** — el 2.º `-m` trae una pregunta (o un reto); **respóndela con tus palabras**. Así tu repo queda como bitácora de lo aprendido. Arranca tu repo:
+Vas a llevar tu progreso en **Git/GitHub**: cada sección cierra con un commit, y **tu reflexión va escrita por ti en el mensaje del commit** (el 2.º `-m`). Así tu repo queda como diario de lo aprendido. Piensa la respuesta a esto:
+
+> 💭 ¿Qué información destruye un `UPDATE` que el diario sí conserva? Da una pregunta del negocio que la foto no responde.
+
+Y arranca tu repo poniendo **tu** respuesta como mensaje (reemplaza el placeholder — no pegues la pregunta):
 
 ```bash
 git init
-git commit --allow-empty -m "ES · El diario de una empresa" \
-  -m "Con mis palabras: ¿qué información destruye un UPDATE que el diario sí conserva? Da una pregunta del negocio que la foto no responde."
+git commit --allow-empty -m "ES · El diario de una empresa" -m "<aquí TU respuesta, con tus palabras>"
 # crea el repo vacío en GitHub y enlázalo (cambia la URL por la tuya):
 git remote add origin https://github.com/TU-USUARIO/TU-REPO.git
 git push -u origin main

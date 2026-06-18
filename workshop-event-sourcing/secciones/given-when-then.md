@@ -102,9 +102,15 @@ dotnet test
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 **Reto:** escribe un test Given→When→Then de un comando y ponlo en verde. ¿Por qué Then compara HECHOS y no filas?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · Given-When-Then" \
-  -m "Reto: escribe un test Given->When->Then de un comando y ponlo en verde. ¿Por qué Then compara HECHOS y no filas?"
+git add .
+git commit -m "ES · Given-When-Then" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

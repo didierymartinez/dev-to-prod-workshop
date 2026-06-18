@@ -67,9 +67,14 @@ Por eso, cuando abras `Cosmos.BuildingBlocks`, no verás una caja negra: verás 
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 Responde las 7 preguntas, y di a qué pieza de `Cosmos.BuildingBlocks` corresponde cada cosa que construiste.
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git commit --allow-empty -m "ES · Capstone" \
-  -m "Con mis palabras: responde las 7 preguntas, y di a qué pieza de Cosmos.BuildingBlocks corresponde cada cosa que construiste."
+git commit --allow-empty -m "ES · Capstone" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

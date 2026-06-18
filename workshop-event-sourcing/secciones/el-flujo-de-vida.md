@@ -143,9 +143,15 @@ Pero hoy los hechos que anotas los **fabricas a mano**, sin que nadie vigile las
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 **Reto:** intenta `new EventStream<string>()`. ¿Por qué no compila? Y hoy, ¿quién decide qué hechos se anotan?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · El flujo de vida" \
-  -m "Reto: intenta new EventStream<string>(). ¿Por qué no compila? Y hoy, ¿quién decide qué hechos se anotan?"
+git add .
+git commit -m "ES · El flujo de vida" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

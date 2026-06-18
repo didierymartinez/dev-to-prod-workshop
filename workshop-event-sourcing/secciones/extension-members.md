@@ -87,9 +87,15 @@ public static class QueryableExtensions
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 ¿Qué le aporta el bloque `extension(...)` de C#14 a la API de la plantilla?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · Extension members" \
-  -m "Con mis palabras: ¿qué le aporta el bloque extension(...) de C#14 a la API de la plantilla?"
+git add .
+git commit -m "ES · Extension members" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

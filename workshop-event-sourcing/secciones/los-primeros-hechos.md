@@ -163,9 +163,15 @@ No guardaste el estado: lo **reconstruiste** a partir de los hechos. Un `record`
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 **Reto:** intenta `evento.Plan = 'x'` sobre un `record`. ¿Qué dice el compilador, y por qué un hecho del pasado no debe poder cambiar?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · Los primeros hechos" \
-  -m "Reto: intenta evento.Plan = 'x' sobre un record. ¿Qué dice el compilador, y por qué un hecho del pasado no debe poder cambiar?"
+git add .
+git commit -m "ES · Los primeros hechos" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

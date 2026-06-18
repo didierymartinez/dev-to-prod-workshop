@@ -145,9 +145,15 @@ Pero todo esto maneja **una sola** empresa, sobre un stream suelto. ¿Y cuando t
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 ¿Por qué el handler obedece el `null` de `Suspender` en vez de decidir él la idempotencia? ¿Para qué numeras cada hecho en el sobre?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · El Command Handler" \
-  -m "Con mis palabras: ¿por qué el handler obedece el null de Suspender en vez de decidir él la idempotencia? ¿Para qué numeras cada hecho en el sobre?"
+git add .
+git commit -m "ES · El Command Handler" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

@@ -84,9 +84,15 @@ Console.WriteLine($"privados: {emp.GetPrivateEvents().Length}");
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 ¿Qué distingue un `IPublicEvent` de un `IPrivateEvent`, y qué decide REALMENTE su destino?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · Público vs privado" \
-  -m "Con mis palabras: ¿qué distingue un IPublicEvent de un IPrivateEvent, y qué decide REALMENTE su destino?"
+git add .
+git commit -m "ES · Público vs privado" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

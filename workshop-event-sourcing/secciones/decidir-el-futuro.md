@@ -180,9 +180,15 @@ Pero ese ciclo **cargar → actuar → guardar** está suelto en el `Program.cs`
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 **Reto:** llama `CambiarPlan` sobre una empresa suspendida. ¿Qué pasa? ¿Por qué `CambiarPlan` NO toca la propiedad `Plan` (decidir ≠ aplicar)?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · Decidir el futuro" \
-  -m "Reto: llama CambiarPlan sobre una empresa suspendida. ¿Qué pasa? ¿Por qué CambiarPlan NO toca la propiedad Plan (decidir != aplicar)?"
+git add .
+git commit -m "ES · Decidir el futuro" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

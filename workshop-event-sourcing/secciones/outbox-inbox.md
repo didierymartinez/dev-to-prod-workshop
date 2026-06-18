@@ -113,9 +113,15 @@ Console.WriteLine($"publicados: {bus.Publicados}, pendientes: {almacen.Pendiente
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 Explica el problema de la doble escritura (BD + broker). ¿Por qué el outbox transaccional lo resuelve?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · Outbox e Inbox" \
-  -m "Con mis palabras: explica el problema de la doble escritura (BD + broker). ¿Por qué el outbox transaccional lo resuelve?"
+git add .
+git commit -m "ES · Outbox e Inbox" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

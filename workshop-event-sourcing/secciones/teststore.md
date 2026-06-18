@@ -116,9 +116,15 @@ Console.WriteLine($"{emp!.Nombre}, plan {emp.Plan}, suspendida={emp.Suspendida}"
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 **Reto:** siembra dos hechos, rehidrata y verifica el estado SIN base de datos. ¿Por qué aquí la reflexión SÍ es buena elección?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · El TestStore" \
-  -m "Reto: siembra dos hechos, rehidrata y verifica el estado SIN base de datos. ¿Por qué aquí la reflexión SÍ es buena elección?"
+git add .
+git commit -m "ES · El TestStore" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

@@ -94,9 +94,15 @@ Console.WriteLine($"enviados al bus público: {sender.Enviados.Count} " +
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 Además del evento, ¿qué viaja en el sobre (`DeliveryOptions`)? ¿Por qué el `TenantId` y el `user_id`?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · Senders y el sobre" \
-  -m "Con mis palabras: además del evento, ¿qué viaja en el sobre (DeliveryOptions)? ¿Por qué el TenantId y el user_id?"
+git add .
+git commit -m "ES · Senders y el sobre" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

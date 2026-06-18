@@ -168,9 +168,15 @@ Verás una fila por hecho, con su `version`, el `type` (`empresa_registrada`, `p
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 ¿Qué método tuyo se volvió qué llamada de Marten? ¿Por qué el reveal fue 1:1 y no un rediseño?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · Revelar Marten" \
-  -m "Con mis palabras: ¿qué método tuyo se volvió qué llamada de Marten? ¿Por qué el reveal fue 1:1 y no un rediseño?"
+git add .
+git commit -m "ES · Revelar Marten" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

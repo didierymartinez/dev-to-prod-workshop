@@ -87,9 +87,15 @@ var suspendidas = await projectionStore.Query<EmpresaResumen>()
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 ¿Por qué una proyección no es 'la verdad' sino una vista? ¿Qué ganas separando lectura de escritura?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · CQRS y proyecciones" \
-  -m "Con mis palabras: ¿por qué una proyección no es 'la verdad' sino una vista? ¿Qué ganas separando lectura de escritura?"
+git add .
+git commit -m "ES · CQRS y proyecciones" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 

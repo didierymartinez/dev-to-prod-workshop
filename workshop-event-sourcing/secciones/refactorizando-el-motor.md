@@ -216,9 +216,15 @@ En tres saltos —separar, subir a una base, y rutear por tipo— pasaste de un 
 
 ## 📓 Registra tu avance
 
+Piensa la respuesta a esto (es tu reflexión de la sección):
+
+> 💭 ¿Por qué el motor (`Load`) vive en la base `AggregateRoot` y el `Aplicar` en cada entidad? ¿Qué ganó el `switch` frente al `if`?
+
+Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
+
 ```bash
-git add . && git commit -m "ES · Refactorizando el motor" \
-  -m "Con mis palabras: ¿por qué el motor (Load) vive en la base AggregateRoot y el Aplicar en cada entidad? ¿Qué ganó el switch frente al if?"
+git add .
+git commit -m "ES · Refactorizando el motor" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 
