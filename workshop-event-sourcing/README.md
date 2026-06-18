@@ -31,7 +31,7 @@ El **código es el protagonista**: aprendes mirándolo cambiar entre un bloque y
 
 ## Cómo está organizado
 
-Es una **secuencia de secciones cortas** (`secciones/`, **34 secciones, §01–§33** más una **§23b** intercalada entre §23 y §24 sobre *serverless* / Azure Functions, opcional si no despliegas en Functions) que se leen en orden: cada una arranca con una pregunta concreta del negocio, evoluciona el código hasta un patrón, y siembra la siguiente. El método está en [`METODO.md`](METODO.md) y el **mapa detallado de cada sección** (qué construyes, qué aprendes, a qué pieza real de la plantilla converge) en [`MAPA.md`](MAPA.md) — útil también para **autocalificarte** mientras avanzas.
+Es una **secuencia de secciones cortas** (`secciones/`, **34 secciones**) que se leen en orden — más una sobre *serverless* ([Serverless (Azure Functions)](secciones/serverless-azure-functions.md)) intercalada entre [Transportes (RabbitMQ y ASB)](secciones/transportes-rabbitmq-asb.md) y [CQRS y proyecciones](secciones/cqrs-proyecciones.md), opcional si no despliegas en Functions: cada una arranca con una pregunta concreta del negocio, evoluciona el código hasta un patrón, y siembra la siguiente. El método está en [`METODO.md`](METODO.md) y el **mapa detallado de cada sección** (qué construyes, qué aprendes, a qué pieza real de la plantilla converge) en [`MAPA.md`](MAPA.md) — útil también para **autocalificarte** mientras avanzas.
 
 El camino, a grandes rasgos: **el diario vs la foto** → construir el motor a mano (hechos, replay, agregado, almacén, decisiones, comandos) → **persistir de verdad** (PostgreSQL) → **adoptar Marten + Wolverine** entendiendo qué reemplazan de lo tuyo → CQRS y proyecciones, mensajería fiable, el Aggregate Handler Workflow, versionado, testing → y un **capstone** que reconstruye un dominio de la `Empresa` de punta a punta.
 
@@ -44,4 +44,4 @@ El camino, a grandes rasgos: **el diario vs la foto** → construir el motor a m
 
 ---
 
-**➡️ Empieza en:** [`secciones/01-el-diario-de-una-empresa.md`](secciones/01-el-diario-de-una-empresa.md)
+**➡️ Empieza en:** [`secciones/el-diario-de-una-empresa.md`](secciones/el-diario-de-una-empresa.md)
