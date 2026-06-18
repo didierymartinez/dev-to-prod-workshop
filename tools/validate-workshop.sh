@@ -73,7 +73,9 @@ struct_warns=0
 while IFS= read -r lesson; do
   base="$(basename "$lesson")"
   [[ "$base" == "README.md" ]] && continue
-  [[ ! "$base" =~ ^[0-9] ]] && continue
+  # Las lecciones viven en secciones/ (los slugs ya no empiezan por número).
+  # MAPA.md y METODO.md están en la raíz del taller → quedan fuera.
+  [[ "$lesson" != */secciones/* ]] && continue
   miss_req=""
   for marker in "${REQUIRED_MARKERS[@]}"; do
     grep -q "$marker" "$lesson" || miss_req="$miss_req $marker"
