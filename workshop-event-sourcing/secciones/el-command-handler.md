@@ -143,6 +143,16 @@ Pero todo esto maneja **una sola** empresa, sobre un stream suelto. ¿Y cuando t
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · El Command Handler" \
+  -m "Con mis palabras: ¿por qué el handler obedece el null de Suspender en vez de decidir él la idempotencia? ¿Para qué numeras cada hecho en el sobre?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 El **Command Handler** es una capa delgada que orquesta **cargar → actuar → guardar** para un comando (un `record`), dejando la lógica en el agregado; y al archivar, el `EventStream` envuelve cada hecho en un **sobre `EventoAlmacenado`** con su **posición** (su versión) — el número que pronto servirá para detectar escrituras que chocan.

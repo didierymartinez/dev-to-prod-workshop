@@ -123,6 +123,16 @@ Es hora de dejar de construir y empezar a **adoptar**. En la próxima sección d
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · Docker y PostgreSQL" \
+  -m "Con mis palabras: ¿cuál es el 'muro' que hace que escribir el store de Postgres a mano no valga la pena?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 Los eventos no caben en tablas rígidas pero **son documentos**; **PostgreSQL + `JSONB`** los guarda con seguridad ACID e índices; **Docker** enciende ese Postgres en segundos; y escribir a mano el puente C#↔Postgres —sobre todo recuperar un `object` como su tipo exacto— es el muro que hace que **adoptar una herramienta** valga la pena.

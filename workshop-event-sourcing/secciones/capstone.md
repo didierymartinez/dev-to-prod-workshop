@@ -65,6 +65,16 @@ Por eso, cuando abras `Cosmos.BuildingBlocks`, no verás una caja negra: verás 
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git commit --allow-empty -m "ES · Capstone" \
+  -m "Con mis palabras: responde las 7 preguntas, y di a qué pieza de Cosmos.BuildingBlocks corresponde cada cosa que construiste."
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 El motor de Event Sourcing que construiste a mano —agregado acumulador, `IEventStore`/Marten, Wolverine + middleware, eventos públicos/privados con outbox, proyecciones, multi-tenancy y tests sin BD— **es** `Cosmos.BuildingBlocks`: ahora lo entiendes por dentro, conoces sus dos vertientes y sus divergencias, y estás listo para **sostenerlo y evolucionarlo**.

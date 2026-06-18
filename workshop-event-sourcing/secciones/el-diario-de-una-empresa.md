@@ -64,6 +64,21 @@ Sin código todavía — solo asegúrate de que la intuición quedó:
 
 ---
 
+## 📓 Registra tu avance (empieza tu bitácora)
+
+Vas a llevar tu progreso en **Git/GitHub**: cada sección cierra con un commit, y el **mensaje es tu repaso** — el 2.º `-m` trae una pregunta (o un reto); **respóndela con tus palabras**. Así tu repo queda como bitácora de lo aprendido. Arranca tu repo:
+
+```bash
+git init
+git commit --allow-empty -m "ES · El diario de una empresa" \
+  -m "Con mis palabras: ¿qué información destruye un UPDATE que el diario sí conserva? Da una pregunta del negocio que la foto no responde."
+# crea el repo vacío en GitHub y enlázalo (cambia la URL por la tuya):
+git remote add origin https://github.com/TU-USUARIO/TU-REPO.git
+git push -u origin main
+```
+
+---
+
 ## 🧠 En una frase
 
 Guardar el **diario** de hechos (eventos), en vez de la **foto** del estado, conserva toda la historia: el estado de hoy se **reconstruye**, pero el pasado ya no se pierde. Eso es **Event Sourcing**.

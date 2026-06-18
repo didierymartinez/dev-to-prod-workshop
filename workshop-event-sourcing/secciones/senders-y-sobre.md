@@ -92,6 +92,16 @@ Console.WriteLine($"enviados al bus público: {sender.Enviados.Count} " +
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · Senders y el sobre" \
+  -m "Con mis palabras: además del evento, ¿qué viaja en el sobre (DeliveryOptions)? ¿Por qué el TenantId y el user_id?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 Los hechos que salen los llevan **dos enviadores** (`IPublicEventSender`/`IPrivateEventSender`, por caminos distintos: broker externo vs bus interno, con `groupId` para orden FIFO), y los **metadatos de contexto** (tenant, usuario) viajan en un **sobre** que envuelve el evento sin ensuciarlo — el `DeliveryOptions` de Wolverine que revelarás en [Transportes (RabbitMQ y ASB)](transportes-rabbitmq-asb.md).

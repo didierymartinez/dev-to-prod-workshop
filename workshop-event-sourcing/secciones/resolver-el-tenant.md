@@ -75,6 +75,16 @@ services.AddScoped<ITenantResolver, TrustedHeadersTenantResolver>();
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · Resolver el tenant" \
+  -m "Con mis palabras: ¿por qué el tenant se RESUELVE de un header confiable y no se pide como parámetro?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 El tenant no se **pasa** por parámetro, se **resuelve** del contexto: una interfaz `ITenantResolver { TenantId; UserId }` —con una implementación que lee headers HTTP **confiables** (`X-Tenant-Id`/`X-User-Id`) estampados por un gateway, y **lanza** si faltan— que inyectas donde haga falta; es el `ITenantResolver`/`TrustedHeadersTenantResolver` de la plantilla.

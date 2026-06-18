@@ -70,6 +70,16 @@ Console.WriteLine($"streams totales: {store.Total}");
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · Multi-tenancy" \
+  -m "Con mis palabras: ¿por qué la llave de un agregado multi-tenant es (tenant, id) y no solo id?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 Un sistema multi-cliente necesita una dimensión de aislamiento **ortogonal** al id: la llave real del stream es **`(tenant, id)`** (el id solo es único dentro de un tenant) — justo lo que Marten ofrece como `TenancyStyle.Conjoined` (tablas compartidas con columna `tenant_id`), fijando el tenant al abrir la sesión.

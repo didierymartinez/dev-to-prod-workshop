@@ -144,6 +144,16 @@ Es hora de conectar Postgres de verdad.
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · Inyección de Dependencias" \
+  -m "Con mis palabras: distingue DIP / IoC / DI / contenedor. ¿Qué problema resuelve el contenedor que el new a mano no?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 Un **contenedor de DI** arma el grafo de objetos por ti —lees su corazón en 20 líneas: registro + reflexión del constructor + recursión— para que tus clases **reciban** sus dependencias ya armadas (hoy el `InMemoryEventStore` concreto; mañana, una abstracción) sin tener que crearlas a mano.

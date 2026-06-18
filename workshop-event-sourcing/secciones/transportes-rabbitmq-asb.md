@@ -89,6 +89,16 @@ options.PublishMessage<EmpresaSuspendida>().ToAzureServiceBusTopic("empresas").U
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · Transportes (RabbitMQ y ASB)" \
+  -m "Reto: levanta RabbitMQ, publica un IPublicEvent y míralo en el panel (localhost:15672). ¿Qué pasa si un evento público NO tiene ruta declarada?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 Conectar tus hechos públicos a un broker es **solo configuración**: en **RabbitMQ**, publicar cada `IPublicEvent` a un **exchange por servicio** (`ToRabbitExchange` + `UseDurableOutbox`) y suscribirse con `ListenToRabbitQueue`/`BindExchange`/`UseDurableInbox`; en **Azure Service Bus**, lo mismo con *topics* — y la regla de oro es que **todo público tenga ruta**, porque sin ella Wolverine lo manda a una cola local y se pierde en silencio.

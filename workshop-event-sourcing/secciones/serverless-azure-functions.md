@@ -97,6 +97,16 @@ Esta sección no se "corre" sin una Azure Function real (cuesta y excede el tall
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git commit --allow-empty -m "ES · Serverless (Azure Functions)" \
+  -m "Con mis palabras: ¿por qué el outbox durable NO funciona en una Azure Function, y qué se usa en su lugar?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 Una **Azure Function es efímera**: no tiene proceso de fondo que vacíe el **outbox durable** ni clúster que coordinar, y en **dotnet-isolated** el auto-descubrimiento de Wolverine falla — por eso la plantilla ofrece gemelos serverless (`AddWolverine(ManualOnly)` + `DurabilityMode.Solo` + `SendInline()`) que cambian **solo el hospedaje y el envío**, no tu dominio, a cambio de una entrega de eventos menos garantizada.

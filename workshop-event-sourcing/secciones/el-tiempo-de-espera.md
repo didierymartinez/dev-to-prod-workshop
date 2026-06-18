@@ -188,6 +188,16 @@ Ahora las interfaces ya no mienten: dicen la verdad sobre la espera. Pero queda 
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · El tiempo de espera" \
+  -m "Con mis palabras: ¿por qué await no es 'otro hilo' ni 'más rápido'? ¿Qué ganas, y qué pasa con .Result en ASP.NET Core?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 Hablar con una base de datos es **I/O que tarda**; con `Task` + `async`/`await` propagados de abajo hacia arriba, el hilo se **libera** mientras espera (no se congela), lo que da **escalabilidad** — y nunca se bloquea con `.Result`/`.Wait()`.

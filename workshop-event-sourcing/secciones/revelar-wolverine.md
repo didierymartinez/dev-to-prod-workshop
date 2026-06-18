@@ -137,6 +137,16 @@ Esto reemplaza tu [El Command Handler](el-command-handler.md) + [Inyección de D
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · Revelar Wolverine" \
+  -m "Con mis palabras: si el middleware no comitea, ¿quién llama a SaveChanges? ¿Por qué hay que instalar WolverineFx.RuntimeCompilation?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 **Wolverine** descubre tus handlers **por convención** (sin tu `ICommandHandler` ni el mini-contenedor) y corre un **middleware** (`After` appendea, `Finally` limpia) más una política **`AutoApplyTransactions`** que comitea la sesión de Marten por cada comando — así el handler queda en *cargar, decidir*, y el *guardar* es automático.

@@ -85,6 +85,16 @@ var suspendidas = await projectionStore.Query<EmpresaResumen>()
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git add . && git commit -m "ES · CQRS y proyecciones" \
+  -m "Con mis palabras: ¿por qué una proyección no es 'la verdad' sino una vista? ¿Qué ganas separando lectura de escritura?"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 Leer reproduciendo cada stream no escala; **CQRS** separa la lectura con una **proyección** —un fold de los hechos en un documento consultable (`SingleStreamProjection` + `Query<T>` LINQ)— que Marten mantiene en modo `Live`/`Inline`/`Async` (consistencia fuerte vs eventual); la plantilla trae el riel (`IProjectionStore`, daemon) y tú defines las proyecciones.

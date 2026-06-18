@@ -62,6 +62,16 @@ Registras ese upcaster en Marten (es **su** mecanismo; lo configuras tú) y, de 
 
 ---
 
+## 📓 Registra tu avance
+
+```bash
+git commit --allow-empty -m "ES · Versionado y upcasting" \
+  -m "Con mis palabras: el día que un evento cambie de forma, ¿cómo lees los viejos sin romperte? (upcasting)"
+git push
+```
+
+---
+
 ## 🧠 En una frase
 
 Los eventos son piedra pero tu código cambia: los cambios **aditivos y opcionales** los toleran los viejos sin más, y los que **rompen** se resuelven con **upcasting** —una traducción `viejo → nuevo` al leer, mecanismo de Marten— dejando el pasado intacto en la BD y tu código hablando solo de la versión actual; los eventos **públicos** se versionan con extra cuidado por ser contratos.
