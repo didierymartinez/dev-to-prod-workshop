@@ -43,24 +43,26 @@ Este mapa, para cada sección, te dice:
 - **👁️ Se te muestra:** el genérico `EventStream<T> where T : AggregateRoot, new()`. *(Por qué: genéricos con restricciones es sintaxis nueva; no se pide inventarla.)*
 - **Tu calificación:** [ ] _____
 
-## El almacén en memoria (Event Store)
-- **🛠️ Construyes (reto):** el `InMemoryEventStore` — un `Dictionary` con un cajón por empresa (por id), con `GetEvents(id)` y `AppendEvent(id, hecho)`. El `EventStream` (que ya leía y escribía) deja de guardar en su lista propia y **delega** en el almacén.
-- **💡 Qué aprendes:** el patrón **Event Store** (almacén central de eventos por id) — surge porque con **muchas** empresas no caben mil listas sueltas; que **el id es la llave**; y la **concurrencia optimista** (rechazar una escritura si la versión esperada ya está ocupada).
-- **👁️ Se te muestra:** cómo el almacén te **entrega** el `EventStream` (`AbrirStream`, con el `this`); y el refactor de concurrencia (el sobre con `Version`), con un bloque **📦 "clase completa"** para que sepas cómo queda todo ensamblado. *(Por qué: la factory con back-reference y la concurrencia son sutiles.)*
-- **Tu calificación:** [ ] _____
-
 ## Decidir el futuro (emitir eventos)
 - **🛠️ Construyes (2 retos):**
   1. **Los métodos `decide`** — `CambiarPlan`/`Suspender`/`Reactivar` que **devuelven** el hecho **sin tocar** el estado.
   2. **Las reglas** — que `CambiarPlan` lance si está suspendida (**validación**) y `Suspender` devuelva `null` si ya lo está (**idempotencia**).
-- **💡 Qué aprendes:** la función **`decide`** (gemela de `evolve`); que **decidir ≠ aplicar**; y la diferencia entre **rechazar lo inválido** (error) e **ignorar lo redundante** (no-op).
+- **💡 Qué aprendes:** la función **`decide`** (gemela de `evolve`); que **decidir ≠ aplicar**; y la diferencia entre **rechazar lo inválido** (error) e **ignorar lo redundante** (no-op). *(Todo sobre un **stream único**, sin almacén todavía.)*
 - **👁️ Se te muestra:** el patrón de prueba *Given-When-Then* (marcado "solo léelo por ahora"). *(Por qué: el proyecto de pruebas se monta en su propia sección.)*
 - **Tu calificación:** [ ] _____
 
 ## El Command Handler
-- **🛠️ Construyes (reto):** el handler que orquesta **cargar → actuar → guardar** para un comando (respetando el `null` de idempotencia).
-- **💡 Qué aprendes:** sacar ese ciclo del `Program.cs` a una pieza con un solo trabajo (el **Command Handler**); y que la **intención** se empaqueta como un dato (un **Comando**).
-- **👁️ Se te muestra:** el comando como `record`, y el contrato `ICommandHandler<T>` + un handler por comando. *(Por qué: la interfaz genérica/SRP es un patrón que conviene mostrar entero.)*
+- **🛠️ Construyes (2 retos):**
+  1. El handler (`ICommandHandler<T>`, uno por comando) que orquesta **cargar → actuar → guardar** sobre el stream (respetando el `null` de idempotencia). El comando es un `record`, aún **sin id** (una sola empresa).
+  2. **La versión del evento** — el `EventStream` envuelve cada hecho en un **sobre `EventoAlmacenado(Version, …)`** y lleva su posición.
+- **💡 Qué aprendes:** sacar el ciclo del `Program.cs` a una pieza con un solo trabajo; que la **intención** se empaqueta como **Comando**; y que cada hecho archivado tiene una **versión** (su posición), que luego servirá para detectar choques.
+- **👁️ Se te muestra:** el contrato `ICommandHandler<T>`. *(Por qué: la interfaz genérica/SRP conviene mostrarla entera.)*
+- **Tu calificación:** [ ] _____
+
+## El almacén en memoria (Event Store)
+- **🛠️ Construyes (reto):** el `InMemoryEventStore` — un `Dictionary` con un cajón de **sobres** por empresa (por id), `GetEvents(id)`/`AppendEvent(id, sobre)`. El `EventStream` deja de guardar su lista y **delega** en el almacén; el comando recupera su `EmpresaId` y el handler **busca por id**.
+- **💡 Qué aprendes:** el patrón **Event Store** (almacén central por id) — surge porque con **muchas** empresas no caben mil listas sueltas; que **el id es la llave**; y la **concurrencia optimista** (rechazar una escritura si la versión esperada ya está ocupada, usando el número del sobre).
+- **👁️ Se te muestra:** cómo el almacén te **entrega** el `EventStream` (`AbrirStream`, con el `this`) y el chequeo de concurrencia, con un bloque **📦 "clase completa"**. *(Por qué: la factory con back-reference y la concurrencia son sutiles.)*
 - **Tu calificación:** [ ] _____
 
 ## El tiempo de espera (async/await)

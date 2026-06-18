@@ -14,11 +14,11 @@ Vale la pena verlo junto. Esto es un motor de Event Sourcing real:
 
 | Sección | Tu pieza | Qué hace |
 |---|---|---|
-| [Los primeros hechos](los-primeros-hechos.md)–03 | eventos (`record`) + `evolve` + `AggregateRoot` | reconstruir el estado leyendo los hechos |
-| [El flujo de vida](el-flujo-de-vida.md) | `EventStream` | la historia de **una** empresa |
-| [El almacén en memoria](el-almacen-en-memoria.md) | `InMemoryEventStore` + el sobre `EventoAlmacenado` (con `Version`) | almacén por id + concurrencia optimista |
+| [Los primeros hechos](los-primeros-hechos.md)–[Refactorizando el motor](refactorizando-el-motor.md) | eventos (`record`) + `evolve` + `AggregateRoot` | reconstruir el estado leyendo los hechos |
+| [El flujo de vida](el-flujo-de-vida.md) | `EventStream` | leer/escribir la historia de **una** empresa |
 | [Decidir el futuro](decidir-el-futuro.md) | `decide` | emitir hechos validando reglas |
-| [El Command Handler](el-command-handler.md) | `CommandHandler` | orquestar **cargar → decidir → guardar** |
+| [El Command Handler](el-command-handler.md) | `CommandHandler` + el sobre `EventoAlmacenado` (con `Version`) | orquestar **cargar → decidir → guardar**; numerar cada hecho |
+| [El almacén en memoria](el-almacen-en-memoria.md) | `InMemoryEventStore` | almacén por id + concurrencia optimista |
 | [El tiempo de espera](el-tiempo-de-espera.md) | `async/await` | no agotar hilos al esperar I/O |
 | [Inyección de Dependencias](inyeccion-de-dependencias.md) | contenedor de DI | ensamblar sin `new` regado |
 | [Docker y PostgreSQL](docker-postgres.md) | Docker + Postgres/`JSONB` | persistir de verdad |

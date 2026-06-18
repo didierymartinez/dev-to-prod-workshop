@@ -194,6 +194,6 @@ Hablar con una base de datos es **I/O que tarda**; con `Task` + `async`/`await` 
 
 ---
 
-[⬅️ Volver: El Command Handler](./el-command-handler.md)
+[⬅️ Volver: El almacén en memoria (Event Store)](./el-almacen-en-memoria.md)
 
 [➡️ Siguiente: De `new` al contenedor (Inyección de Dependencias)](./inyeccion-de-dependencias.md)

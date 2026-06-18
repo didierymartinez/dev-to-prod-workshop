@@ -111,13 +111,16 @@ Console.WriteLine($"{empresa.Nombre}: plan {empresa.Plan}");
 > ```
 > (Esta historia es corta —solo registro y cambio de plan—, por eso no aparece "suspendida".) Y revisa que ya **no** quede ni `EventStreamDeEmpresa` ni la `new List<object>{ … }` armada a mano: ahora los hechos entran **uno a uno por `Append`**.
 
-Quien consume ya **no sabe ni le importa** cómo se guarda ni cómo se rehidrata: `Append` para anotar, `.Get()` para recibir la `Empresa` lista — la lista cruda nunca sale a la luz. Ese patrón —un envoltorio que esconde la **lista de eventos** y te entrega el objeto— se llama **Repositorio**. O sea: `EventStream<T>` y "Repositorio" son el **mismo objeto** visto desde dos ángulos — *event stream* por la historia que envuelve, *repositorio* por la forma de esconderla y entregarte la empresa.
+### Por ahora, los hechos los pones tú (a mano)
+
+Detente en cómo usaste `Append`. Así como `Get` te **guía** a reconstruir la empresa (le pides la entidad y él reproduce la historia), `Append` es la **otra mitad** del ciclo: escribir. Pero fíjate **quién decide qué se anota**: **tú**. Fabricaste cada hecho a mano (`new EmpresaRegistrada(...)`, `new PlanCambiado("Premium")`) y se lo entregaste al stream. Y el stream **anota lo que le des, sin preguntar** — no valida reglas ni decide nada: solo guarda lo que le pasas.
+
+O sea, ahora mismo estás **insertando los hechos arbitrariamente, desde afuera**. Hazte la pregunta incómoda: ¿quién garantiza que esa empresa *puede* cambiar de plan, o que no la estás suspendiendo dos veces? Hoy, **nadie**. Está bien para *este* paso —queríamos aislar el ciclo **escribir → leer**—, pero **decidir** qué hechos ocurren (con sus reglas) es responsabilidad de la **propia empresa**. Esa responsabilidad se la daremos en la próxima sección; por ahora, tú pones los hechos.
+
+Con eso, quien consume ya **no sabe ni le importa** cómo se guarda ni cómo se rehidrata: `Append` para anotar, `.Get()` para recibir la `Empresa` lista — la lista cruda nunca sale a la luz. Ese patrón —un envoltorio que esconde la **lista de eventos** y te entrega el objeto— se llama **Repositorio**. O sea: `EventStream<T>` y "Repositorio" son el **mismo objeto** visto desde dos ángulos — *event stream* por la historia que envuelve, *repositorio* por la forma de esconderla y entregarte la empresa.
 
 > [!NOTE]
 > 🌱 **Semilla — los genéricos no son solo "ahorrar código".** Sin `<T>` tendrías que devolver `object` y andar casteando por todos lados (con riesgo de reventar en ejecución). Con `EventStream<Empresa>`, el compilador **sabe** que `Get()` devuelve una `Empresa`: autocompletado, seguridad de tipos, cero sorpresas. Esta misma firma —genérico con restricción a `AggregateRoot`— es **exactamente** la que usan las librerías que adoptaremos para cargar agregados. La estás construyendo a mano.
-
-> [!NOTE]
-> **El límite de este stream.** Tu `EventStream<T>` ya lee y escribe la historia de **una** empresa, y guarda los hechos en su **propia lista**. Pero esa lista vive dentro del stream: si tienes **1.000** empresas, tendrías 1.000 streams, cada uno con su lista suelta flotando en el programa. ¿Cómo se **archivan y organizan** miles de historias en un solo lugar, sin variables globales por todas partes? Para eso, en la próxima sección, llega un **almacén central** — y con él aparecerá, por primera vez y porque por fin hace falta, la **identidad** de cada empresa.
 
 ---
 
@@ -125,7 +128,7 @@ Quien consume ya **no sabe ni le importa** cómo se guarda ni cómo se rehidrata
 
 Envolviste la historia de una empresa en un **`EventStream<T>`** genérico —un **Repositorio** dueño de su lista— que **anota** hechos (`Append`) y **rehidrata** el agregado (`Get`), de modo que quien consume nunca toca la lista cruda: solo escribe y lee a través del stream.
 
-Pero queda un cuello de botella: si llegan **1.000 empresas**, tendrías 1.000 streams con 1.000 listas sueltas flotando en el programa. ¿Cómo se **archivan y organizan** miles de historias en un solo lugar? Para eso necesitamos un **Event Store**.
+Pero hoy los hechos que anotas los **fabricas a mano**, sin que nadie vigile las reglas. En la próxima sección, la **empresa toma el control**: ella decide qué hechos ocurren y los **emite** —protegiendo lo que es válido—, en vez de que se los insertemos por la fuerza.
 
 ---
 
@@ -146,4 +149,4 @@ La historia de una empresa se envuelve en un **`EventStream<T>`** genérico (un 
 
 [⬅️ Volver: Refactorizando el motor](./refactorizando-el-motor.md)
 
-[➡️ Siguiente: El almacén en memoria (Event Store)](./el-almacen-en-memoria.md)
+[➡️ Siguiente: Decidir el futuro (emitir eventos)](./decidir-el-futuro.md)

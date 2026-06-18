@@ -1,6 +1,6 @@
 # La versión es del agregado
 
-En [El almacén en memoria](el-almacen-en-memoria.md) le pusiste a cada hecho un número de **versión** y el almacén rechaza una escritura si la versión no es la que toca: esa es la **concurrencia optimista**. Pero hay una pregunta incómoda: si cargas `emp-7` y te pregunto *"¿en qué versión estás?"*, tu `Empresa` **no sabe responder**. El número vive desperdigado —en el sobre `EventoAlmacenado` y en un `_version` privado, escondido dentro del `EventStream`—. Vamos a darle su hogar natural: el propio agregado.
+En [El Command Handler](el-command-handler.md) le pusiste a cada hecho un número de **versión** (el sobre `EventoAlmacenado`), y en [El almacén en memoria](el-almacen-en-memoria.md) el almacén lo usa para rechazar una escritura si la versión no es la que toca: esa es la **concurrencia optimista**. Pero hay una pregunta incómoda: si cargas `emp-7` y te pregunto *"¿en qué versión estás?"*, tu `Empresa` **no sabe responder**. El número vive desperdigado —en el sobre `EventoAlmacenado` y en un `_version` privado, escondido dentro del `EventStream`—. Vamos a darle su hogar natural: el propio agregado.
 
 ## 🎯 El Objetivo
 
