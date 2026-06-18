@@ -71,6 +71,14 @@ public class Empresa : AggregateRoot
 
 El día que tengas una `Factura` event-sourced, copiarías `EventStreamDeEmpresa` entero cambiando `Empresa` por `Factura`. La mecánica —ser dueño de la lista, anotar hechos, crear el agregado vacío y rehidratarlo— es **idéntica** para todos. Lo único que cambia es **el tipo**. C# permite parametrizar justo eso: un **genérico** (con una restricción especial — esta vez te lo muestro yo, porque la sintaxis es nueva).
 
+> 💡 **El nombre ya te lo decía.** `EventStreamDeEmpresa` se lee *"un Event Stream **de** Empresa"*. Generalizar es convertir ese **"De ⟨algo⟩"** en un **hueco entre paréntesis angulares `<>`**: el **`De`** se vuelve los **`<>`**, y el tipo (`Empresa`) entra ahí como si lo **pasaras de parámetro**. Así:
+> ```
+> EventStream De Empresa   →   EventStream<Empresa>
+>            └──┬──┘                       └───┬───┘
+>            se vuelve <>            el "parámetro": el tipo que envuelve
+> ```
+> Y si en la **definición** de la clase dejas ese hueco **sin fijar** —lo llamas `T`— la clase queda **genérica**: `EventStream<T>` sirve para cualquier agregado, y tú eliges el tipo al **usarla** (`EventStream<Empresa>`, `EventStream<Factura>`, `EventStream<Pedido>`…).
+
 **🔁 Reemplaza `EventStreamDeEmpresa` por esta versión genérica** (y **borra** `EventStreamDeEmpresa`: el genérico la deja obsoleta):
 
 ```csharp
