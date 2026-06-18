@@ -8,7 +8,7 @@ Este mapa, para cada sección, te dice:
 - **👁️ Se te muestra:** lo que se te da hecho — y *por qué* (idioma nuevo o dato).
 - **Tu calificación:** márcala al hacer la sección (`✅ entendí` / `🟡 me costó` / `🔴 no entendí` + nota).
 
-**Estado:** §01–§10 construidas, en estilo reto, **verificadas por un "alumno" agente** (build-along: se pueden construir solo siguiendo la guía; el proyecto final compila y corre). §11–§33 **planeadas al detalle** y **ancladas 1:1 a `Cosmos.BuildingBlocks`** (cada sección lleva una línea 🔗 con el tipo real al que converge, extraída leyendo la plantilla módulo por módulo). La numeración §11+ es **tentativa** (el METODO permite renumerar/partir).
+**Estado:** §01–§12 construidas. §01–§10 verificadas por build-along; §11 (bisagra conceptual) por los 3 revisores; §12 (agregado acumulador) por los **4 agentes**: técnico ✅ (compila 0/0, salida exacta, 3 afirmaciones verificadas), build-along ✅ (construible sin abrir `<details>`), coherencia ✅, principiante ✅. §13–§33 **planeadas al detalle** y **ancladas 1:1 a `Cosmos.BuildingBlocks`** (cada sección lleva una línea 🔗 con el tipo real al que converge, extraída leyendo la plantilla módulo por módulo). La numeración §11+ es **tentativa** (el METODO permite renumerar/partir).
 
 ---
 
