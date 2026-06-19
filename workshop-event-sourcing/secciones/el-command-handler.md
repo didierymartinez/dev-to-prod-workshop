@@ -27,29 +27,23 @@ public record SuspenderEmpresa(string Motivo);
 
 ## El handler: cargar → actuar → guardar, en un solo sitio
 
-> 🛠️ **Inténtalo tú.** Crea un contrato `ICommandHandler<TCommand>` con un único método `Handle(TCommand)`. Y un handler **por comando** (responsabilidad única) que reciba el **stream** de la empresa por constructor y, en `Handle`: lo **cargue** (`Get`), pida a la empresa que decida, y **guarde** el hecho (`Append`). **Ojo:** `Suspender` puede devolver `null` (idempotencia, [Decidir el futuro](decidir-el-futuro.md)) → en ese caso **no** guardes nada.
+Empecemos por lo **concreto**: una clase que haga ese trabajo para la `Empresa`.
+
+> 🛠️ **Inténtalo tú.** Crea una clase `EmpresaCommandHandlers` que reciba el `EventStream<Empresa>` por **constructor** (constructor primario). Dale **un método por comando** —`CambiarPlan(...)` y `Suspender(...)`— que: **cargue** (`Get`), pida a la empresa que **decida**, y **guarde** (`Append`) el hecho. **Ojo:** `Suspender` puede devolver `null` (idempotencia, [Decidir el futuro](decidir-el-futuro.md)) → en ese caso **no** guardes nada.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```csharp
-public interface ICommandHandler<TCommand>
+public class EmpresaCommandHandlers(EventStream<Empresa> stream)
 {
-    void Handle(TCommand comando);
-}
-
-public class CambiarPlanHandler(EventStream<Empresa> stream) : ICommandHandler<CambiarPlanDeEmpresa>
-{
-    public void Handle(CambiarPlanDeEmpresa cmd)
+    public void CambiarPlan(CambiarPlanDeEmpresa cmd)
     {
-        var empresa = stream.Get();                       // 1. cargar (rehidratar)
-        stream.Append(empresa.CambiarPlan(cmd.NuevoPlan)); // 2+3. actuar y guardar
+        var empresa = stream.Get();                        // 1. cargar (rehidratar)
+        stream.Append(empresa.CambiarPlan(cmd.NuevoPlan));  // 2+3. actuar y guardar
     }
-}
 
-public class SuspenderHandler(EventStream<Empresa> stream) : ICommandHandler<SuspenderEmpresa>
-{
-    public void Handle(SuspenderEmpresa cmd)
+    public void Suspender(SuspenderEmpresa cmd)
     {
         var empresa = stream.Get();
         var hecho   = empresa.Suspender(cmd.Motivo);
@@ -62,17 +56,52 @@ public class SuspenderHandler(EventStream<Empresa> stream) : ICommandHandler<Sus
 
 Fíjate en el `if (hecho is not null)`: como en [Decidir el futuro](decidir-el-futuro.md) hicimos que `Suspender` devuelva `null` cuando la operación es redundante (idempotencia), el handler **debe** respetarlo y no archivar un hecho inexistente. La regla la decide el agregado; el handler solo la **obedece**.
 
+Ahora el `Program.cs` ya no orquesta nada: crea el handler y le pasa la intención.
+
 ```csharp
-var stream  = new EventStream<Empresa>();
+var stream = new EventStream<Empresa>();
 stream.Append(new EmpresaRegistrada("Constructora Andes", "Básico"));
 
-ICommandHandler<SuspenderEmpresa> handler = new SuspenderHandler(stream);
-handler.Handle(new SuspenderEmpresa("falta de pago"));
+var handlers = new EmpresaCommandHandlers(stream);
+handlers.Suspender(new SuspenderEmpresa("falta de pago"));
 
 Console.WriteLine(stream.Get().Suspendida ? "suspendida" : "activa");   // suspendida
 ```
 
-Quien envía un comando solo busca "alguien que cumpla `ICommandHandler<SuspenderEmpresa>`" y llama a `Handle`. No necesita saber nombres internos.
+## 🔧 Un handler por comando (no un súper-secretario)
+
+Funciona, pero esconde un acoplamiento: si mañana una API web quiere suspender una empresa, tendría que **saberse de memoria** que el método se llama `Suspender` y vive en `EmpresaCommandHandlers`. Quien envía la intención no debería conocer los nombres internos del secretario.
+
+La salida es la **misma jugada que con `EventStream<T>`** ([El flujo de vida](el-flujo-de-vida.md)): ya tienes lo **concreto**, ahora extrae lo **abstracto**. Un **contrato genérico** con un único método inequívoco —`Handle`— y, por **responsabilidad única**, una clase handler **por cada comando** (especialistas, no un súper-secretario). La interfaz te la muestro (la sintaxis genérica ya la conoces). **🔁 Reemplaza `EmpresaCommandHandlers` por esto** —y **bórrala**—:
+
+```csharp
+public interface ICommandHandler<TCommand>
+{
+    void Handle(TCommand comando);
+}
+
+public class CambiarPlanHandler(EventStream<Empresa> stream) : ICommandHandler<CambiarPlanDeEmpresa>
+{
+    public void Handle(CambiarPlanDeEmpresa cmd) =>
+        stream.Append(stream.Get().CambiarPlan(cmd.NuevoPlan));
+}
+
+public class SuspenderHandler(EventStream<Empresa> stream) : ICommandHandler<SuspenderEmpresa>
+{
+    public void Handle(SuspenderEmpresa cmd)
+    {
+        var hecho = stream.Get().Suspender(cmd.Motivo);
+        if (hecho is not null) stream.Append(hecho);
+    }
+}
+```
+
+Ahora quien envía un comando solo busca *"alguien que cumpla `ICommandHandler<SuspenderEmpresa>`"* y llama a `Handle` — sin saber nombres internos:
+
+```csharp
+ICommandHandler<SuspenderEmpresa> handler = new SuspenderHandler(stream);
+handler.Handle(new SuspenderEmpresa("falta de pago"));
+```
 
 > [!NOTE]
 > 🌱 **Semilla — este handler es plomería que se repite.** Mira los dos `Handle`: ambos hacen *Get → llamar al método → Append*, cambiando solo el comando y el método. Ese patrón tan repetitivo es justo lo que **Wolverine descubrirá y generará por ti** más adelante: tú escribirás solo la decisión, y el framework pondrá el cargar/guardar. Lo construyes a mano ahora para que, cuando lo veas automatizado, sepas exactamente qué hace.
