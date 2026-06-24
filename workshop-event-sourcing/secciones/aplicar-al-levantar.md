@@ -4,7 +4,7 @@
 
 ## 🎯 El Objetivo
 
-Que cuando la `Empresa` levante un hecho, su estado **cambie al instante** (no solo al recargar), y que cada hecho se aplique con un método **`Apply` por tipo** — la forma que las herramientas esperan para rehidratar (un método `Apply` por cada tipo de hecho).
+Que cuando la `Empresa` levante un hecho, su estado **cambie al instante** (no solo al recargar), y que cada hecho se aplique con un método **`Apply` por tipo** — la forma que las herramientas esperan para **rehidratar** —reconstruir el estado del agregado reproduciendo sus eventos—.
 
 ## El dolor: la empresa que decide pero no se entera
 
@@ -46,7 +46,10 @@ Eso es todo. Ahora `emp.CambiarPlan("Premium")` deja `emp.Plan == "Premium"` al 
 
 ## 🔧 Refactor 2: un `Apply` por tipo
 
-En [Refactorizando el motor](refactorizando-el-motor.md) viste —y dejamos guardada— "otra forma" de aplicar: en vez de un `switch` con la mutación **incrustada** en cada `case`, un método **`Apply` por tipo de hecho**. La descartamos entonces porque la versión con `(dynamic)` perdía el chequeo de tipos. Ahora la adoptamos **bien** (con un `switch` tipado que enruta, sin `dynamic`) — porque es la forma con la que la herramienta que adoptaremos **rehidrata por convención**: busca métodos `Apply(TipoDeEvento)` en tu agregado. Si dejas la mutación incrustada en el `switch`, la herramienta no la ve.
+En [Refactorizando el motor](refactorizando-el-motor.md) viste —y dejamos guardada— "otra forma" de aplicar: en vez de un `switch` con la mutación **incrustada** en cada `case`, un método **`Apply` por tipo de hecho**. La descartamos entonces porque la versión con `(dynamic)` perdía el chequeo de tipos. Ahora la adoptamos **bien** (con un `switch` tipado que enruta, sin `dynamic`) — porque es la forma con la que la herramienta que adoptaremos **rehidrata por convención** —el framework lo detecta por una regla (p. ej. que el método se llame `Apply`), sin que tú lo registres—: busca métodos `Apply(TipoDeEvento)` en tu agregado. Si dejas la mutación incrustada en el `switch`, la herramienta no la ve.
+
+> [!NOTE]
+> ⚖️ **Esto es convergencia preventiva, no un dolor de hoy.** Seamos honestos: con tu `Apply` **protected** y la mutación dentro del `switch`, tu código correría **idéntico** — aquí no hay nada roto que arreglar. Reescribes y abres los `Apply` a **públicos** *ahora* solo para que, el día del reveal, la herramienta encuentre tus `Apply(TEvento)` por convención y **no toques ni una línea** del agregado. Es justo la idea de este bloque de convergencia: dejar el motor con la forma **exacta** de la plantilla, por adelantado.
 
 > 🛠️ **Inténtalo tú.** En `Empresa`, **🔁 reemplaza** tu `switch Aplicar`: que cada `case` quede con **una sola línea** que **enrute** al método correcto —`case PlanCambiado e: Apply(e); break;`— y **mueve** la mutación de estado a un método `Apply` por cada tipo de hecho, que sea **público** (la herramienta los llamará desde afuera al rehidratar — lo explica la nota de abajo). Cuida dos cosas: el `case EmpresaSuspendida` ahora necesita ligar la variable (`case EmpresaSuspendida e:`) para poder pasar `e`; y si alguna mutación (`Nombre = …`, `Plan = …`) se te queda **dentro** del `switch`, **bórrala** —ahora vive en su `Apply`—, porque duplicada **compilaría en silencio**. *(Las propiedades y los métodos `CambiarPlan`/`Suspender`/`Reactivar` no cambian.)*
 

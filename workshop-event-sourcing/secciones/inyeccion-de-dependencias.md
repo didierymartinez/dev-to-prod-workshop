@@ -54,6 +54,10 @@ services.AddTransient<SuspenderHandler>();     // uno NUEVO cada vez que lo pida
 
 var proveedor = services.BuildServiceProvider();
 
+// sembramos "emp-7": como el almacén es Singleton, esta es la MISMA instancia que recibirá el handler
+var almacen = proveedor.GetRequiredService<InMemoryEventStore>();
+await almacen.AbrirStream<Empresa>("emp-7").AppendAsync(new EmpresaRegistrada("Constructora Andes", "Básico"));
+
 // pedimos el handler: el recepcionista lee su constructor, fabrica el InMemoryEventStore y se lo inyecta
 var handler = proveedor.GetRequiredService<SuspenderHandler>();
 await handler.HandleAsync(new SuspenderEmpresa("emp-7", "falta de pago"));
@@ -101,7 +105,7 @@ var c = new MiniContenedor();
 var handler = c.Resolver<SuspenderHandler>();   // lee su ctor, fabrica el InMemoryEventStore, lo inyecta
 ```
 
-> 💡 El `MiniContenedor` es un **juguete para entender** que un contenedor no es magia — no lo necesitas en tu app (ahí usas el `ServiceCollection` de arriba). Constrúyelo, pruébalo para verlo funcionar, y luego puedes **borrarlo** o dejarlo en un archivo aparte.
+> 💡 El `MiniContenedor` es un **juguete para entender** que un contenedor no es magia — no lo necesitas en tu app (ahí usas el `ServiceCollection` de arriba). Constrúyelo, pruébalo para verlo funcionar, y luego puedes **borrarlo** o dejarlo en un archivo aparte. *(Su método `Registrar<TServicio, TImpl>` —el "libro" interfaz→implementación— hoy no se usa: aún no hay interfaces que mapear, por eso el demo resuelve la clase concreta directo. Lo ejercitarás al extraer `IEventStore` ([El gran reveal — Marten](revelar-marten.md)), cuando aparezca la 2ª implementación.)*
 
 > [!NOTE]
 > **¿Qué es la "reflexión"?** Es la capacidad de C# de **inspeccionarse a sí mismo en ejecución**: `concreto.GetConstructors()` pregunta "¿qué constructores tiene esta clase?", `GetParameters()` "¿qué pide cada uno?", y `Activator.CreateInstance` crea el objeto. El mini-contenedor lee el constructor del `SuspenderHandler`, ve que pide un `InMemoryEventStore`, lo resuelve (recursión: si ese a su vez pidiera cosas, las arma), y lo construye. **Eso es todo lo esencial de un contenedor.** El de .NET le añade tiempos de vida, validación y rendimiento — pero el corazón es esto. La próxima vez que `AddSingleton<…>()` parezca magia, recuerda: **acabas de escribirla**.

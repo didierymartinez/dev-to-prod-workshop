@@ -118,6 +118,12 @@ Ahora, crear una `Factura` event-sourced es heredar de `AggregateRoot` y escribi
 </details>
 
 > [!NOTE]
+> 🆕 **Idioma de C#: herencia con `abstract` / `protected` / `override`.** `abstract class AggregateRoot` es una **clase base incompleta** —no se crea con `new`, solo se hereda—. `protected abstract void Aplicar(object hecho);` declara un método **obligatorio pero sin cuerpo** (`abstract`): la base exige que exista, pero no sabe implementarlo. `protected` lo hace visible **solo dentro de la base y sus hijas** (ni público ni privado). Cada hija da el cuerpo con `protected override void Aplicar(...)` (`override` = "estoy reemplazando el método de la base"). `Empresa : AggregateRoot` significa "`Empresa` **hereda de** `AggregateRoot`": recibe gratis el `Load` y solo aporta su `Aplicar`.
+
+> [!NOTE]
+> 🆕 **Idioma de C#: cuerpo de expresión (`=>`).** `public Empresa(...) => Load(historia);` es la forma corta de un método/constructor de **una sola línea**: `=> expresión;` equivale a `{ expresión; }`. Es solo azúcar sintáctica; el clásico sería `public Empresa(...) { Load(historia); }`.
+
+> [!NOTE]
 > **¿Y por qué una clase abstracta, no una interfaz?**
 > Las dos sirven para estandarizar ("toda entidad sabe cargar su historia"). La diferencia que importa **aquí**: una **clase abstracta** lleva **código real compartido** (el bucle `Load`, escrito una vez) y puede guardar **estado** (pronto le pondremos un `Id`); además es "incompleta" — no se crea sola con `new`. Una **interfaz** es ante todo un **contrato**: aunque el C# moderno le permite traer métodos *por defecto*, **no guarda estado de instancia**, y una clase puede implementar muchas. Como nuestro motor es **el mismo para todos** y pronto tendrá estado, encaja una clase abstracta: lo escribes **una vez** y cada hija lo hereda. (Con una interfaz, en la práctica, acabarías **repitiendo** el motor en cada clase.)
 
@@ -148,6 +154,9 @@ protected override void Aplicar(object hecho)
 
 Cada `case` es "si el hecho es de **este tipo**, recíbelo ya convertido (`r`, `p`) y haz esto". Misma lógica que los `if`, pero agrupada, sin repetir `is`, y mucho más fácil de leer y crecer: un hecho nuevo = un `case` más.
 </details>
+
+> [!NOTE]
+> 🆕 **Idioma de C#: pattern matching de tipo (`case Tipo x:`).** Un `switch` clásico compara valores (`case 1:`, `case "hola":`). Aquí el `switch` ramifica según el **tipo** del objeto: `case EmpresaRegistrada r:` significa "si `hecho` **es** un `EmpresaRegistrada`, entra aquí y dámelo ya convertido en la variable `r`". Es el mismo `hecho is EmpresaRegistrada r` que ya usabas en los `if`, ahora como rama del `switch`. Si no necesitas la variable (porque el hecho no trae datos), omites el nombre: `case EmpresaSuspendida:`.
 
 > [!NOTE]
 > **Otra forma de enrutar por tipo (que NO usaremos, pero vale la pena ver entera).** En vez del `switch`, el enrutado podría vivir en la clase base, y cada hija tener un método `Aplicar` **por tipo**. El cambio completo sería así:

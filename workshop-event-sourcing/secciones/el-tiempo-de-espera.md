@@ -29,7 +29,7 @@ La regla del event sourcing real (y de la plantilla del equipo): **todo acceso a
 Los métodos del `InMemoryEventStore` cambian de firma: en vez de devolver una lista al instante, devuelven una **`Task`** (la promesa de un resultado futuro), y reciben un parámetro nuevo, el **`CancellationToken`**.
 
 > [!NOTE]
-> **¿Qué es ese `CancellationToken ct = default`?** Es una señal de *"ya no necesito esto, abandona"*: si el cliente cierra la página o se cumple un *timeout*, la operación se corta en vez de seguir gastando. Toda API real de base de datos lo recibe (y las de la plantilla, también). Lo dejamos con `= default` para no tener que pasarlo en cada llamada todavía, pero ya está ahí, listo para cuando importe. **Adopta el hábito: cuando una firma sea `async`, dale su `CancellationToken`.**
+> **¿Qué es ese `CancellationToken ct = default`?** Es una señal de *"ya no necesito esto, abandona"*: si el cliente cierra la página o se cumple un *timeout*, la operación se corta en vez de seguir gastando. Toda API real de base de datos lo recibe (y las de la plantilla, también). Lo dejamos con `= default` para no tener que pasarlo en cada llamada todavía. **Por ahora el `ct` es un hueco reservado: lo recibimos en las firmas, pero aún no lo encadenamos** (los handlers todavía llaman a `GetAsync()`/`AppendAsync()` sin pasarlo). Eso lo haremos cuando importe —cuando detrás haya una base de datos real que pueda cancelarse—. Lo que queremos dejar grabado hoy es el **hábito de la firma**: cuando un método sea `async`, déjale su `CancellationToken` listo.
 
 El `InMemoryEventStore` no habla con ninguna red — todo está en RAM, así que **no espera de verdad**. Como no hay espera, envolvemos sus resultados en una `Task` ya completada:
 
@@ -155,10 +155,16 @@ public class CambiarPlanHandler(InMemoryEventStore store) : ICommandHandler<Camb
 }
 ```
 
-Y en el `Program.cs`, como los *top-level statements* ya son `async`, simplemente usas `await`:
+Y en el `Program.cs`, como los *top-level statements* ya son `async`, simplemente usas `await` (siembra `emp-7` primero, para que tenga historia que cargar):
 
 ```csharp
-await new SuspenderHandler(store).HandleAsync(new SuspenderEmpresa("emp-7", "falta de pago"));
+var store = new InMemoryEventStore();
+await store.AbrirStream<Empresa>("emp-7").AppendAsync(new EmpresaRegistrada("Constructora Andes", "Básico"));  // siembra
+
+await new SuspenderHandler(store).HandleAsync(new SuspenderEmpresa("emp-7", "falta de pago"));   // top-level async: solo await
+
+var emp = await store.AbrirStream<Empresa>("emp-7").GetAsync();
+Console.WriteLine(emp.Suspendida ? "suspendida" : "activa");   // 👉 suspendida
 ```
 
 Fíjate en el patrón del handler: la **espera** (I/O) está en cargar y guardar; la **decisión** (CPU pura) en medio no espera nada. Eso es exactamente lo que el `await` te deja hacer bien.
@@ -171,8 +177,8 @@ La arquitectura real **nunca** asume que la base de datos es instantánea. En .N
 
 > [!WARNING]
 > 🌱 **Semilla — tres reglas de producción (adóptalas desde ya):**
-> 1. **Nunca `.Result` ni `.Wait()`** sobre un `Task`. En ASP.NET Core / Azure Functions (como la plantilla) esto **no** causa el "deadlock" clásico, pero **bloquea un hilo del pool**; bajo carga agotas los hilos y la app se cae (*thread starvation*). La regla: **async hasta arriba**.
-> 2. **Propaga el `CancellationToken`** por toda la cadena async.
+> 1. **Nunca `.Result` ni `.Wait()`** sobre un `Task`. En ASP.NET Core / Azure Functions (como la plantilla) esto **bloquea un hilo del pool** mientras espera; bajo carga agotas los hilos y la app se cae. La regla: **async hasta arriba**.
+> 2. **Deja siempre el `CancellationToken` en la firma async.** Hoy lo recibimos pero todavía no lo encadenamos (es un hueco reservado); cuando detrás haya una base de datos real lo propagaremos por toda la cadena para poder cancelar de verdad.
 > 3. **`async` no es "más rápido" ni "otro hilo".** Bajo el capó, `await` compila a una **máquina de estados**: no hay un hilo "esperando" a la base de datos. Lo que ganas no es velocidad, es **escalabilidad** (más peticiones con los mismos hilos).
 
 Ahora las interfaces ya no mienten: dicen la verdad sobre la espera. Pero queda una pregunta — ¿quién va a *armar* el handler y darle el almacén (`new SuspenderHandler(store)`), y de dónde sale ese `store`? Hasta ahora lo hacemos a mano con `new()` por todos lados. En la próxima sección despedimos a ese intermediario manual.
@@ -184,7 +190,7 @@ Ahora las interfaces ya no mienten: dicen la verdad sobre la espera. Pero queda 
 - [ ] El `InMemoryEventStore`, el `EventStream` y los handlers son **todos** `async` (devuelven `Task`/`Task<T>`).
 - [ ] `dotnet run` sigue funcionando con `await` en el `Program.cs`.
 - [ ] Sabes explicar por qué el almacén en memoria usa `Task.FromResult`/`Task.CompletedTask` (no hay espera real, pero cumple el contrato).
-- [ ] Explica por qué `.Result`/`.Wait()` en ASP.NET Core causa *starvation* y no *deadlock*, y qué significa "async hasta arriba".
+- [ ] Sabes, a grandes rasgos, por qué evitamos `.Result`/`.Wait()` (bloquean un hilo en vez de liberarlo) y qué significa "async hasta arriba".
 
 ---
 

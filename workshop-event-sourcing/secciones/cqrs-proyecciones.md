@@ -21,7 +21,7 @@ Reproducir la película entera de cada empresa solo para mirar un dato es carís
 
 ## Una proyección: pliega los hechos en un documento consultable
 
-Una **proyección** es un *fold* de los eventos hacia un documento de lectura. Igual que tu `Apply` reconstruye el agregado, una proyección reconstruye una **vista**. Marten las mantiene por ti. Defines el documento de lectura y cómo cada hecho lo actualiza:
+Una **proyección** es un *fold* —plegar la lista de eventos en un solo estado, como el replay— de los eventos hacia un documento de lectura. Igual que tu `Apply` reconstruye el agregado, una proyección reconstruye una **vista**. Marten las mantiene por ti. Defines el documento de lectura y cómo cada hecho lo actualiza:
 
 ```csharp
 using Marten.Events.Aggregation;
@@ -36,7 +36,7 @@ public class EmpresaResumen
 }
 
 // la proyección: cómo cada hecho actualiza el resumen (mismo estilo que tus Apply)
-public class EmpresaResumenProjection : SingleStreamProjection<EmpresaResumen, string>
+public partial class EmpresaResumenProjection : SingleStreamProjection<EmpresaResumen, string>
 {
     public void Apply(EmpresaRegistrada e, EmpresaResumen r) { r.Nombre = e.Nombre; r.Plan = e.Plan; }
     public void Apply(PlanCambiado e, EmpresaResumen r)      => r.Plan = e.NuevoPlan;
@@ -44,6 +44,9 @@ public class EmpresaResumenProjection : SingleStreamProjection<EmpresaResumen, s
     public void Apply(EmpresaReactivada e, EmpresaResumen r) => r.Suspendida = false;
 }
 ```
+
+> [!NOTE]
+> ⚖️ **`partial` no es opcional (Marten 9.10+).** La proyección se declara **`partial`** porque el **generador de código** de Marten/JasperFx crea en compilación el *dispatcher* que enruta cada evento a su `Apply`. Sin `partial` **compila, pero revienta al arrancar** con `InvalidProjectionException` (*"a projection subclass that uses convention methods DOES need to be declared 'partial'"*). Versiones más viejas de Marten no lo exigían — es un endurecimiento de la serie 9.x.
 
 La registras en la config de Marten, eligiendo **cuándo** se calcula:
 
@@ -53,13 +56,18 @@ using JasperFx.Events.Projections;
 options.Projections.Add<EmpresaResumenProjection>(ProjectionLifecycle.Inline);   // o .Async, o .Live
 ```
 
-Y ahora consultar es **directo**, con LINQ, sin reproducir nada (vía el `Query<T>()` del read store — el `IProjectionStore` que trae la plantilla, que por dentro es `querySession.Query<T>`):
+Y ahora consultar es **directo**, con LINQ, sin reproducir nada. La sesión de solo-lectura de Marten —`IQuerySession`, que abres con `store.QuerySession()` (donde `store` es el **`IDocumentStore`** de Marten que te inyecta el contenedor, **no** tu `IEventStore`)— expone `Query<T>()` sobre cualquier documento, incluido tu modelo de lectura:
 
 ```csharp
-var suspendidas = await projectionStore.Query<EmpresaResumen>()
+await using var querySession = store.QuerySession();
+
+var suspendidas = await querySession.Query<EmpresaResumen>()
     .Where(e => e.Suspendida)
-    .ToListAsync();
+    .ToListAsync(CancellationToken.None);   // helper async sobre la consulta LINQ (ver Extension members)
 ```
+
+> [!NOTE]
+> ⚖️ **La plantilla lo envuelve.** Aquí usamos la sesión cruda de Marten para que veas la API real; en el código del equipo no llamas a `querySession.Query<T>` directo, sino al `IProjectionStore` que lo envuelve (ver la nota *Qué trae la plantilla* más abajo).
 
 > [!NOTE]
 > **Tres modos: `Live`, `Inline`, `Async` (cuándo se calcula la proyección).**
@@ -68,7 +76,7 @@ var suspendidas = await projectionStore.Query<EmpresaResumen>()
 > - **`Async`**: un proceso de fondo (el **async daemon**) actualiza el resumen **poco después**. Escala mejor, pero la lectura puede ir unos milisegundos atrás: **consistencia eventual**.
 
 > [!NOTE]
-> ⚖️ **Qué trae la plantilla y qué pones tú.** La capa del equipo expone el **riel** —un `IProjectionStore` con `Query<T>()` (sobre `querySession.Query<T>`) y el `AddAsyncDaemon` para correr el daemon— pero **no trae ninguna proyección concreta**: las defines **tú** y las registras en su hook `Action<ProjectionOptions>`. La maquinaria de proyecciones (`SingleStreamProjection`, los modos) es de **Marten**, desde su doc; la plantilla solo te da dónde enchufarlas. (Y el lado de lectura tiene su propio `IQueryRouter`/`WolverineQueryRouter`, gemelo del de comandos de [Revelar Wolverine](revelar-wolverine.md).)
+> ⚖️ **Qué trae la plantilla y qué pones tú.** La capa del equipo expone el **riel** —un `IProjectionStore` con `Query<T>()` (sobre `querySession.Query<T>`) y el `AddAsyncDaemon` para correr el daemon— pero **no trae ninguna proyección concreta**: las defines **tú** y las registras en su hook `Action<ProjectionOptions>`. La maquinaria de proyecciones (`SingleStreamProjection`, los modos) es de **Marten**, desde su doc; la plantilla solo te da dónde enchufarlas. (Y el lado de lectura tiene su propio *router* de consultas, gemelo del de comandos de [Revelar Wolverine](revelar-wolverine.md); igual que aquel, es un wrapper que **reconocerás** en la plantilla, no algo que construyas en el taller.)
 
 > [!NOTE]
 > 🌱 **Semilla — la consistencia eventual es una decisión, no un accidente.** Con `Async`, tu lista puede ir un instante atrasada respecto a la escritura. Eso es normal en CQRS y casi siempre aceptable (un reporte no necesita el milisegundo exacto). Pero nómbralo: si una pantalla **debe** ver su propia escritura al instante, usa `Inline` para esa vista. El **cuándo NO** de CQRS: en un CRUD simple con pocos datos, montar proyecciones es sobreingeniería — consulta el agregado y ya.

@@ -1,6 +1,6 @@
 # El idioma de la plantilla: extension members de C#14
 
-A lo largo del taller viste, en las extensiones del equipo, una sintaxis rara: `extension(IServiceCollection service) { … }`, `extension(WolverineOptions options) { … }` ([Revelar Marten](revelar-marten.md), [Revelar Wolverine](revelar-wolverine.md), [Transportes (RabbitMQ y ASB)](transportes-rabbitmq-asb.md), [Resolver el tenant](resolver-el-tenant.md)). No son métodos de extensión clásicos (`this IServiceCollection`). Es un **idioma nuevo de C# 14** —los *extension members*— y la plantilla lo usa en **todos** sus `*Extensions.cs`. Para mantenerla, tienes que reconocerlo. Aprendámoslo construyéndolo.
+A lo largo del taller escribiste la configuración con la **API directa** de Marten y Wolverine (`builder.UseWolverine(...)`, `AddMarten(...).IntegrateWithWolverine()`, los `services.Add…`). La plantilla del equipo **envuelve** todo eso en sus propias extensiones —`AgregarConfiguracionMartenComandos`, `UsarWolverineParaComandos`, `HabilitarRabbitMq`, `AgregarTenantResolverConHeadersConfiables`…— y las escribe con una sintaxis que **aún no has visto**: `extension(IServiceCollection service) { … }`, `extension(WolverineOptions options) { … }`. No son métodos de extensión clásicos (`this IServiceCollection`). Es un **idioma nuevo de C# 14** —los *extension members*— y la plantilla lo usa en **todos** sus `*Extensions.cs`. Cuando abras la plantilla a mantenerla, te toparás con él en cada archivo; vas a reconocerlo aprendiéndolo aquí, construyéndolo.
 
 ## 🎯 El Objetivo
 
@@ -23,7 +23,7 @@ Si tienes cinco helpers sobre `IQueryable<T>`, repites `this IQueryable<T> … w
 
 ## 🔧 El bloque `extension(...)`
 
-> 🛠️ **Inténtalo tú.** Escribe un par de helpers async sobre `IQueryable<T>` (p. ej. `ToListAsync`, `AnyAsync`) **primero** como métodos de extensión clásicos (con `this`), y luego **refactóralos** a un bloque **`extension<T>(IQueryable<T> fuente) where T : notnull { … }`** de C# 14, donde los miembros comparten el receptor. *(Requiere `<LangVersion>14</LangVersion>` y .NET 10, que ya usas.)*
+> 🛠️ **Inténtalo tú.** Escribe un par de helpers async sobre `IQueryable<T>` (p. ej. `ToListAsync`, `AnyAsync`) **primero** como métodos de extensión clásicos (con `this`), y luego **refactóralos** a un bloque **`extension<T>(IQueryable<T> fuente) where T : notnull { … }`** de C# 14, donde los miembros comparten el receptor. *(En **.NET 10** C# 14 ya es el default, así que **no tocas el `.csproj`**; solo si tu target fuera .NET 8/9 añadirías `<LangVersion>14</LangVersion>`.)*
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -47,10 +47,10 @@ Dentro del bloque, cada miembro usa `fuente` directamente — sin `this`, sin re
 </details>
 
 > [!NOTE]
-> **Por qué te importa: es el estilo de TODA la capa del equipo.** Cada `*Extensions.cs` que viste —`AgregarConfiguracionMartenComandos`, `UsarWolverineParaComandos`, `HabilitarRabbitMq`, `AgregarTenantResolverConHeadersConfiables`…— está escrito así: un `extension(IServiceCollection service) { … }` o `extension(WolverineOptions options) { … }` que agrupa los helpers. Reconocer este idioma es la diferencia entre "leer" la plantilla y "perderte" en ella.
+> **Por qué te importa: es el estilo de TODA la capa del equipo.** Cada `*Extensions.cs` de la plantilla —`AgregarConfiguracionMartenComandos`, `UsarWolverineParaComandos`, `HabilitarRabbitMq`, `AgregarTenantResolverConHeadersConfiables`…, los que **envuelven** la configuración que tú escribiste con la API directa— está escrito así: un `extension(IServiceCollection service) { … }` o `extension(WolverineOptions options) { … }` que agrupa los helpers. Reconocer este idioma es la diferencia entre "leer" la plantilla y "perderte" en ella.
 
 > [!NOTE]
-> ⚖️ **Es `QueryableExtensions` / `TaskAggregateRootExtensions` de la plantilla, 1:1.** El primero reexpone `ToListAsync`/`AnyAsync`/`FirstOrDefaultAsync` delegando a `Marten.QueryableExtensions`; el segundo trae `Tap`/`Map` sobre `Task<T>` (el azúcar que viste en `MartenEventStore`). Detalle de empaquetado: la dependencia a Marten va con **`PrivateAssets=all`** — el consumidor de tu paquete obtiene los helpers **sin** recibir Marten como dependencia transitiva. (Lo veremos en [Empaquetar como NuGet](nuget-empaquetado.md).)
+> ⚖️ **Es `QueryableExtensions` / `TaskAggregateRootExtensions` de la plantilla, 1:1.** El primero reexpone `ToListAsync`/`AnyAsync`/`FirstOrDefaultAsync` delegando a `Marten.QueryableExtensions`; el segundo trae `Tap`/`Map` sobre `Task<T>` (azúcar para encadenar transformaciones sobre tareas async). Detalle de empaquetado: la dependencia a Marten va con **`PrivateAssets=all`** — el consumidor de tu paquete obtiene los helpers **sin** recibir Marten como dependencia transitiva. (Lo veremos en [Empaquetar como NuGet](nuget-empaquetado.md).)
 
 > [!NOTE]
 > ⚖️ **Divergencia de la doc del creador.** Marten/Wolverine documentan sus extensiones con la firma **clásica** (`this`). El equipo eligió el bloque `extension(...)` de C# 14 — compila igual en .NET 10, pero diverge de los ejemplos de la doc oficial. Tenlo presente al traducir doc → plantilla.

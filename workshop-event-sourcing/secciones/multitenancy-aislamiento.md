@@ -38,7 +38,14 @@ public class AlmacenMultiTenant
 Dos empresas "emp-7" en `sinco` y `acme` ahora son **dos** streams distintos: la tupla `(tenant, id)` los separa.
 
 > [!NOTE]
-> ⚖️ **Tu tupla `(tenant, id)` es `TenancyStyle.Conjoined` de Marten.** No tendrás que reimplementar esto: Marten ofrece multi-tenancy *conjoined* — todos los tenants comparten las **mismas tablas**, pero cada fila lleva una columna **`tenant_id`**, exactamente como tu tupla. Se activa en la config (lo verás abajo) con `o.Events.TenancyStyle = TenancyStyle.Conjoined` y `o.Policies.AllDocumentsAreMultiTenanted()` — y el tenant **no se pasa por parámetro** al guardar: se fija al **abrir la sesión** (`LightweightSession(tenantId)`), y el aislamiento es transparente.
+> ⚖️ **Tu tupla `(tenant, id)` es `TenancyStyle.Conjoined` de Marten.** No reimplementas esto: Marten ofrece multi-tenancy *conjoined* — todos los tenants comparten las **mismas tablas**, pero cada fila lleva una columna **`tenant_id`**, exactamente como tu tupla. Se activa con **dos líneas** en tu `AddMarten` ([Revelar Marten](revelar-marten.md)):
+> ```csharp
+> using JasperFx.MultiTenancy;   // ⚠️ TenancyStyle vive AQUÍ, no en JasperFx.Events
+>
+> options.Events.TenancyStyle = TenancyStyle.Conjoined;   // dentro del AddMarten(options => { … })
+> options.Policies.AllDocumentsAreMultiTenanted();
+> ```
+> Y el tenant **no se pasa por parámetro** al guardar: se fija al **abrir la sesión** (`store.LightweightSession("sinco")`), y el aislamiento es transparente. (De **dónde** sale ese tenant para abrir la sesión correcta es lo de [Resolver el tenant](resolver-el-tenant.md) y [El tenant viaja con el mensaje](tenant-viaja-con-el-mensaje.md).)
 
 > [!NOTE]
 > 🌱 **Semilla — pero, ¿de dónde sale el `tenantId`?** Ahora mismo lo pasas a mano en cada llamada. Eso ensucia todo. En [Resolver el tenant](resolver-el-tenant.md) lo esconderás tras una mini-interfaz ("dime el tenant actual") y, en [El tenant viaja con el mensaje](tenant-viaja-con-el-mensaje.md), harás que **viaje con el mensaje** cuando no haya una petición HTTP de por medio.

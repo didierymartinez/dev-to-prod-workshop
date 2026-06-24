@@ -10,9 +10,31 @@ Un `IEventStore` **en memoria** para tests: siembras hechos pasados, ejecutas, y
 
 `MartenEventStore` ([Revelar Marten](revelar-marten.md)) necesita una conexión a Postgres viva. Probar contra él es lento, flojo (depende de la BD) y arrastra infraestructura a tus tests. Pero tus handlers **no** dependen de Marten: dependen de `IEventStore`. Así que para tests, basta **otra implementación** de `IEventStore`, en memoria.
 
+## 🟢 Primer intento: rehidratar a pie (un `switch` por tipo)
+
+Para rehidratar un agregado hay que aplicarle cada hecho de su historia. La forma obvia: un `foreach` sobre los eventos y, dentro, un `switch` que mire el tipo de cada hecho y llame al `Apply` correcto.
+
+```csharp
+// rehidrata "a pie": un switch que rutea cada hecho a su Apply
+private static void ApplyEvent(Empresa ar, object evento)
+{
+    switch (evento)
+    {
+        case EmpresaRegistrada e: ar.Apply(e); break;
+        case EmpresaSuspendida e: ar.Apply(e); break;
+        case EmpresaReactivada e: ar.Apply(e); break;
+        // … una rama MÁS por cada hecho nuevo
+    }
+}
+```
+
+💥 **El dolor.** Cada vez que el negocio aprende un hecho nuevo (`EmpresaPlanCambiado`, `EmpresaRenombrada`…) tienes que **volver aquí y añadir otra rama**, o el test rehidrata mal y nadie te avisa. Y este `switch` está atado a `Empresa`: el día que pruebes un `Pedido` o una `Factura`, **copias el bloque entero** con sus mismas ramas. El cableado crece con cada hecho **y** con cada agregado.
+
 ## 🔧 Un TestStore que rehidrata por reflexión
 
-> 🛠️ **Inténtalo tú.** Un `TestStore` con dos diccionarios: **eventos previos** (los que *siembras* como historia) y **eventos nuevos** (los que el handler *produce*). Y un `GetAggregateRoot<T>(id)` que rehidrate **reproduciendo** esa historia. Para aplicar cada hecho sin un `switch` a mano por tipo, usa **reflexión**: busca el método `Apply(TipoDelEvento)` del agregado y llámalo (cachéalo).
+¿Y si en vez de mantener el `switch` a mano, le pides a C# que **busque solo** el `Apply` que encaje con el tipo del hecho? Eso es **reflexión** —la capacidad de C# de inspeccionarse en ejecución: buscar tipos y métodos por su nombre—. Un solo `ApplyEvent` reflexivo sirve para **cualquier** agregado y **nunca** hay que tocarlo al sumar un hecho.
+
+> 🛠️ **Inténtalo tú.** Un `TestStore` con dos diccionarios: **eventos previos** (los que *siembras* como historia) y **eventos nuevos** (los que el handler *produce*). Y un `GetAggregateRoot<T>(id)` que rehidrate **reproduciendo** esa historia. En vez del `switch` a mano de arriba, aplica cada hecho por **reflexión**: busca el método `Apply(TipoDelEvento)` del agregado y llámalo (cachéalo).
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>

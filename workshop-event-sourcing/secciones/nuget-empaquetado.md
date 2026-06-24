@@ -31,11 +31,11 @@ Fíjate qué **NO** está aquí: ni `Version` ni `PackageId` horneados. El `Pack
 <!-- PrivateAssets=all: tu paquete USA Marten, pero NO se lo impone como dependencia al consumidor -->
 ```
 
-`PrivateAssets="all"` es lo que viste en [Extension members](extension-members.md): la `Linq.Extensions` delega en Marten, pero quien instala tu paquete **no** hereda Marten.
+`PrivateAssets="all"` es lo que viste en [Extension members](extension-members.md): la `Linq.Extensions` delega en Marten, pero quien instala tu paquete **no** hereda Marten. Sin ese atributo, Marten le llegaría al consumidor como **dependencia transitiva** —una dependencia que te llega indirecta, porque algo de lo que dependes a su vez depende de ella—; con `PrivateAssets="all"` cortas esa cadena: usas Marten puertas adentro sin filtrarlo.
 
 ## El workflow de publicación
 
-La publicación es **manual** (por `workflow_dispatch`), versionado LOCKSTEP, y delegada a un workflow **reusable de la organización**:
+La publicación es **manual** (por `workflow_dispatch`), versionado LOCKSTEP, y delegada a un workflow **reusable de la organización** —un workflow que vive en otro repositorio y que el tuyo invoca con `uses:`, en lugar de copiar los pasos—:
 
 ```yaml
 # release-nuget.yml — disparo manual
@@ -62,7 +62,7 @@ Y un manifiesto, `paquetes-nuget.yml` —que vive en la **raíz de `.github/`** 
 - [ ] Explicas el versionado **LOCKSTEP** (todos los paquetes una versión por release, un tag) y por qué evita la matriz de compatibilidad.
 - [ ] Sabes por qué se **desacopla** `AssemblyVersion` (fijo `0.0.0.0`) de `PackageVersion` (referencias horneadas → fallo en runtime, dotnet/sdk#12322).
 - [ ] Sabes que `PackageId` = nombre del proyecto y la `Version` la inyecta el workflow (`-p:Version=X`), no el `.csproj`.
-- [ ] Explicas `PrivateAssets="all"`: usas una dependencia sin imponérsela al consumidor.
+- [ ] Explicas `PrivateAssets="all"`: usas una dependencia sin imponérsela al consumidor (sin filtrarla como **dependencia transitiva**).
 - [ ] Sabes que la publicación es manual (`workflow_dispatch`), delegada a un reusable de la organización, con `paquetes-nuget.yml` como fuente de verdad.
 
 ---

@@ -38,14 +38,23 @@ Asómate al panel en **http://localhost:15672** (guest / guest): ahí verás, en
 
 ## RabbitMQ: un exchange por servicio
 
-El equipo envuelve la API de Wolverine en tres helpers (idioma/herramienta nueva — te los muestro). Los tres van **dentro del mismo `builder.UseWolverine(options => { … })` de [Revelar Wolverine](revelar-wolverine.md)**, junto al `IncludeAssembly`, el middleware y `AutoApplyTransactions`:
+El equipo envuelve la API de Wolverine en tres helpers (idioma/herramienta nueva — te los muestro). Primero **instala el transporte de RabbitMQ** para Wolverine:
+
+```bash
+dotnet add package WolverineFx.RabbitMQ
+```
+
+Los tres helpers van **dentro del mismo `builder.UseWolverine(options => { … })` de [Revelar Wolverine](revelar-wolverine.md)**, junto al `IncludeAssembly`, el middleware y `AutoApplyTransactions`. Añade arriba `using Wolverine.RabbitMQ;` (de ahí salen `ToRabbitExchange`/`ListenToRabbitQueue`):
 
 ```csharp
+using Wolverine.RabbitMQ;   // arriba del Program — donde viven los helpers de RabbitMQ
+
 // 1) conectar a RabbitMQ y dejar que Wolverine cree exchanges/colas
 options.UseRabbitMqUsingNamedConnection("rabbitmq").AutoProvision();
 
 // 2) publicar TODOS tus IPublicEvent a un exchange con el nombre de tu servicio (outbox durable)
 options.Policies.UseDurableOutboxOnAllSendingEndpoints();
+var contratos = typeof(EmpresaSuspendida).Assembly;   // el ensamblado donde viven tus IPublicEvent
 foreach (var tipo in contratos.GetTypes().Where(t => t.IsAssignableTo(typeof(IPublicEvent))))
     options.PublishMessage(tipo).ToRabbitExchange("gestion-empresas").UseDurableOutbox();
 
@@ -63,12 +72,21 @@ Fíjate en la idea: **un exchange por servicio** (no por mensaje). Tu servicio p
 
 ## Azure Service Bus: topics
 
-En la nube, el equipo usa Azure Service Bus. Mismo patrón, con *topics* en vez de exchanges:
+En la nube, el equipo usa Azure Service Bus. Mismo patrón, con *topics* en vez de exchanges (requiere `dotnet add package WolverineFx.AzureServiceBus` y `using Wolverine.AzureServiceBus;`):
 
 ```csharp
-options.UseAzureServiceBus("AsbConnection");   // "AsbConnection" = conexión nombrada (de ConnectionStrings), igual que "rabbitmq"
+// ⚠️ OJO: a diferencia de UseRabbitMqUsingNamedConnection, UseAzureServiceBus toma el
+// connection string LITERAL (no una conexión nombrada). Léelo de tu config:
+options.UseAzureServiceBus(builder.Configuration.GetConnectionString("AsbConnection")!);
 options.PublishMessage<EmpresaSuspendida>().ToAzureServiceBusTopic("empresas").UseDurableOutbox();
 ```
+
+> [!NOTE]
+> 💡 **Para probar ASB en local, sin Azure ni costo** (verificado e2e): usa el **emulador oficial de Azure Service Bus de Microsoft** (`mcr.microsoft.com/azure-messaging/servicebus-emulator` + un backend SQL —`azure-sql-edge` en Apple Silicon—, ambos en Docker) con un connection string que termine en `…;UseDevelopmentEmulator=true;`. Es el único que habla el mismo handshake (**CBS**) que el SDK .NET. Dos ajustes que **el emulador exige y Azure real no**:
+> 1. **Pre-declara el topic** `empresas` (con al menos una subscription) en el `Config.json` del emulador — **no auto-provisiona** en runtime como RabbitMQ; publicar a un topic no declarado falla con `MessagingEntityNotFound` y Wolverine reintenta en bucle.
+> 2. Añade **`.SystemQueuesAreEnabled(false)`** a `UseAzureServiceBus(...)` — si no, Wolverine intenta crear sus colas de control y el emulador las rechaza inundando el log (en Azure real se crean solas). Es el mismo flag que el camino serverless de [Serverless (Azure Functions)](serverless-azure-functions.md) ya trae.
+>
+> *(Ojo: emuladores genéricos tipo LocalStack/floci-az **NO** sirven aquí — su capa AMQP usa SASL `PLAIN`/`ANONYMOUS`, que el SDK .NET de ASB rechaza con `MSSBCBS`.)*
 
 > [!NOTE]
 > ⚖️ **Una divergencia del README del equipo.** El README dice que los eventos **privados** se despachan "en memoria, local". Pero el código permite rutearlos a RabbitMQ igual que los públicos (`HabilitarOutboxParaEventosPrivados`). La verdad operativa: **el destino lo decide la configuración (qué rutas declaras), no el tipo del evento**. Un `IPrivateEvent` sin ruta a broker se queda local; con ruta, sale. Tenlo presente al mantener la plantilla: el README va por detrás del código.

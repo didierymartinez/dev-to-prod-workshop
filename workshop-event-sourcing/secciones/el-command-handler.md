@@ -10,26 +10,11 @@ Encapsular ese "cargar → actuar → guardar" en una pieza con un solo trabajo,
 
 La `Empresa` (el agregado) se concentra en **vivir y hacer cumplir sus reglas**: decide y emite hechos. Pero, ¿acaso la empresa va a rehidratarse y guardar los hechos cada vez? No. Para eso tiene un **secretario** que: (1) carga su historia desde el stream, (2) la rehidrata, (3) le presenta la intención, y (4) **guarda** el hecho que la empresa emita. Ese secretario es el **Command Handler**.
 
-## La intención, como objeto: un Comando
+## El handler: primer intento (con los parámetros sueltos)
 
-Hasta ahora la "intención" era llamar a un método (`empresa.CambiarPlan("Enterprise")`). Para que esa petición pueda **viajar** (desde una API, una cola, otro servicio), la empaquetamos como un dato: un **Comando**.
+Empecemos por lo **concreto y directo**: una clase que orqueste **cargar → decidir → guardar** para la `Empresa`, recibiendo los parámetros **sueltos**.
 
-```csharp
-public record CambiarPlanDeEmpresa(string NuevoPlan);
-public record SuspenderEmpresa(string Motivo);
-```
-
-> [!NOTE]
-> **¿Por qué un `record` para el comando?** Igual que un evento, un comando es un **dato que viaja** y nadie debería alterar en tránsito. El `record` lo hace **inmutable**: una vez que alguien expresa "cambia el plan a Enterprise", ese paquete llega intacto a su handler. Es un simple vehículo de datos (un DTO).
-
-> [!NOTE]
-> 💡 **Todavía sin id.** Por ahora manejamos **una** empresa, sobre su stream — el comando no necesita decir *cuál*. Cuando lleguen **muchas** ([El almacén en memoria](el-almacen-en-memoria.md)), el comando ganará un `EmpresaId` y el handler la buscará por él.
-
-## El handler: cargar → actuar → guardar, en un solo sitio
-
-Empecemos por lo **concreto**: una clase que haga ese trabajo para la `Empresa`.
-
-> 🛠️ **Inténtalo tú.** Crea una clase `EmpresaCommandHandlers` que reciba el `EventStream<Empresa>` por **constructor** (constructor primario). Dale **un método por comando** —`CambiarPlan(...)` y `Suspender(...)`— que: **cargue** (`Get`), pida a la empresa que **decida**, y **guarde** (`Append`) el hecho. **Ojo:** `Suspender` puede devolver `null` (idempotencia, [Decidir el futuro](decidir-el-futuro.md)) → en ese caso **no** guardes nada.
+> 🛠️ **Inténtalo tú.** Crea `EmpresaCommandHandlers` que reciba el `EventStream<Empresa>` por **constructor**. Dale **un método por operación, con sus parámetros sueltos** —`CambiarPlan(string nuevoPlan)` y `Suspender(string motivo)`—: cada uno **carga** (`Get`), pide a la empresa que **decida**, y **guarda** (`Append`) el hecho. **Ojo:** `Suspender` puede devolver `null` (idempotencia, [Decidir el futuro](decidir-el-futuro.md)) → en ese caso **no** guardes nada.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -37,74 +22,80 @@ Empecemos por lo **concreto**: una clase que haga ese trabajo para la `Empresa`.
 ```csharp
 public class EmpresaCommandHandlers(EventStream<Empresa> stream)
 {
-    public void CambiarPlan(CambiarPlanDeEmpresa cmd)
+    public void CambiarPlan(string nuevoPlan)
     {
-        var empresa = stream.Get();                        // 1. cargar (rehidratar)
-        stream.Append(empresa.CambiarPlan(cmd.NuevoPlan));  // 2+3. actuar y guardar
+        var empresa = stream.Get();                       // 1. cargar (rehidratar)
+        stream.Append(empresa.CambiarPlan(nuevoPlan));     // 2+3. actuar y guardar
     }
 
-    public void Suspender(SuspenderEmpresa cmd)
+    public void Suspender(string motivo)
     {
         var empresa = stream.Get();
-        var hecho   = empresa.Suspender(cmd.Motivo);
-        if (hecho is not null)        // ← Suspender devuelve null si ya estaba suspendida (idempotencia)
-            stream.Append(hecho);     //    en ese caso NO guardamos nada
+        var hecho   = empresa.Suspender(motivo);
+        if (hecho is not null) stream.Append(hecho);       // null = ya suspendida → no guardamos
     }
 }
 ```
 </details>
 
-Fíjate en el `if (hecho is not null)`: como en [Decidir el futuro](decidir-el-futuro.md) hicimos que `Suspender` devuelva `null` cuando la operación es redundante (idempotencia), el handler **debe** respetarlo y no archivar un hecho inexistente. La regla la decide el agregado; el handler solo la **obedece**.
+> [!NOTE]
+> 🆕 **Idioma de C#: el constructor primario.** `public class EmpresaCommandHandlers(EventStream<Empresa> stream)` declara el parámetro `stream` **en la cabecera de la clase** (un *constructor primario*, C# 12+): queda disponible en todos los métodos sin que escribas un campo ni un constructor aparte. Es azúcar para el clásico `private readonly EventStream<Empresa> _stream; public EmpresaCommandHandlers(EventStream<Empresa> stream) { _stream = stream; }`. Es la misma idea posicional del `record`, ahora en una `class` — y la verás en todos los handlers de aquí en adelante.
 
-Ahora el `Program.cs` ya no orquesta nada: crea el handler y le pasa la intención.
+El `if (hecho is not null)` respeta la idempotencia que decidió el agregado ([Decidir el futuro](decidir-el-futuro.md)): la regla la pone la `Empresa`; el handler solo la **obedece**.
+
+El `Program.cs` ya no orquesta el ciclo: crea el handler y le pide la operación, **directo, con sus valores**:
 
 ```csharp
 var stream = new EventStream<Empresa>();
 stream.Append(new EmpresaRegistrada("Constructora Andes", "Básico"));
 
 var handlers = new EmpresaCommandHandlers(stream);
-handlers.Suspender(new SuspenderEmpresa("falta de pago"));
+handlers.CambiarPlan("Premium");
+handlers.Suspender("falta de pago");
 
 Console.WriteLine(stream.Get().Suspendida ? "suspendida" : "activa");   // suspendida
 ```
 
-## 🔧 Un handler por comando (no un súper-secretario)
+Funciona — pero **todo en una sola clase** no escala.
 
-Funciona, pero esconde un acoplamiento: si mañana una API web quiere suspender una empresa, tendría que **saberse de memoria** que el método se llama `Suspender` y vive en `EmpresaCommandHandlers`. Quien envía la intención no debería conocer los nombres internos del secretario.
+## 🔧 Una clase por comando (rompe el súper-secretario)
 
-La salida es la **misma jugada que con `EventStream<T>`** ([El flujo de vida](el-flujo-de-vida.md)): ya tienes lo **concreto**, ahora extrae lo **abstracto**. Un **contrato genérico** con un único método inequívoco —`Handle`— y, por **responsabilidad única**, una clase handler **por cada comando** (especialistas, no un súper-secretario). La interfaz te la muestro (la sintaxis genérica ya la conoces). **🔁 Reemplaza `EmpresaCommandHandlers` por esto** —y **bórrala**—:
+Esa clase es un **súper-secretario**: hoy 2 operaciones, mañana 20, todas amontonadas y tocadas por todos. Por **responsabilidad única**, cada operación merece su **propia clase** —un especialista, no un secretario que hace de todo—.
+
+> 🛠️ **Inténtalo tú.** **🔁 Rompe `EmpresaCommandHandlers`** —y **bórrala**— en **una clase por comando**: `CambiarPlanHandler` y `SuspenderHandler`. Cada una recibe el `EventStream<Empresa>` por constructor y tiene un método `Handle(...)` —con sus **parámetros sueltos**, como antes— que hace **cargar → decidir → guardar** (respetando el `null` de `Suspender`).
+
+<details>
+<summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```csharp
-public interface ICommandHandler<TCommand>
+public class CambiarPlanHandler(EventStream<Empresa> stream)
 {
-    void Handle(TCommand comando);
+    public void Handle(string nuevoPlan) =>
+        stream.Append(stream.Get().CambiarPlan(nuevoPlan));
 }
 
-public class CambiarPlanHandler(EventStream<Empresa> stream) : ICommandHandler<CambiarPlanDeEmpresa>
+public class SuspenderHandler(EventStream<Empresa> stream)
 {
-    public void Handle(CambiarPlanDeEmpresa cmd) =>
-        stream.Append(stream.Get().CambiarPlan(cmd.NuevoPlan));
-}
-
-public class SuspenderHandler(EventStream<Empresa> stream) : ICommandHandler<SuspenderEmpresa>
-{
-    public void Handle(SuspenderEmpresa cmd)
+    public void Handle(string motivo)
     {
-        var hecho = stream.Get().Suspender(cmd.Motivo);
+        var hecho = stream.Get().Suspender(motivo);
         if (hecho is not null) stream.Append(hecho);
     }
 }
 ```
+</details>
 
-Ahora quien envía un comando solo busca *"alguien que cumpla `ICommandHandler<SuspenderEmpresa>`"* y llama a `Handle` — sin saber nombres internos:
+Para ejecutar uno, **eliges la clase y la llamas a mano**:
 
 ```csharp
-ICommandHandler<SuspenderEmpresa> handler = new SuspenderHandler(stream);
-handler.Handle(new SuspenderEmpresa("falta de pago"));
+var handler = new SuspenderHandler(stream);
+handler.Handle("falta de pago");
 ```
 
+Funciona. Pero fíjate: **tú** decides, para cada comando, **qué clase instanciar**. Cuando quieras un **único punto** que reciba un comando *cualquiera* y lo rutee a su handler —sin que quien lo envía conozca la clase—, eso pedirá un par de piezas más: un **tipo por comando** y un **contrato común**. No las inventamos aquí porque **todavía no hacen falta** — nacerán justo cuando las necesites, al construir el **despachador** ([El despachador](el-despachador.md)).
+
 > [!NOTE]
-> 🌱 **Semilla — este handler es plomería que se repite.** Mira los dos `Handle`: ambos hacen *Get → llamar al método → Append*, cambiando solo el comando y el método. Ese patrón tan repetitivo es justo lo que **Wolverine descubrirá y generará por ti** más adelante: tú escribirás solo la decisión, y el framework pondrá el cargar/guardar. Lo construyes a mano ahora para que, cuando lo veas automatizado, sepas exactamente qué hace.
+> 🌱 **Semilla — este handler es plomería que se repite.** Mira los dos `Handle`: ambos hacen *Get → decidir → Append*, cambiando solo el comando y el método. Primero, en [El despachador](el-despachador.md), construirás **a mano** lo que rutea cada comando a su handler; más adelante verás que **Wolverine descubre y genera todo eso por ti** —tú escribirás solo la decisión, el framework pondrá el cargar/guardar y encontrará el handler por su tipo, ese `switch` que no tuviste que escribir—. Lo construyes a mano ahora para que, cuando lo veas automatizado, sepas exactamente qué hace.
 
 ## 🔧 La versión del evento: el stream numera lo que archiva
 
@@ -159,13 +150,13 @@ Quedó repartido con claridad: el **Aggregate Root** (`Empresa`) tiene la **lóg
 > [!NOTE]
 > 🌱 **Semilla — esta repartición es un regalo para los tests.** Como el agregado es puro y el handler es una capa delgada, puedes probar **toda tu lógica de negocio sin mocks ni base de datos**: das hechos pasados (*Given*), ejecutas un comando (*When*) y verificas el hecho emitido (*Then*). Es justo el estilo que la plantilla del equipo trae listo para usar.
 
-Pero todo esto maneja **una sola** empresa, sobre un stream suelto. ¿Y cuando tengas **mil**? Necesitas un sitio central que guarde la historia de **cada** empresa y te dé la correcta por su **id** — y que, ahora que habrá varios escritores, **detecte los choques** usando esos números de versión. Eso es el **Event Store**, la próxima sección.
+Pero fíjate **cómo** ejecutas un comando: eliges la **clase del handler a mano** (`new SuspenderHandler(stream)`). Para que algo reciba un comando *cualquiera* y encuentre su handler solo —sin que tú nombres la clase—, falta una pieza (y, con ella, un par más que la hacen posible). Esa pieza es el **despachador**, la próxima sección.
 
 ---
 
 ## ✅ Compruébalo
 
-- [ ] Moviste el ciclo "cargar → actuar → guardar" del `Program.cs` a un handler **por comando** que implementa `ICommandHandler<TCommand>`.
+- [ ] Moviste el ciclo "cargar → actuar → guardar" del `Program.cs` a una clase handler **por comando** (`CambiarPlanHandler`, `SuspenderHandler`), cada una con su `Handle` recibiendo los **parámetros sueltos**.
 - [ ] El handler de suspender respeta la idempotencia: si `Suspender` devuelve `null`, **no** hace `Append`.
 - [ ] Tu `EventStream` guarda `EventoAlmacenado` (con `Version` y fecha) y **desenvuelve** el sobre al leer.
 - [ ] Explicas por qué el sobre **no** lleva el id de la empresa (el stream ya es de una empresa) y para qué servirá el número de versión (detectar choques).
@@ -190,10 +181,10 @@ git push
 
 ## 🧠 En una frase
 
-El **Command Handler** es una capa delgada que orquesta **cargar → actuar → guardar** para un comando (un `record`), dejando la lógica en el agregado; y al archivar, el `EventStream` envuelve cada hecho en un **sobre `EventoAlmacenado`** con su **posición** (su versión) — el número que pronto servirá para detectar escrituras que chocan.
+El **Command Handler** es una capa delgada (una clase **por comando**) que orquesta **cargar → actuar → guardar**, dejando la lógica en el agregado; y al archivar, el `EventStream` envuelve cada hecho en un **sobre `EventoAlmacenado`** con su **posición** (su versión) — el número que pronto servirá para detectar escrituras que chocan.
 
 ---
 
 [⬅️ Volver: Decidir el futuro (emitir eventos)](./decidir-el-futuro.md)
 
-[➡️ Siguiente: El almacén en memoria (Event Store)](./el-almacen-en-memoria.md)
+[➡️ Siguiente: El despachador (dado un comando, encuentra su handler)](./el-despachador.md)

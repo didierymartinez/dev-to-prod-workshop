@@ -22,6 +22,93 @@ Ese `foreach` + `Clear` es **fontanería de persistencia** repetida en cada hand
 
 La salida: un almacén que **recuerda** qué agregados tocaste durante la operación, y al final los persiste **todos de un golpe**. Esa pieza tiene nombre: **Unit of Work** (unidad de trabajo).
 
+## 🟢 El intento ingenuo: solo recuerdo lo que nace
+
+¿Por qué "recordar"? Hagamos primero lo **obvio** y veámoslo fallar. Un almacén que apunta lo que **nace** (`StartStream`), pero que al **cargar** solo te devuelve el agregado, sin apuntarlo:
+
+```csharp
+public class InMemoryEventStore
+{
+    private readonly Dictionary<string, List<EventoAlmacenado>> _cajones = new();
+    private readonly List<AggregateRoot> _iniciados = new();   // solo lo que NACE aquí
+
+    public void StartStream(AggregateRoot ar) => _iniciados.Add(ar);
+
+    public Task<T?> GetAggregateRootAsync<T>(string id, CancellationToken ct = default) where T : AggregateRoot, new()
+    {
+        var cajon = _cajones.GetValueOrDefault(id);
+        if (cajon is null || cajon.Count == 0) return Task.FromResult<T?>(null);
+        var ar = new T { Id = id };
+        ar.Load(cajon.Select(s => s.EventData));
+        return Task.FromResult<T?>(ar);           // 👈 te lo doy… y me olvido de él
+    }
+
+    public Task SaveChangesAsync(CancellationToken ct = default)
+    {
+        foreach (var ar in _iniciados)            // 👈 SOLO drena lo que nació
+            Volcar(ar);
+        _iniciados.Clear();
+        return Task.CompletedTask;
+    }
+
+    private void Volcar(AggregateRoot ar)
+    {
+        var cajon = _cajones.GetValueOrDefault(ar.Id) ?? new();
+        _cajones[ar.Id] = cajon;
+        var version = ar.Version;
+        foreach (var hecho in ar.UncommittedEvents)
+            cajon.Add(new EventoAlmacenado(++version, DateTime.UtcNow, hecho));
+        ar.ClearUncommittedEvents();
+    }
+}
+```
+
+Ahora un handler que **carga → decide → guarda** una empresa que ya existe:
+
+```csharp
+public class CambiarPlanHandler(InMemoryEventStore store) : ICommandHandler<CambiarPlanDeEmpresa>
+{
+    public async Task HandleAsync(CambiarPlanDeEmpresa cmd, CancellationToken ct = default)
+    {
+        var empresa = await store.GetAggregateRootAsync<Empresa>(cmd.EmpresaId, ct)
+                      ?? throw new InvalidOperationException($"No existe la empresa {cmd.EmpresaId}.");
+        empresa.CambiarPlan(cmd.NuevoPlan);       // levanta PlanCambiado en UncommittedEvents
+        await store.SaveChangesAsync(ct);         // …pero ¿quién drena a `empresa`?
+    }
+}
+```
+
+Para probarlo necesitamos crear una empresa. Dale a `Empresa` una **fábrica estática** que la dé de alta levantando su `EmpresaRegistrada` (la reusaremos en *El alta*, más abajo):
+
+```csharp
+// en Empresa (el evento de creación NO lleva id; el id es la llave del stream, El almacén en memoria)
+public static Empresa Registrar(string id, string nombre, string plan)
+{
+    var empresa = new Empresa { Id = id };
+    empresa.Raise(new EmpresaRegistrada(nombre, plan));
+    return empresa;
+}
+```
+
+Ahora el experimento: damos de alta `emp-7` —y esto **sí** se persiste, porque nació aquí (`StartStream` la apunta en `_iniciados`)—; luego la **cargamos** y le cambiamos el plan:
+
+```csharp
+var store = new InMemoryEventStore();
+
+var creada = Empresa.Registrar("emp-7", "Constructora Andes", "Básico");
+store.StartStream(creada);
+await store.SaveChangesAsync();        // alta OK: emp-7 queda en el cajón
+
+await new CambiarPlanHandler(store).HandleAsync(new CambiarPlanDeEmpresa("emp-7", "Premium"));
+
+var empresa = await store.GetAggregateRootAsync<Empresa>("emp-7");
+Console.WriteLine(empresa!.Plan);      // 💥 imprime "Básico", NO "Premium"
+```
+
+💥 **El cambio se perdió.** El `CambiarPlan` sí levantó su `PlanCambiado` en `UncommittedEvents`, pero `SaveChangesAsync` **solo recorre `_iniciados`** — y esa empresa no nació aquí, la **cargaste**. Como el `Get` te la dio y se **olvidó** de ella, el evento se quedó colgando en el agregado y nunca llegó al cajón. *Si no rastreas lo que cargaste, al guardar lo pierdes.*
+
+La cura es apuntar **también** lo que cargas. Eso pide una **segunda lista**.
+
 ## El almacén directo (te lo muestro: el rastreo es sutil)
 
 Esta pieza —un almacén que rastrea agregados y los drena al guardar— es maquinaria fina, así que te la muestro entera. **🔁 Reemplaza tu `InMemoryEventStore`** por esta versión (y **borra** la clase `EventStream<T>` y el viejo `AbrirStream`: ya no existen):
@@ -98,26 +185,18 @@ Lo importante de leer ahí:
 
 `GetAggregateRootAsync` sirve para uno que **ya existe**. ¿Y para **registrar** una empresa nueva, que aún no tiene stream? Ahí entra `StartStream`. Démosle a `Empresa` una forma de nacer.
 
-> 🛠️ **Inténtalo tú.** (1) Añade a `Empresa` un método estático `Registrar(id, nombre, plan)` que cree una empresa, le ponga el `Id`, y **levante** (`Raise`) un `EmpresaRegistrada(nombre, plan)`. (2) Escribe un `RegistrarEmpresaHandler` que la cree con `Empresa.Registrar(...)`, la pase a `store.StartStream(...)` y llame a `store.SaveChangesAsync(ct)`.
+> 🛠️ **Inténtalo tú.** Ya tienes la fábrica `Empresa.Registrar(...)` (la definiste arriba para el experimento). Escribe ahora un `RegistrarEmpresaHandler` que **primero** pregunte `await store.ExistsAsync<Empresa>(cmd.EmpresaId, ct)` y lance si ese id ya tiene stream (no se registra dos veces); si no existe, cree la empresa con `Empresa.Registrar(...)`, la pase a `store.StartStream(...)` y llame a `store.SaveChangesAsync(ct)`.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
-
-```csharp
-// en Empresa (recuerda: el evento de creación no lleva id; el id es la llave del stream, El almacén en memoria)
-public static Empresa Registrar(string id, string nombre, string plan)
-{
-    var empresa = new Empresa { Id = id };
-    empresa.Raise(new EmpresaRegistrada(nombre, plan));
-    return empresa;
-}
-```
 
 ```csharp
 public class RegistrarEmpresaHandler(InMemoryEventStore store) : ICommandHandler<RegistrarEmpresa>
 {
     public async Task HandleAsync(RegistrarEmpresa cmd, CancellationToken ct = default)
     {
+        if (await store.ExistsAsync<Empresa>(cmd.EmpresaId, ct))   // ya tiene stream → no se registra dos veces
+            throw new InvalidOperationException($"La empresa {cmd.EmpresaId} ya existe.");
         var empresa = Empresa.Registrar(cmd.EmpresaId, cmd.Nombre, cmd.Plan);
         store.StartStream(empresa);
         await store.SaveChangesAsync(ct);
@@ -127,6 +206,8 @@ public class RegistrarEmpresaHandler(InMemoryEventStore store) : ICommandHandler
 
 Con su comando: `public record RegistrarEmpresa(string EmpresaId, string Nombre, string Plan);`
 </details>
+
+> 💡 Ese `ExistsAsync` es el primer **consumidor** del método que dejamos en el almacén: pregunta *"¿este id ya tiene historia?"* antes de abrir un stream nuevo. Cuando reveles Marten, su equivalente será **`FetchStreamStateAsync(id)`** (devuelve el estado del stream, o `null` si no existe) — la misma pregunta, una API distinta.
 
 ## 🔧 Los handlers ya no drenan
 

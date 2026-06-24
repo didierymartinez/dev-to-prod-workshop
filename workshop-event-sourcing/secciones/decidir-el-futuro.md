@@ -84,6 +84,9 @@ El agregado es el **guardián de las reglas**, así que la defensa nace **dentro
 
 > 🛠️ **Inténtalo tú.** **🔁 Modifica** los dos métodos que ya escribiste (no crees otra clase): que `CambiarPlan` **lance** una excepción `ReglaDeNegocioException` si la empresa está `Suspendida` (la operación es **inválida**), y que `Suspender` **devuelva `null`** si ya está `Suspendida` (es **redundante**, no un error → su tipo de retorno pasa a `EmpresaSuspendida?`). *(`Reactivar()` queda igual.)*
 
+> [!NOTE]
+> 🆕 **Idioma de C#: el tipo anulable `T?`.** Escribir `EmpresaSuspendida?` (con el `?`) declara que ese valor **puede ser `null`** —aquí, "no emití ningún hecho"—. Sin el `?`, el compilador asume que un tipo de referencia **nunca** es null y te avisa si devuelves uno; con el `?`, le dices "sí puede serlo" y, a cambio, el compilador **te obliga a contemplar el caso** (a comprobar si es null antes de usarlo) en quien reciba el resultado.
+
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
@@ -92,6 +95,9 @@ Primero, la excepción (al final, con las demás clases):
 ```csharp
 public class ReglaDeNegocioException(string mensaje) : Exception(mensaje);
 ```
+
+> [!NOTE]
+> 🆕 **Idioma de C#: el constructor primario.** `class ReglaDeNegocioException(string mensaje)` declara el parámetro `mensaje` **en la cabecera de la clase** (un *constructor primario*, C# 12+): queda disponible sin que escribas un campo ni un constructor aparte. Aquí lo encadenamos a la base con `: Exception(mensaje)`. Es azúcar para el clásico `public ReglaDeNegocioException(string mensaje) : base(mensaje) { }`. Es la misma idea posicional del `record`, ahora en una `class` — y la verás en los handlers más adelante.
 
 Y en tu `Empresa`, **reemplaza** esos dos métodos:
 
