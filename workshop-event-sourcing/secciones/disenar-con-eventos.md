@@ -36,6 +36,8 @@ La regla práctica:
 
 "Tercero creado o rechazado" suele ser una **pregunta** ("¿me aprobaste este tercero?") cuando el flujo de origen **se bloquea** esperándola: ahí gRPC encaja mejor que un evento. Un evento brilla cuando **notificas un hecho y otros reaccionan a su ritmo**, sin que tú esperes. (Es justo lo que se nota en la práctica: *"servicios que deberían comunicarse por gRPC y los forzamos a un eventual… terminamos esperando respuesta"* — ese es el smell.)
 
+Y la **otra cara**, del lado del **consumidor**: si un handler *reacciona* a un evento ejecutando **lógica de dominio que cambia estado y puede ser *rechazada*** (validar, fallar), eso **no** es reaccionar a un hecho — es un **comando disfrazado de evento**. Hazlo explícito: un comando con su handler, no un efecto colgado de un evento. *(Khorikov: los domain events son para comunicar **efectos más allá de la BD**; el flujo dentro de la app va explícito —devuelve el resultado y pásalo al siguiente paso—, no por eventos.)*
+
 ## Decisión 3 — el acoplamiento que los eventos esconden
 
 Los eventos desacoplan en el **espacio** (el emisor no conoce al consumidor) — pero pueden **acoplarte en el tiempo y en el flujo** si los usas para *coordinar* un proceso. Dos olores:
@@ -51,6 +53,36 @@ Cuando un hecho dispara una cadena (`RegistroObligacionCreado` → crear/rechaza
 - **Orquestación:** un **coordinador** (un orquestador / una *saga*) dice los pasos y las compensaciones. El proceso queda **explícito y visible**, a costa de un punto central.
 
 Regla de pulgar: para *notificaciones* sueltas, coreografía; para un **proceso con pasos, resultados y compensaciones**, una saga/orquestador suele razonarse mejor que pura coreografía.
+
+## 🧭 Zoom out: tres patrones que se llaman "evento"
+
+Las cuatro decisiones de arriba se confunden porque **tres patrones distintos** usan la palabra "evento". Sepáralos por su **propósito**:
+
+| Patrón | Propósito | Dónde vive en este taller |
+|---|---|---|
+| **Event Sourcing** | **Persistencia**: el evento **es el estado**; reconstruyes reproduciéndolo | el event store ([El almacén directo](el-almacen-directo.md)) |
+| **Domain events in-process** | **Notificación dentro del mismo proceso/transacción** | el agregado los **levanta** y se despachan **al commit** (el `UnitOfWorkMiddleware` de [Revelar Wolverine](revelar-wolverine.md)) |
+| **EDA / integration events** | **Comunicación async entre servicios** (cruzan boundaries) | `IPublicEvent` → broker ([Transportes](transportes-rabbitmq-asb.md)) |
+
+La trampa: **es el mismo evento el que cambia de ROL**. Mientras vive en el stream, es **estado** (ES). En el momento en que lo publicas para que **otro** reaccione, pasó a ser un **mensaje** (EDA) — y ahora exige lo que EDA exige: async, durabilidad, idempotencia, consistencia eventual, contexto en el sobre. El error clásico —el que originó esta sección— es **handlearlo fingiendo que sigue siendo ES/in-process** (por una cola en memoria handleada de inmediato), saltándose todo eso.
+
+> [!NOTE]
+> 💡 **Los cuatro significados de "event-driven" (Martin Fowler).** "Event-driven" no es **una** cosa: (1) **Event Notification** —avisar de un cambio sin esperar respuesta (tus `IPublicEvent`)—; (2) **Event-carried State Transfer** —el evento lleva **suficientes datos** para que el consumidor no tenga que volver a llamar al emisor (un evento "gordo")—; (3) **Event Sourcing** —el log es la fuente de la verdad (todo este taller)—; (4) **CQRS** —separar lectura de escritura ([CQRS y proyecciones](cqrs-proyecciones.md))—. El taller construye 1, 3 y 4; el **2 (ECST)** es una decisión de diseño: un evento más gordo **desacopla** al consumidor de llamadas síncronas, a costa de **duplicar datos** y versionar un contrato más grande.
+
+> [!NOTE]
+> 💡 **Domain events in-process: el patrón legítimo (Jimmy Bogard).** Levantar domain events y despacharlos **dentro del proceso** es válido y respetado —*si* lo haces bien—: **no despaches al instante**; **registra** los eventos en el agregado y **despáchalos en un punto controlado, justo al commit, en el mismo scope/transacción**. Es justo lo que hace tu `UnitOfWorkMiddleware` ([Revelar Wolverine](revelar-wolverine.md)). El **anti-patrón** es una **cola en memoria handleada de inmediato en otro scope**: ahí no hay misma transacción (el efecto se **pierde** si el proceso cae) ni contexto (`local://` no rehidrata el tenant, [El tenant viaja con el mensaje](tenant-viaja-con-el-mensaje.md)). Para un efecto **intra-proceso**, un broker real sería *overkill*; el broker es para los **integration events** que cruzan servicios.
+
+## 📋 La regla, en cuatro líneas
+
+Para decidir **qué hacer con un hecho** que tu comando produce:
+
+1. **Es estado (ES)** → va al **event store**. No se "publica para handlear".
+2. **Es efecto de la *misma* decisión de negocio** (mismo comando; mismo agregado o efecto acotado) → **flujo explícito** o **domain event diferido al commit**, en el **mismo scope** — **no una cola**.
+3. **Es una reacción *cross-cutting*** (otro agregado / otro proceso / otro servicio) → **EDA real**: outbox + async + idempotencia + el contexto (tenant) viajando en el sobre.
+4. **Un handler de evento NUNCA ejecuta lógica de dominio que pueda ser *rechazada*.** Si puede fallar/validar, no estás reaccionando a un hecho: es un **comando** — hazlo explícito.
+
+> [!NOTE]
+> ⚖️ Esto resume la **postura del equipo** para `Cosmos.BuildingBlocks`: **un mecanismo por caso**, no un "evento → cola en memoria → handler" para todo. La frontera entre la regla 2 y la 3 la decide el **criterio de Vernon** ([El almacén directo](el-almacen-directo.md)): ¿dejar consistente es trabajo del usuario de este caso de uso, o de otro/del sistema?
 
 ---
 
