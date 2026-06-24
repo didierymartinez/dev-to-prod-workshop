@@ -1,0 +1,27 @@
+{
+  "name": "workshop-event-sourcing-video",
+  "version": "0.1.0",
+  "description": "Videos explicativos (Remotion) de las secciones del taller de Event Sourcing",
+  "private": true,
+  "scripts": {
+    "dev": "remotion studio",
+    "studio": "remotion studio",
+    "render": "remotion render",
+    "render:todas": "remotion render todas-las-secciones out/todas.mp4",
+    "upgrade": "remotion upgrade"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "@remotion/google-fonts": "^4.0.482",
+    "@remotion/layout-utils": "^4.0.482",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "typescript": "^5.4.0"
+  }
+}
