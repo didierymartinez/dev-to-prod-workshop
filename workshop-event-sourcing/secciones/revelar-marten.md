@@ -10,7 +10,7 @@ Reemplazar tu `InMemoryEventStore` por uno construido sobre **Marten** (Postgres
 
 Hasta ahora los handlers reciben el tipo **concreto** `InMemoryEventStore`. Para poder cambiarlo por otro, necesitan depender de un **contrato**, no de una implementación. Es el momento de extraer `IEventStore` — y es justo ahora porque por fin hay una **segunda implementación** (la de Marten) que justifica la abstracción.
 
-> 🛠️ **Inténtalo tú.** (1) Extrae una interfaz `IEventStore` con los métodos públicos de tu almacén (`StartStream`, `GetAggregateRootAsync<T>`, `AppendEvent`, `SaveChangesAsync`, `ExistsAsync<T>`). (2) Haz que `InMemoryEventStore` la implemente (`: IEventStore`). (3) En los tres handlers, cambia el parámetro `InMemoryEventStore store` por **`IEventStore store`**. Compila: debe seguir todo igual.
+> 🛠️ **Inténtalo tú.** (1) Extrae una interfaz `IEventStore` con los métodos públicos de tu almacén (`StartStream`, `GetAggregateRootAsync<T>`, `SaveChangesAsync`, `ExistsAsync<T>`). (2) Haz que `InMemoryEventStore` la implemente (`: IEventStore`). (3) En los tres handlers, cambia el parámetro `InMemoryEventStore store` por **`IEventStore store`**. Compila: debe seguir todo igual.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -20,7 +20,6 @@ public interface IEventStore
 {
     void StartStream(AggregateRoot agregado);
     Task<T?> GetAggregateRootAsync<T>(string id, CancellationToken ct = default) where T : AggregateRoot, new();
-    void AppendEvent(string id, object hecho);
     Task SaveChangesAsync(CancellationToken ct = default);
     Task<bool> ExistsAsync<T>(string id, CancellationToken ct = default) where T : AggregateRoot;
 }
@@ -77,8 +76,6 @@ public class MartenEventStore(IDocumentSession session, IQuerySession querySessi
         RastrearModificado(ar);
         return ar;
     }
-
-    public void AppendEvent(string id, object hecho) => session.Events.Append(id, hecho);
 
     public async Task<bool> ExistsAsync<T>(string id, CancellationToken ct = default) where T : AggregateRoot
         => await querySession.Events.FetchStreamStateAsync(id, ct) is not null;

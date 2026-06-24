@@ -15,7 +15,10 @@ Para esto solo necesitas **.NET** — ni base de datos ni librerías todavía. C
 ```bash
 dotnet new console -n Empresas.Historia
 cd Empresas.Historia
+dotnet new gitignore          # ignora bin/ y obj/ — sin esto, tus commits subirían binarios
 ```
+
+> 💡 **Dónde queda cada cosa (y desde dónde corres los comandos).** El repo Git lo iniciaste en [El diario de una empresa](el-diario-de-una-empresa.md), en tu carpeta de trabajo; el proyecto acaba de nacer **dentro**, en `Empresas.Historia/`. De aquí en adelante corre `dotnet run` **dentro** de la carpeta del proyecto, y los `git add`/`commit`/`push` desde donde está el `.git`. El `.gitignore` que acabas de crear evita que `bin/`/`obj/` (binarios de compilación) ensucien tu bitácora.
 
 Listo. A anotar hechos.
 
@@ -101,6 +104,9 @@ Esas variables sirven para un script de juguete. Pero en un sistema real querrá
 
 > 🛠️ **Inténtalo tú.** Crea una clase `Empresa`: mete las cuatro variables como **propiedades** (de solo-lectura desde fuera: `{ get; private set; }`), y en el **constructor** recibe `IEnumerable<object> historia` y corre adentro el mismo `foreach` que acabas de escribir. Luego, arriba, **reemplaza** las variables sueltas por `var empresa = new Empresa(historia);` e imprime su estado. **Ve e inténtalo**, y luego te muestro una forma:
 
+> [!NOTE]
+> 🆕 **Idioma de C#: `{ get; private set; }`.** Una propiedad que se **lee** desde cualquier parte pero solo se **escribe** dentro de su propia clase. El `get;` es público; el `private set;` deja la asignación reservada al código de `Empresa` (su constructor, en este caso). Por eso de afuera puedes hacer `empresa.Plan`, pero `empresa.Plan = "X"` no compila. Es el equivalente a escribir un campo privado con una propiedad de solo lectura, en una sola línea — y es justo lo que protege la coherencia del agregado.
+
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
@@ -156,7 +162,7 @@ No guardaste el estado: lo **reconstruiste** a partir de los hechos. Un `record`
 
 - [ ] `dotnet run` imprime el estado reconstruido (`plan Premium`, `reactivada 1 vez/veces`).
 - [ ] Agrega `new PlanCambiado("Enterprise")` al final de `historia` y vuelve a correr: el estado refleja "Enterprise" **sin que toques el replay**.
-- [ ] Intenta `((EmpresaRegistrada)historia[0]).Plan = "X"` y observa que **no compila**: el pasado no se edita.
+- [ ] Toma el primer hecho con `if (historia[0] is EmpresaRegistrada r)` e intenta `r.Plan = "X"`: observa que **no compila**: el pasado no se edita.
 - [ ] Explica con tus palabras por qué un hecho se modela como `record` y no como una clase mutable.
 
 ---

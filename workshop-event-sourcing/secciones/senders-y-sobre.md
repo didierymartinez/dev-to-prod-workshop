@@ -41,7 +41,9 @@ public class TestPublicEventSender : IPublicEventSender
 </details>
 
 > [!NOTE]
-> **¿Por qué DOS enviadores y no uno?** Porque van por **caminos distintos**: los públicos salen a un **broker externo** (RabbitMQ, Azure Service Bus) para que otros servicios los oigan; los privados viajan por un **bus interno** del mismo servicio. Separarlos en `GetPublicEvents`/`GetPrivateEvents` ([Público vs privado](publico-vs-privado.md)) y en dos senders deja esa decisión explícita. Y el `groupId` pide **orden FIFO** dentro de un grupo (p. ej. todos los hechos de `emp-7` en orden), cuando importa.
+> **¿Por qué DOS enviadores y no uno?** Porque van por **caminos distintos**: los públicos salen a un **broker externo** (RabbitMQ, Azure Service Bus) para que otros servicios los oigan; los privados viajan por un **bus interno** del mismo servicio. Separarlos en `GetPublicEvents`/`GetPrivateEvents` ([Público vs privado](publico-vs-privado.md)) y en dos senders deja esa decisión explícita. Y el `groupId` pide **orden FIFO** —*first in, first out*: se entregan en el orden en que se enviaron— dentro de un grupo (p. ej. todos los hechos de `emp-7` en orden), cuando importa.
+>
+> 🌱 Por ahora el `groupId` **no hace nada todavía**: tu `TestPublicEventSender` lo ignora y solo acumula. Su FIFO **real** llega con el broker en [Transportes (RabbitMQ y ASB)](transportes-rabbitmq-asb.md), que es quien respeta el orden por grupo.
 
 ## 🔧 El sobre: metadatos sin ensuciar el evento
 
@@ -56,6 +58,9 @@ public record Sobre(object Payload, string TenantId, string? UserId = null, stri
 </details>
 
 El evento sigue limpio; el contexto viaja en el sobre. Al publicar, se **estampa** el tenant/usuario actual en el sobre — y se **re-lee** en cada publicación (porque una cadena de handlers podría cambiar de contexto).
+
+> [!NOTE]
+> 📐 Aquí **solo MODELAS la forma** del sobre: el `record` que dice *qué metadatos* lo acompañan. Ninguna firma lo recibe todavía y la comprobación de abajo no lo toca — el cableado **evento→sobre** (quién lo construye, quién lo estampa al publicar) llega en [Transportes (RabbitMQ y ASB)](transportes-rabbitmq-asb.md), donde tu `Sobre` se convierte en el `DeliveryOptions` de Wolverine.
 
 > [!NOTE]
 > 🌱 **Semilla — tu `Sobre` es el `DeliveryOptions` de Wolverine.** Cuando reveles los transportes ([Transportes (RabbitMQ y ASB)](transportes-rabbitmq-asb.md)), no construirás el sobre a mano: Wolverine trae `DeliveryOptions { TenantId, GroupId }` y un `.WithHeader("user_id", …)`. La capa del equipo centraliza eso en un helper (`TenancyDelivery.Build`) y sus enviadores reales —`WolverinePublicEventSender`/`WolverinePrivateEventSender`— publican con `IMessageBus.PublishAsync(evento, sobre)`. *De dónde sale el tenant/usuario* lo **resuelve** un `ITenantResolver` (que los senders reciben inyectado); lo construirás en [Resolver el tenant](resolver-el-tenant.md) a [El tenant viaja con el mensaje](tenant-viaja-con-el-mensaje.md).
@@ -79,6 +84,8 @@ Console.WriteLine($"enviados al bus público: {sender.Enviados.Count} " +
 > enviados al bus público: 1 (EmpresaSuspendida)
 > ```
 > El agregado separó el hecho público ([Público vs privado](publico-vs-privado.md)) y el sender lo publicó; el `groupId` pidió orden para ese stream. El `EmpresaRegistrada` (no público) no salió.
+>
+> 🌱 Aquí solo ejercitas el **lado público**: el privado (`EmpresaRegistrada`) daría `0` con este sender. No es un error — su camino (bus interno) se **siente de verdad** en [Transportes (RabbitMQ y ASB)](transportes-rabbitmq-asb.md), donde el `WolverinePrivateEventSender` lo lleva al bus del propio servicio.
 
 ---
 

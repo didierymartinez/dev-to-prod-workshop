@@ -55,6 +55,9 @@ services.AddScoped<ITenantResolver, TrustedHeadersTenantResolver>();
 </details>
 
 > [!NOTE]
+> 🆕 **Estás en una app web (idioma nuevo).** Esto corre sobre el host web que montaste al revelar Wolverine ([Revelar Wolverine](revelar-wolverine.md)). Un **header HTTP** es un par clave-valor que acompaña a cada petición (metadatos como `X-Tenant-Id`, aparte del cuerpo). `IHttpContextAccessor` es el servicio de ASP.NET Core que, inyectado en cualquier clase, te entrega la petición en curso (`HttpContext?.Request.Headers`); se habilita con `services.AddHttpContextAccessor()`. Un **gateway** es el servicio que recibe el tráfico de internet **antes** que el tuyo (y que aquí ya autenticó y estampó esos headers).
+
+> [!NOTE]
 > **Header "confiable": la app no autentica, confía en quien va delante.** En la arquitectura del equipo, un **gateway** ya autenticó al usuario y **estampó** `X-Tenant-Id`/`X-User-Id` antes de que la petición llegue a tu servicio. Tu app los **lee** como verdad. Por eso, si faltan, **lanzas** (un error fuerte) en vez de asumir un default silencioso: un request sin tenant es un bug de infraestructura, no algo que adivinar.
 
 > [!NOTE]

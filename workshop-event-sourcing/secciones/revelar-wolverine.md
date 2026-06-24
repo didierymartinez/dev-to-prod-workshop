@@ -1,6 +1,6 @@
 # El gran reveal (2): Wolverine y el commit automático
 
-Marten reemplazó tu almacén ([Revelar Marten](revelar-marten.md)). Falta la otra mitad del Critter Stack: **Wolverine**, que reemplaza dos cosas que hiciste a mano — el **despacho** de comandos ([El Command Handler](el-command-handler.md)) y el contenedor que arma handlers ([Inyección de Dependencias](inyeccion-de-dependencias.md)) — y, de regalo, te quita el `SaveChangesAsync` de encima.
+Marten reemplazó tu almacén ([Revelar Marten](revelar-marten.md)). Falta la otra mitad del Critter Stack: **Wolverine**, que reemplaza dos cosas que hiciste a mano — el **despacho** de comandos ([El despachador](el-despachador.md)) y el contenedor que arma handlers ([Inyección de Dependencias](inyeccion-de-dependencias.md)) — y, de regalo, te quita el `SaveChangesAsync` de encima.
 
 ## 🎯 El Objetivo
 
@@ -9,7 +9,7 @@ Que Wolverine **descubra y ejecute** tus handlers por convención, y que el **gu
 ## El dolor: dos plomerías que se repiten
 
 1. **Cada handler termina igual:** `await store.SaveChangesAsync(ct);`. Es un *cross-cutting concern* —algo transversal a todos— repetido a mano. Si un día olvidas la línea, ese comando no persiste.
-2. **El despacho lo armas tú:** en [El Command Handler](el-command-handler.md) escribiste el `ICommandHandler<T>` y en [Inyección de Dependencias](inyeccion-de-dependencias.md) un mini-contenedor que resuelve e invoca. Es plomería: encontrar el handler del comando y llamarlo.
+2. **El despacho lo armas tú:** en [El Command Handler](el-command-handler.md) escribiste el `ICommandHandler<T>`, en [El despachador](el-despachador.md) construiste el despachador que rutea cada comando a su handler por tipo, y en [Inyección de Dependencias](inyeccion-de-dependencias.md) un mini-contenedor que los **construye** (resuelve sus dependencias). Es plomería: encontrar el handler del comando, armarlo y llamarlo.
 
 Wolverine hace ambas: **descubre** tus handlers (sin que registres cada uno) y ejecuta un **middleware** —código que corre antes/después de tu handler sin que el handler lo invoque— alrededor de cada comando, que hace el `SaveChanges` por ti.
 
@@ -88,6 +88,9 @@ public class UnitOfWorkMiddleware(IEventStore eventStore)
 
 ## Cablear Wolverine
 
+> [!NOTE]
+> 🆕 **De consola a app web.** Hasta aquí tu `Program.cs` era una **app de consola** (`new ServiceCollection()`, [Inyección de Dependencias](inyeccion-de-dependencias.md)). Wolverine —y la multi-tenancy por HTTP que viene ([Resolver el tenant](resolver-el-tenant.md))— viven en una **app web**, así que de aquí en adelante el host es un `WebApplicationBuilder` (`var builder = WebApplication.CreateBuilder(args);`, con el SDK `Microsoft.NET.Sdk.Web`). Es el **mismo** contenedor de DI que ya conoces —`builder.Services` es tu `ServiceCollection` de siempre—, solo que con un servidor web y un pipeline HTTP encima. Por eso aparece `builder`.
+
 Todo se enchufa en el arranque. Instala **dos** paquetes:
 
 ```bash
@@ -113,14 +116,14 @@ builder.UseWolverine(options =>
 builder.Services.AddScoped<IEventStore, MartenEventStore>();   // el swap de «Revelar Marten» SIGUE: así Handle(…, IEventStore store) resuelve
 ```
 
-Esto reemplaza tu [El Command Handler](el-command-handler.md) + [Inyección de Dependencias](inyeccion-de-dependencias.md) + el `SaveChangesAsync` de cada handler:
+Esto reemplaza tu [El despachador](el-despachador.md) + [Inyección de Dependencias](inyeccion-de-dependencias.md) (el `ICommandHandler<T>` de [El Command Handler](el-command-handler.md) queda opcional) + el `SaveChangesAsync` de cada handler:
 - `Discovery.IncludeAssembly` → encuentra los handlers (adiós mini-contenedor).
 - `UseRuntimeCompilation` → genera el código del despacho en el arranque (lo levantamos en [Reflexión vs codegen](reflexion-vs-codegen.md)).
 - `IntegrateWithWolverine` → deja que Wolverine guarde sus propios mensajes en la **misma** transacción de Marten (el outbox/inbox; a fondo en [Outbox e Inbox](outbox-inbox.md)).
 - `AddMiddleware<UnitOfWorkMiddleware>` + `AutoApplyTransactions` → el guardar, automático.
 
 > [!NOTE]
-> 🌱 **Semilla — `IMessageBus` y cómo se invoca.** Donde antes hacías `new SuspenderHandler(store).HandleAsync(...)`, ahora inyectas un `IMessageBus` y haces `await bus.InvokeAsync(new SuspenderEmpresa("emp-7", "falta de pago"))`. Wolverine resuelve el handler, corre el middleware y comitea. (La plantilla envuelve esto en un `ICommandRouter` para no exponer `IMessageBus` al dominio.)
+> 🌱 **Semilla — `IMessageBus` y cómo se invoca.** Donde antes hacías `new SuspenderHandler(store).HandleAsync(...)`, ahora inyectas un `IMessageBus` y haces `await bus.InvokeAsync(new SuspenderEmpresa("emp-7", "falta de pago"))`. Wolverine resuelve el handler, corre el middleware y comitea. (La plantilla esconde este `IMessageBus` tras una pequeña interfaz propia —un *router* de comandos— para no exponerlo al dominio; **no la construyes en el taller**, la reconocerás al abrir la plantilla.)
 
 > [!NOTE]
 > 🌱 **Semilla — ¿magia? No: código generado ([Reflexión vs codegen](reflexion-vs-codegen.md)).** Wolverine no usa reflexión en cada llamada para encontrar tu `Handle`: **genera código** en el arranque (`UseRuntimeCompilation`) que llama tu handler y tu middleware directo. En [Reflexión vs codegen](reflexion-vs-codegen.md) levantamos esa última magia y miramos el código que genera.

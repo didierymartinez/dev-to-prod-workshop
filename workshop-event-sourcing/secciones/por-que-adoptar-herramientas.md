@@ -56,7 +56,7 @@ Ninguna de estas es "imposible" — las podrías construir. Pero son **meses** d
 Hay dos librerías hermanas (mismo autor, la familia se llama **Critter Stack**) que hacen exactamente lo que tú ya entiendes:
 
 - **Marten** — convierte **PostgreSQL** en un **event store** (y base documental) de primera. Guarda streams de eventos, los rehidrata reproduciéndolos, lleva la versión, serializa y **deserializa al tipo correcto** por ti, y trae proyecciones, multi-tenancy y time-travel horneados. Es tu `InMemoryEventStore` + todo el plumbing de Postgres de [Docker y PostgreSQL](docker-postgres.md), hecho por expertos.
-- **Wolverine** — un **mediador + mensajería**. Encuentra tus handlers, despacha comandos, **comitea (guarda) por ti** al final de cada uno, y publica eventos a un **broker** (un servicio de mensajería intermedio —tipo cola— que aún no construyes) con **outbox/inbox** durable. Es tu `CommandHandler` y tu orquestación, industrializados.
+- **Wolverine** — un **mediador** —algo que recibe un comando y lo entrega a quien sabe manejarlo, sin que el emisor conozca al handler— **+ mensajería**. Encuentra tus handlers, despacha comandos, **comitea (guarda) por ti** al final de cada uno, y publica eventos a un **broker** (un servicio de mensajería intermedio —tipo cola— que aún no construyes) con **outbox/inbox** durable. Es tu `CommandHandler` y tu orquestación, industrializados.
 
 > [!NOTE]
 > 💡 Wolverine **no** reemplaza tu contenedor de DI ([Inyección de Dependencias](inyeccion-de-dependencias.md)): se **apoya** en él. Lo que reemplaza es el **despacho** de comandos y el "guardar al final" que escribías a mano.

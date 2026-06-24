@@ -24,6 +24,24 @@ public async Task Handle(CambiarPlanDeEmpresa cmd, IDocumentSession session, Can
 
 Fíjate: **devuelve/anexa los hechos** y Marten controla la versión. Se parece a tu **[Decidir el futuro](decidir-el-futuro.md)** (decidir y devolver el hecho), no a tu [El agregado que acumula](el-agregado-acumula.md) (acumular). Menos código, concurrencia gratis.
 
+Wolverine lleva esto un paso más allá con el atributo **`[Aggregate]`** —su *Aggregate Handler Workflow*—: él hace el `FetchForWriting` por ti, te **inyecta el agregado ya cargado** como parámetro, y **persiste lo que devuelvas** sin que llames a `SaveChangesAsync`. El mismo caso queda así:
+
+```csharp
+// el camino NATIVO con [Aggregate]: Wolverine carga y persiste por ti
+[Aggregate]                                  // marca el parámetro a cargar/guardar (Empresa, por su id)
+public static PlanCambiado Handle(CambiarPlanDeEmpresa cmd, Empresa empresa)
+{
+    if (empresa.Suspendida)                  // valida con el estado actual, ya cargado
+        throw new ReglaDeNegocioException("No se puede cambiar el plan de una empresa suspendida.");
+    return new PlanCambiado(cmd.NuevoPlan);  // lo que devuelves se anexa al stream (concurrencia optimista incluida)
+}
+```
+
+Compáralo con tu camino: ahí **tu** `UnitOfWorkMiddleware` es quien envuelve el handler para guardar al final. Con `[Aggregate]`, ese pegamento lo **genera Wolverine** y no se ve. Más automático todavía — y más caja negra.
+
+> [!NOTE]
+> 🆕 **Idioma de C#: handler estático.** El `[Aggregate]` permite que el método sea `static` y devuelva el evento directo: Wolverine descubre el handler por convención (no necesita una instancia) y trata el valor devuelto como "esto va al stream". Es la misma idea de tu `decide` (devolver el hecho), pero cableada por el framework.
+
 ## Vertiente 2 — La capa del equipo (lo que construiste)
 
 Tu camino: `IEventStore` + `MartenEventStore` (con `AggregateStreamAsync` para cargar y `Events.Append` para escribir) + `MartenUnitOfWork` + `UnitOfWorkMiddleware`. El agregado **acumula** (`Raise`) y el almacén **drena**. **Más código propio**, pero a cambio de control. Verificado: la capa del equipo **no** usa `FetchForWriting` en ningún lado.

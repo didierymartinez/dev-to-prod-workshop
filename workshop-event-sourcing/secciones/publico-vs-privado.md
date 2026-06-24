@@ -8,9 +8,28 @@ Marcar qué hechos son **públicos** (cruzan a otros servicios) y cuáles **priv
 
 ## El dolor: ¿cómo marco un hecho como "externo"?
 
-El primer instinto es feo. ¿Un `bool EsExterno` en cada evento? ¿Una convención de nombres (`...Integracion`)? ¿Una lista de tipos "públicos" en algún lado? Todas se rompen: una bandera se olvida de poner, una convención de nombres no la verifica nadie, una lista central se desincroniza. Necesitas algo que el **compilador** entienda y que viva **con el tipo**.
+El primer instinto es una **bandera**: un `bool EsExterno` en cada evento.
 
-La herramienta de C#: una **interfaz marcadora** — una interfaz **vacía** que solo sirve para *etiquetar* un tipo. Un evento "es público" simplemente **implementándola**.
+```csharp
+public record EmpresaSuspendida(string Motivo, bool EsExterno = true);
+public record PlanCambiado(string Plan, bool EsExterno = false);
+```
+
+Y para separarlos, recorres la lista mirando la bandera:
+
+```csharp
+var publicos = _uncommittedEvents.Where(e => ((dynamic)e).EsExterno);
+```
+
+Funciona… hasta que **mañana agregas un hecho nuevo**. Llega `EmpresaReactivada`, que otros servicios SÍ querrían oír, y la escribes sin pensar en la bandera:
+
+```csharp
+public record EmpresaReactivada();   // ⟵ ¡sin el bool EsExterno!
+```
+
+Compila sin chistar. Pero al **correr**, el filtro `((dynamic)e).EsExterno` **revienta** sobre ese evento (no tiene el campo) — y si le pusieras el campo pero olvidaras `= true`, se quedaría en `false` y la reactivación **nunca cruzaría la frontera**, sin avisar. Crash en runtime de un lado, bug silencioso del otro: en ambos, **nada te obligó** a marcar el evento, y leer una bandera repartida en records distintos ya te empujó a `(dynamic)` —perdiendo el chequeo de tipos—. Lo mismo con una convención de nombres (`...Integracion`, nadie verifica que la respetaste) o una lista central de "tipos públicos" en otro archivo (se desincroniza). Necesitas algo que el **compilador** entienda y que viva **con el tipo**, no a su lado.
+
+La herramienta de C#: una **interfaz marcadora** — una interfaz **vacía** que solo sirve para *etiquetar* un tipo. Un evento "es público" simplemente **implementándola**: queda escrito en su firma, no en un campo que se olvida.
 
 ## 🔧 Refactor: interfaces marcadoras + filtrar
 
@@ -45,6 +64,9 @@ public IPrivateEvent[] GetPrivateEvents() => _uncommittedEvents.OfType<IPrivateE
 > **Por qué la mayoría de eventos no marca nada.** Fíjate: `EmpresaRegistrada` y `PlanCambiado` no implementan `IPublicEvent` ni `IPrivateEvent` — son hechos de dominio que **solo viven en el stream**. Ser público o privado es una **decisión adicional y deliberada**, no algo que todo evento es. Por eso `OfType<T>()` los ignora, y por eso el acumulador es `List<object>` (de [El agregado que acumula](el-agregado-acumula.md)) y no `List<IEvent>`: admite hechos que no marcan **nada**.
 
 > [!NOTE]
+> **¿Y para qué `IEvent` si hoy no filtro por ella?** Hoy `GetPublicEvents`/`GetPrivateEvents` filtran por `IPublicEvent`/`IPrivateEvent`, no por la raíz `IEvent`. Entonces, ¿por qué existe? Como **techo común** de las otras dos: deja que más adelante una API exija "cualquier evento marcado" (`IEvent`) sin importar de qué lado caiga, y agrupa la jerarquía bajo un solo nombre. No la borres por no usarla aún — es el ancla del contrato.
+
+> [!NOTE]
 > 🌱 **Semilla — el contrato público es tu API hacia afuera.** Un `IPublicEvent` es parte de lo que **otros servicios** consumen: cambiarlo puede romperles. Por eso (a) se versiona con cuidado ([Versionado y upcasting](versionado-upcasting.md), upcasting) y (b) **no lleva** id/tenant/timestamp en el cuerpo — esos son **metadatos del transporte**, que viajan aparte (el "sobre", [Senders y el sobre](senders-y-sobre.md)). El evento privado, en cambio, es libre de cambiar: nadie afuera depende de él.
 
 ---
@@ -69,6 +91,9 @@ Console.WriteLine($"privados: {emp.GetPrivateEvents().Length}");
 > privados: 0
 > ```
 > Dos hechos sin confirmar (`EmpresaRegistrada` + `EmpresaSuspendida`), pero **solo uno es público**: el filtro `OfType<IPublicEvent>()` separó el que cruza la frontera del que solo vive en el diario.
+
+> [!NOTE]
+> **Que `privados: 0` no te confunda — y qué cambia cada camino.** Hoy ningún hecho implementa `IPrivateEvent`, así que ese lado da **0**: no es un bug, es que aún no hemos necesitado marcar uno como "interno explícito". Lo importante es que ya tienes **dos pilas separadas**, y cada una irá por un **camino distinto** que sentirás más adelante en [Transportes](senders-y-sobre.md): los **públicos** salen al mundo **Event-Driven** (a otros servicios, por un broker —*un servicio de mensajería intermedio, tipo cola*—), mientras que los **privados** se quedan en el **bus interno** del propio servicio. Por ahora solo los separamos; en Transportes les damos su destino.
 
 ---
 

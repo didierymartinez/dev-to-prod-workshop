@@ -132,6 +132,9 @@ public class SuspenderHandler(InMemoryEventStore store) : ICommandHandler<Suspen
 }
 ```
 
+> [!NOTE]
+> 🔁 **Haz el mismo cambio en `CambiarPlanHandler`.** Arriba solo se muestra `SuspenderHandler`, pero `CambiarPlanHandler` cambia **igual**: recibe el `InMemoryEventStore` por constructor, abre el stream con `store.AbrirStream<Empresa>(cmd.EmpresaId)` y lee `cmd.NuevoPlan`. Si lo dejas con la firma vieja (`EventStream<Empresa>`), **no compilará**.
+
 ## Probémoslo: un almacén, muchas empresas
 
 ```csharp
@@ -187,6 +190,8 @@ public void AppendEvent(string aggregateId, EventoAlmacenado evento)
 ```
 
 Ahora el choque se nota: si "Constructora Andes" va en la versión 2, `a.Append` escribe la 3 (entra), y `b.Append` —que también cree que le toca la 3— **choca** y lanza `ConcurrencyException` en vez de pisar a A en silencio.
+
+> 💡 El mensaje que verás dice *"Esperaba la versión 4, pero llegó la 3"*: como A **ya** dejó el cajón en la 3, el almacén ahora espera la **4** — y la 3 que trae B ya está ocupada. Ese desajuste (lo que esperaba el cajón ≠ lo que trae B) **es** el choque; el número exacto sube porque A escribió primero.
 
 > [!NOTE]
 > Esto que construiste tiene nombre: **control de concurrencia optimista**. **¿Por qué "optimista"?** Asumes que los choques son **raros**, así que **no bloqueas** a nadie mientras trabaja (eso sería *pesimista*, y cuesta caro). Dejas que todos avancen y solo **al guardar** verificas la versión; si chocó, **fallas y reintentas** (recargar → reaplicar → reintentar).
@@ -246,6 +251,6 @@ Un **almacén** (`InMemoryEventStore`: un cajón de sobres por id) custodia las 
 
 ---
 
-[⬅️ Volver: El Command Handler](./el-command-handler.md)
+[⬅️ Volver: El despachador (dado un comando, encuentra su handler)](./el-despachador.md)
 
 [➡️ Siguiente: El tiempo de espera (async/await)](./el-tiempo-de-espera.md)

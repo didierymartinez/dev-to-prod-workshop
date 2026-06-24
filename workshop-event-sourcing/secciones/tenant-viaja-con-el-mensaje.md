@@ -16,7 +16,17 @@ public async Task Handle(EmpresaSuspendida e, ITenantResolver tenant)
 }
 ```
 
-Pero el tenant **sí** llegó: en [Senders y el sobre](senders-y-sobre.md) lo metiste en el **sobre** (`DeliveryOptions { TenantId }`) al publicar. Wolverine lo propaga: del lado receptor, el `IMessageContext` del mensaje **trae** ese `TenantId`. Solo falta un resolver que lo lea **de ahí**.
+Pero el tenant **sí** puede llegar: cuando un evento se publica, se estampa en el **sobre** con `DeliveryOptions { TenantId }`, y Wolverine lo **propaga** — del lado receptor, el `IMessageContext` del mensaje **trae** ese `TenantId`. Solo falta un resolver que lo lea **de ahí**.
+
+> [!NOTE]
+> **Cómo se estampa al publicar (el otro extremo del hilo).** Para que el receptor tenga un `TenantId` que leer, quien **publica** debe ponerlo en el sobre. Ojo: los `PublishAsync` que escribiste en [Transportes](transportes-rabbitmq-asb.md) salieron **planos** (sin tenant) — el sender del equipo (`WolverinePublicEventSender`) lo estampa por ti con `DeliveryOptions`; si publicas a mano, hazlo así:
+> ```csharp
+> await bus.PublishAsync(evento, new DeliveryOptions { TenantId = tenant.TenantId }.WithHeader("user_id", tenant.UserId));
+> ```
+> Sin ese `DeliveryOptions.TenantId`, el `IMessageContext.TenantId` del receptor llega **`null`** y el resolver de abajo lanza. (Ese es el "otro extremo" que cierra el hilo del tenant.)
+
+> [!NOTE]
+> 🆕 **`IMessageContext` —el contexto del mensaje que Wolverine está procesando ahora; hermano de `IMessageBus`, te da metadatos como el tenant y los headers—.** Donde `IMessageBus` ([Senders y el sobre](senders-y-sobre.md)) es para **publicar** mensajes, `IMessageContext` es para **leer** el que estás manejando: su `TenantId` y su `Envelope.Headers`. Lo inyecta **Wolverine** al correr el handler (lo pides como parámetro o en el constructor y aparece resuelto). Aquí lo usamos para recuperar el `TenantId` del sobre y el header `user_id` que se estampó al publicar (con `.WithHeader("user_id", …)`, como muestra la nota de arriba).
 
 ## 🔧 Refactor: un resolver del mensaje + un proxy
 
@@ -57,7 +67,7 @@ services.AddScoped<ITenantResolver, ProxyTenantResolver>();
 Ahora **el mismo** código de dominio resuelve el tenant tanto en un endpoint HTTP como dentro del daemon — sin saber cuál es. El proxy decide **por presencia de `HttpContext`** (no con `try/catch`, para no ensuciar el log de observabilidad).
 
 > [!NOTE]
-> **El hilo del tenant, completo:** al **publicar** ([Senders y el sobre](senders-y-sobre.md)) metes el `TenantId` en el sobre (`DeliveryOptions`); Wolverine lo **propaga** al `IMessageContext` del receptor; el `WolverineMessageContextTenantResolver` lo **lee**; y de ahí va a Marten al abrir la sesión por tenant ([Multi-tenancy](multitenancy-aislamiento.md)). El `UserId` viaja como un **header** del sobre (`user_id`), porque Wolverine propaga el `TenantId` de forma nativa pero el usuario no — es una extensión del equipo.
+> **El hilo del tenant, completo:** al **publicar** se mete el `TenantId` en el sobre (`DeliveryOptions`, como en la nota de arriba); Wolverine lo **propaga** al `IMessageContext` del receptor; el `WolverineMessageContextTenantResolver` lo **lee**; y de ahí va a Marten al abrir la sesión por tenant ([Multi-tenancy](multitenancy-aislamiento.md)). El `UserId` viaja como un **header** del sobre (`user_id`), porque Wolverine propaga el `TenantId` de forma nativa pero el usuario no — es una extensión del equipo.
 
 > [!NOTE]
 > ⚖️ **Este módulo NO diverge de la doc.** A diferencia de la capa de event store ([Las dos vertientes](dos-vertientes.md)), aquí la plantilla usa los caminos **nativos** de Wolverine: `DeliveryOptions.TenantId` → `IMessageContext.TenantId`. Incluso cruzar a **otro** tenant dentro de un handler usa el `IMessageBus.InvokeForTenantAsync(tenantId, …)` documentado. Es `ITenantResolver` + `WolverineMessageContextTenantResolver` + `ProxyTenantResolver` + `AgregarTenantResolverHibrido()`, 1:1.
