@@ -71,13 +71,23 @@ Este es el **guion para dictar el taller en vivo**. Tú das los **conceptos**; a
 ---
 
 ## 6 · El Command Handler  ·  📄 [el-command-handler.md](secciones/el-command-handler.md)
-**🧑‍🏫 Presentas:** el **Command Handler** (el "secretario" que orquesta cargar→decidir→guardar); el **Comando** (la intención como `record`/DTO); **responsabilidad única**; la **versión del evento**.
+**🧑‍🏫 Presentas:** el **Command Handler** (el "secretario" que orquesta cargar→decidir→guardar); **responsabilidad única** (una clase por comando); el **constructor primario** de C# (idioma nuevo: `class X(deps)`); la **versión del evento** (el sobre). *(Ojo: aquí NO nace el record ni la interfaz — eso llega en §6b, cuando hagan falta.)*
 **🛠️ Pides que hagan:**
-1. Crea los comandos como `record`: `CambiarPlanDeEmpresa(NuevoPlan)`, `SuspenderEmpresa(Motivo)` — **sin id** todavía (una sola empresa).
-2. **(Concreto)** Crea `EmpresaCommandHandlers(EventStream<Empresa> stream)` con un método por comando que **carga** (`Get`) → pide **decidir** → **guarda** (`Append`); respeta el `null` de `Suspender`.
-3. **(Extrae la interfaz)** Saca `ICommandHandler<TCommand>` con `Handle(TCommand)`; **🔁 reemplaza** por un handler **por comando** (`CambiarPlanHandler`, `SuspenderHandler`) y borra `EmpresaCommandHandlers`.
-4. **(Versión del evento)** Define el sobre `EventoAlmacenado(int Version, DateTime Timestamp, object EventData)`; **🔁 modifica** `EventStream<T>` para guardar **sobres**, llevar un `_version` que **sube con cada `Append`**, y **desenvolver** el sobre al leer.
-**✅ Deben ver:** el handler suspende la empresa; cada hecho archivado queda **numerado** (posición 1, 2, 3…).
+1. **(Primer intento)** Crea `EmpresaCommandHandlers(EventStream<Empresa> stream)` con un método por operación **de parámetros sueltos** (`CambiarPlan(string)`, `Suspender(string)`) que **carga** (`Get`) → pide **decidir** → **guarda** (`Append`); respeta el `null` de `Suspender`.
+2. **🔁 Rompe el súper-secretario** en una clase **por comando** (`CambiarPlanHandler`, `SuspenderHandler`), cada una con un `Handle(...)` de **parámetros sueltos** (aún **sin record ni interfaz**).
+3. **(Versión del evento)** Define el sobre `EventoAlmacenado(int Version, DateTime Timestamp, object EventData)`; **🔁 modifica** `EventStream<T>` para guardar **sobres**, llevar un `_version` que **sube con cada `Append`**, y **desenvolver** el sobre al leer.
+**✅ Deben ver:** un handler **por comando** suspende la empresa; cada hecho queda **numerado** (1, 2, 3…). Y la pregunta abierta: para ejecutar uno **eliges la clase a mano** — eso pedirá un despachador (§6b).
+
+---
+
+## 6b · El despachador  ·  📄 [el-despachador.md](secciones/el-despachador.md)
+**🧑‍🏫 Presentas:** un **despachador** (mediador) que, dado un comando *cualquiera*, encuentra y llama a su handler **por el tipo** — sin `switch` ni nombres. Y las **dos piezas que eso exige** (aquí nacen, no antes): el **Comando** (un `record` por intención, para rutear por tipo) y el **contrato `ICommandHandler<T>`** (molde común). El `Despachador` es un **andamio** — lo industrializará Wolverine (§17).
+**🛠️ Pides que hagan:**
+1. **💥 El dolor:** con `new SuspenderHandler(...).Handle("…")` eres **tú** quien elige la clase; un `switch` por tipo crece con cada comando (justo lo que el contrato prometía evitar).
+2. **(Pieza 1 — el Comando)** Crea un `record` por comando (`CambiarPlanDeEmpresa(NuevoPlan)`, `SuspenderEmpresa(Motivo)`) y **🔁** cambia cada handler de `Handle(string)` a `Handle(suComando)`. *(Motivo real: rutear por tipo necesita que cada comando sea su PROPIO tipo — con `string` todos colisionan.)*
+3. **(Pieza 2 — el contrato)** Declara `ICommandHandler<TCommand>` con `Handle(TCommand)`; cada handler lo **implementa**.
+4. **(El despachador)** Construye `Despachador` con `Dictionary<Type, Action<object>>`: `Registrar<T>(ICommandHandler<T>)` (guarda una lambda que castea) y `Enviar(object)` (busca por `comando.GetType()`). Demo: registra los handlers y `Enviar` un comando que llega como `object`.
+**✅ Deben ver:** un `object` ruteado a su handler **por tipo**, sin `switch`. Y **por qué** hacían falta el record (la llave es `GetType()`) y la interfaz (`Registrar<T>` no se escribe sin el contrato — sin él, reflexión/`dynamic`). Diles que **dejen el `Despachador` de lado** después: es andamio; Wolverine lo hace en §17.
 
 ---
 
@@ -160,7 +170,7 @@ Este es el **guion para dictar el taller en vivo**. Tú das los **conceptos**; a
 ---
 
 ## 15 · El almacén directo (y la Unit of Work)  ·  📄 [el-almacen-directo.md](secciones/el-almacen-directo.md)
-**🧑‍🏫 Presentas:** la **Unit of Work** (recuerda qué tocaste y persiste todo de un golpe); jubilar el `EventStream`-ventana; **un solo `SaveChangesAsync`**.
+**🧑‍🏫 Presentas:** la **Unit of Work** (recuerda qué tocaste y persiste todo de un golpe); jubilar el `EventStream`-ventana; **un solo `SaveChangesAsync`**. Y el matiz **poder ≠ deber**: `SaveChanges` *puede* persistir varios agregados, pero la regla de diseño es **1 transacción = 1 agregado** (Evans/Vernon, regla de pulgar); cruzarla pide **consistencia eventual** (criterio de Vernon: ¿es trabajo del usuario de este caso de uso, o de otro?).
 **🛠️ Pides que hagan:**
 1. Añade a `Empresa` un estático `Registrar(id, nombre, plan)` (crea, pone `Id`, `Raise(EmpresaRegistrada)`); y un `RegistrarEmpresaHandler` (`Empresa.Registrar` → `store.StartStream` → `SaveChangesAsync`).
 2. **🔁 Reemplaza** `InMemoryEventStore` por la versión **directa** con UoW (`StartStream`, `GetAggregateRootAsync` que **rastrea**, `AppendEvent`, `SaveChangesAsync` que **drena**, `ExistsAsync`); **borra** `EventStream<T>` y `AbrirStream`.
@@ -248,7 +258,18 @@ Este es el **guion para dictar el taller en vivo**. Tú das los **conceptos**; a
 
 ---
 
-## 23b · Serverless: Azure Functions *(opcional — solo si despliegas en Functions)*  ·  📄 [serverless-azure-functions.md](secciones/serverless-azure-functions.md)
+## 23b · Diseñar con eventos  ·  📄 [disenar-con-eventos.md](secciones/disenar-con-eventos.md)
+**🧑‍🏫 Presentas:** las decisiones que el broker **no** toma por ti, sobre un caso real (`RegistroObligacionCreado → TerceroCreado/TerceroRechazado`). Marcos: **evento vs comando** (si esperas respuesta es un comando → gRPC, no un evento disfrazado = acoplamiento temporal); **tres patrones que se llaman "evento"** (ES=persistencia · domain-events-in-process=notificación · EDA=comunicación) y que el **mismo evento cambia de rol** (estado→mensaje); los **4 significados de Fowler** (Notification · ECST · ES · CQRS); el patrón **in-process de Bogard** (registrar→despachar al commit, no cola inmediata); **1-tx-1-agregado** + criterio de **Vernon**; la **dependencia circular** (smell ≠ antipatrón). **Sin código (diseño/criterio).**
+**💬 Dirige la discusión:**
+1. Para `TerceroCreado`/`TerceroRechazado`: ¿un topic por evento o uno **por servicio**? (por servicio + ruteo por tipo).
+2. ¿El emisor **espera** la respuesta para seguir? → es un **comando** (gRPC), no un evento. ¿Un handler que **valida y puede rechazar** reaccionando a un evento? → **comando disfrazado** (Regla 4).
+3. Reciten **las 4 reglas** del destino de un hecho (ES→store · misma decisión→explícito/diferido-a-commit · cross-cutting→EDA real · un handler de evento nunca corre lógica rechazable).
+4. ¿Por qué un broker es **overkill** para un efecto intra-proceso? (Bogard: despacha al commit, mismo scope).
+**✅ Deben poder responder:** ante un hecho, decidir si va al **store**, a un **domain-event in-process**, o a **EDA real** — y reconocer la postura de la plantilla (*un mecanismo por caso*). *(Lo profundo —sagas, orquestación entre servicios— es el taller ⑤ Microservicios.)*
+
+---
+
+## 23c · Serverless: Azure Functions *(opcional — solo si despliegas en Functions)*  ·  📄 [serverless-azure-functions.md](secciones/serverless-azure-functions.md)
 **🧑‍🏫 Presentas:** una Function **se apaga entre invocaciones** → el outbox durable no tiene quién lo drene; en `dotnet-isolated` el auto-discovery de Wolverine falla. Los **gemelos serverless**: `AddWolverine(ManualOnly)`, `DurabilityMode.Solo`, `SendInline()`.
 **💬 Dirige la discusión:**
 1. En una función que se apaga apenas responde, ¿quién corre el proceso de fondo del outbox?
@@ -355,11 +376,11 @@ Este es el **guion para dictar el taller en vivo**. Tú das los **conceptos**; a
 
 | Bloque | Secciones | Tono |
 |---|---|---|
-| **Motor a mano** | 1–10 | construcción guiada, mucho teclado |
+| **Motor a mano** | 1–10 (+6b despachador) | construcción guiada, mucho teclado |
 | **Bisagra** | 11 | discusión (sin código) |
 | **Afinar a producción** | 12–15 | refactores guiados |
 | **Revelar la Critter Stack** | 16–19 | "lo que escribiste, la librería lo hace" + 2 discusiones |
-| **EDA (mensajería)** | 20–23(+23b) | público/privado, outbox, broker real |
+| **EDA (mensajería + diseño)** | 20–23 · 23b diseño *(23c serverless opc.)* | público/privado, outbox, broker real, **criterio de diseño EDA** |
 | **CQRS · versionado · multi-tenancy** | 24–28 | lado de lectura + aislamiento |
 | **Testing · idioma · NuGet** | 29–32 | probar sin BD, C#14, empaquetar |
 | **Capstone** | 33 | ensamblar + el reveal final |
