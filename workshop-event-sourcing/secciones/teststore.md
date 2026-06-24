@@ -66,7 +66,6 @@ public class TestStore : IEventStore
         return Task.FromResult<T?>(ar);
     }
 
-    public void AppendEvent(string id, object e) => (_nuevos[id] = _nuevos.GetValueOrDefault(id) ?? new()).Add(e);
     public Task<bool> ExistsAsync<T>(string id, CancellationToken ct = default) where T : AggregateRoot
         => Task.FromResult(_previos.ContainsKey(id));
     public Task SaveChangesAsync(CancellationToken ct = default) { SaveChanges(); return Task.CompletedTask; }

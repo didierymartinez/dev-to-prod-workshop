@@ -43,7 +43,7 @@ Ahora la pieza nueva. La **API de Marten es idioma nuevo**, así que te la muest
 ```csharp
 using Marten;
 
-// El change-tracker (Unit of Work), igual que en «El almacén directo» pero como base reutilizable
+// El change-tracker (Unit of Work), igual que en «El almacén directo»; la plantilla lo factoriza en esta base (aquí solo la hereda MartenEventStore — es su forma de organizarlo, no una reutilización que sientas en el taller)
 public abstract class MartenUnitOfWork
 {
     private readonly List<AggregateRoot> _modificados = [];

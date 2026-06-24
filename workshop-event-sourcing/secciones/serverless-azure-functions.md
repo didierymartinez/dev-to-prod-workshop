@@ -118,6 +118,6 @@ Una **Azure Function es efímera**: no tiene proceso de fondo que vacíe el **ou
 
 ---
 
-[⬅️ Volver: Transportes reales (RabbitMQ y Azure Service Bus)](./transportes-rabbitmq-asb.md)
+[⬅️ Volver: Diseñar con eventos (las decisiones que el broker no toma por ti)](./disenar-con-eventos.md)
 
 [➡️ Siguiente: El lado de lectura (CQRS)](./cqrs-proyecciones.md)

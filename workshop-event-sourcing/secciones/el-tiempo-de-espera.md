@@ -13,6 +13,8 @@ Hay dos tipos de operación:
 - **CPU** (sumar, el `switch Aplicar`): la CPU tiene los datos ahí mismo. Ocurre en **nanosegundos**.
 - **I/O** (escribir en disco, llamar a PostgreSQL en otra máquina): hay que **salir al mundo exterior**. Toma **milisegundos** — para la CPU, una eternidad.
 
+Una palabra antes de seguir: tu servidor atiende peticiones con un número **limitado** de **hilos** (*threads*) — piensa en cada hilo como un **trabajador**, y en el conjunto como una **bolsa** (*pool*) de trabajadores. Cuando se acaban, las peticiones nuevas **esperan en fila**. Con eso en mente:
+
 > [!WARNING]
 > Si le dices al procesador *"guarda estos hechos en la base de datos"* y lo obligas a quedarse **congelado** esperando la respuesta, desperdicias un recurso carísimo: ese hilo no puede atender a nadie más mientras tanto. Con 100 peticiones a la vez, congelas 100 hilos esperando al disco y la aplicación se cae. **Esperar bloqueando no escala.**
 
