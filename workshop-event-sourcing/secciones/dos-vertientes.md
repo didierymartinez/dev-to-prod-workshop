@@ -48,6 +48,9 @@ Tu camino: `IEventStore` + `MartenEventStore` (con `AggregateStreamAsync` para c
 
 ## ¿Por qué el equipo eligió su capa? (con evidencia)
 
+> [!NOTE]
+> Honestidad: **tres de estas razones aún no las has *sentido***. Las vivirás en los bloques que vienen ([El TestStore](teststore.md), [Público vs privado](publico-vs-privado.md), [Multi-tenancy](multitenancy-aislamiento.md)). Tómalas aquí como **adelanto** de por qué la capa propia paga; al llegar a cada una, recuerda que aquí lo prometimos. (Lo que **sí** ya sentiste es el contraste de arriba: el nativo da menos código y concurrencia gratis.)
+
 | Razón | Qué te da | Evidencia |
 |---|---|---|
 | **Testear sin base de datos** | un `TestStore` en memoria que implementa `IEventStore` → pruebas deterministas sin Postgres | el paquete de testing del equipo ([El TestStore](teststore.md) a [Given-When-Then](given-when-then.md)) |

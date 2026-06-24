@@ -123,7 +123,7 @@ Esto reemplaza tu [El despachador](el-despachador.md) + [Inyección de Dependenc
 - `AddMiddleware<UnitOfWorkMiddleware>` + `AutoApplyTransactions` → el guardar, automático.
 
 > [!NOTE]
-> 🌱 **Semilla — `IMessageBus` y cómo se invoca.** Donde antes hacías `new SuspenderHandler(store).HandleAsync(...)`, ahora inyectas un `IMessageBus` y haces `await bus.InvokeAsync(new SuspenderEmpresa("emp-7", "falta de pago"))`. Wolverine resuelve el handler, corre el middleware y comitea. (La plantilla esconde este `IMessageBus` tras una pequeña interfaz propia —un *router* de comandos— para no exponerlo al dominio; **no la construyes en el taller**, la reconocerás al abrir la plantilla.)
+> 🌱 **Semilla — `IMessageBus` y cómo se invoca.** Donde antes hacías `new SuspenderHandler(store).HandleAsync(...)`, ahora inyectas un `IMessageBus` y haces `await bus.InvokeAsync(new SuspenderEmpresa("emp-7", "falta de pago"))`. Wolverine resuelve el handler, corre el middleware y comitea. (La plantilla esconde este `IMessageBus` tras una pequeña interfaz propia —un *router* de comandos— para que el dominio no dependa de Wolverine directo; no es un dolor que sientas en el taller, sino **convergencia a la plantilla** — **no la construyes aquí**, la reconocerás al abrirla.)
 
 > [!NOTE]
 > 🌱 **Semilla — ¿magia? No: código generado ([Reflexión vs codegen](reflexion-vs-codegen.md)).** Wolverine no usa reflexión en cada llamada para encontrar tu `Handle`: **genera código** en el arranque (`UseRuntimeCompilation`) que llama tu handler y tu middleware directo. En [Reflexión vs codegen](reflexion-vs-codegen.md) levantamos esa última magia y miramos el código que genera.

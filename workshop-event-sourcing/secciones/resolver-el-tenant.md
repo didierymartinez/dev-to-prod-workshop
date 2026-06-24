@@ -10,8 +10,7 @@ Esconder el `tenantId` (y el usuario) tras una pequeña abstracción —"dime el
 
 ```csharp
 await store.GetAggregateRootAsync<Empresa>(tenantId, id, ct);   // tenantId aquí…
-await router.EnviarAsync(tenantId, comando);                    // …y aquí…
-await sender.PublishAsync(tenantId, evento);                    // …y aquí. Ruido, y un olvido filtra datos.
+await sender.PublishAsync(tenantId, evento);                    // …y aquí. Ruido en cada firma, y un olvido filtra datos entre clientes.
 ```
 
 La salida: una interfaz mínima que responde *"¿cuál es el tenant (y el usuario) de esta operación?"*. La inyectas donde la necesites y dejas de arrastrar el parámetro.

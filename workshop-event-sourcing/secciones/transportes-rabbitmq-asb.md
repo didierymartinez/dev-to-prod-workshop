@@ -62,6 +62,9 @@ foreach (var tipo in contratos.GetTypes().Where(t => t.IsAssignableTo(typeof(IPu
 options.ListenToRabbitQueue("gestion-empresas.cola", c => c.BindExchange("facturacion")).UseDurableInbox();
 ```
 
+> [!NOTE]
+> Aquí los eventos salen **sin tenant** todavía: `PublishMessage(...).ToRabbitExchange(...)` es **config de ruteo**, no un `PublishAsync` con datos. Quién **estampa** el sobre (`DeliveryOptions.TenantId` / `user_id`) al publicar lo cierras en [El tenant viaja con el mensaje](tenant-viaja-con-el-mensaje.md) — lo hace el `WolverinePublicEventSender` de la plantilla.
+
 Fíjate en la idea: **un exchange por servicio** (no por mensaje). Tu servicio publica todos sus hechos públicos a su exchange; quien quiera oírlos crea una **cola** y la **ata** (`BindExchange`) a ese exchange. El ruteo se descubre **por tipo**: el `foreach` escanea tu **ensamblado de contratos** (el proyecto/`.dll` donde viven tus eventos) y publica cada `IPublicEvent` que encuentre — los privados y los que no marcan nada ([Público vs privado](publico-vs-privado.md)) **no** salen.
 
 > [!NOTE]
@@ -131,6 +134,4 @@ Conectar tus hechos públicos a un broker es **solo configuración**: en **Rabbi
 
 [⬅️ Volver: El proceso que se cae (Outbox/Inbox)](./outbox-inbox.md)
 
-[➡️ Siguiente: Serverless — la plantilla en Azure Functions (complemento de despliegue)](./serverless-azure-functions.md)
-
-> Si despliegas en contenedores (no serverless), puedes **saltar [Serverless (Azure Functions)](serverless-azure-functions.md)** e ir directo a [CQRS y proyecciones](./cqrs-proyecciones.md) — pero léela cuando toques Azure Functions.
+[➡️ Siguiente: Diseñar con eventos (las decisiones que el broker no toma por ti)](./disenar-con-eventos.md)

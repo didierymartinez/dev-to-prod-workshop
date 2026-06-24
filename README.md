@@ -33,7 +33,7 @@ ARQUITECTURA Y DISEÑO
   ④  EDA + Event Sourcing                              ✅ completo
        eventos · event store · agregados · CQRS · mensajería (outbox) · multi-tenancy · Critter Stack
   ⑤  Microservicios                                    📋 planeado
-       descomposición · comunicación · resiliencia · sagas
+       descomposición · comunicación (evento vs comando · gRPC vs eventual) · resiliencia · sagas · coreografía/orquestación
 
 PROFUNDIZACIÓN / SRE
   ⑥  Observabilidad                                    📋 planeado
@@ -63,13 +63,15 @@ Cada taller declara su **prerequisito**. Sigue la ruta que te interese; todas pa
 | ① | [Básico — El ciclo de vida del software](workshop-basics/README.md) | ✅ Completo | `workshop-basics/` |
 | ② | [DevOps — Operar en producción](workshop-devops/README.md) | ✅ Completo | `workshop-devops/` |
 | ③ | Estilos y diseño arquitectónico | 📋 Planeado | — |
-| ④ | [EDA + Event Sourcing (Critter Stack)](workshop-event-sourcing/README.md) | ✅ Completo | `workshop-event-sourcing/` (34 secciones; la vieja `eventsourcing-workshops-basics/` quedó como guía) |
+| ④ | [EDA + Event Sourcing (Critter Stack)](workshop-event-sourcing/README.md) | ✅ Completo | `workshop-event-sourcing/` (36 secciones; la vieja `eventsourcing-workshops-basics/` quedó como guía) |
 | ⑤ | Microservicios | 📋 Planeado | — |
 | ⑥ | Observabilidad | 📋 Planeado | — |
 | ⑦ | DevOps avanzado | 📋 Planeado | — |
 | ⑧ | El producto real (Cosmos) | ♻️ A reconstruir | carpeta nueva (la actual `workshop-adv/` queda como guía) |
 
 > Los enlaces aparecen a medida que cada taller queda listo y validado.
+
+> **Enlace entre talleres — requerimiento sembrado desde ④ hacia ⑤:** la sección [*Diseñar con eventos*](workshop-event-sourcing/secciones/disenar-con-eventos.md) del taller ④ introduce el **criterio** de diseño EDA —evento vs comando (eventual vs gRPC/request-reply), dependencia circular / acoplamiento entre servicios, coreografía vs orquestación, granularidad de topics— y **deja a ⑤ Microservicios el tratamiento a fondo** (sagas y orquestadores, transacciones distribuidas, comunicación y resiliencia entre N servicios). **Al construir ⑤, recoger este requerimiento** y enlazar de vuelta a esa sección.
 
 ---
 
