@@ -145,7 +145,7 @@ Console.WriteLine($"{empresa.Nombre}: plan {empresa.Plan}, {(empresa.Suspendida 
 > Constructora Andes: plan Premium, suspendida, reactivada 1 vez/veces
 > ```
 
-Esa clase que es **dueña** de la coherencia de la empresa, y el **único punto autorizado** para tocarla, tiene un nombre en diseño de dominio: **Aggregate Root** (raíz del agregado). Nadie le cambia el plan a `Empresa` por fuera; se lo pide a `Empresa`. (A esa frontera de "qué se mantiene coherente como una unidad" le pondremos lupa más adelante; por ahora, quédate con el nombre.)
+Esa clase que es **dueña** de la coherencia de la empresa, y el **único punto autorizado** para tocarla, tiene un nombre en diseño de dominio: **Aggregate Root** (raíz del agregado). Nadie le cambia el plan a `Empresa` por fuera; se lo pide a `Empresa`. (A esa frontera de "qué se mantiene coherente como una unidad" le pones lupa en [El almacén directo](el-almacen-directo.md) —la frontera del agregado resulta ser la de la **transacción**, regla `1-tx-1-agregado`— y a fondo en el taller ③ de diseño arquitectónico; por ahora, quédate con el nombre.)
 
 > [!NOTE]
 > 🌱 Mira ese `foreach` con cuatro `if (hecho is …)` dentro del constructor. Funciona hoy, pero **crecerá feo**: cada hecho nuevo es otro `if`, y el día que tengas una `Factura` además de la `Empresa`, copiarías todo este bucle. En la próxima sección lo vamos a **sentir doler** y lo evolucionaremos paso a paso — el código nos pedirá una forma mejor.

@@ -181,6 +181,9 @@ Lo importante de leer ahí:
 - **`SaveChangesAsync` drena todo de un golpe** y limpia el rastreo. Es el **único** punto que persiste — y el único que el handler tendrá que llamar.
 - La **concurrencia optimista** de [El almacén en memoria](el-almacen-en-memoria.md) se mudó aquí: antes de volcar un agregado modificado, comprueba que el stream **siga** en la versión con la que cargó (`ar.Version`, de [La versión del agregado](la-version-del-agregado.md)). Por eso pusimos la versión en el agregado.
 
+> [!NOTE]
+> ⚖️ **Poder ≠ deber: la frontera del agregado es la frontera de la transacción.** Tu `SaveChangesAsync` *puede* persistir **varios** agregados juntos, pero la **regla de diseño** (Evans/Vernon) es **1 transacción = 1 agregado** —regla de pulgar, no ley—. ¿Cuándo cruzarla? El **criterio de Vernon**: ¿dejar los datos consistentes es **trabajo del usuario que ejecuta este caso de uso**? → misma transacción. ¿Es trabajo de **otro usuario o del sistema**? → **consistencia eventual**, en otra transacción (vía un evento, [Diseñar con eventos](disenar-con-eventos.md)). Una transacción que abarca muchos agregados acopla su consistencia y escala peor. *(El diseño de agregados a fondo —invariantes, tamaño y frontera, referencias por id— es del taller ③ Estilos y diseño arquitectónico.)*
+
 ## 🔧 El alta de un agregado: `StartStream`
 
 `GetAggregateRootAsync` sirve para uno que **ya existe**. ¿Y para **registrar** una empresa nueva, que aún no tiene stream? Ahí entra `StartStream`. Démosle a `Empresa` una forma de nacer.

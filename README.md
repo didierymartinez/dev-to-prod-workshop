@@ -73,6 +73,8 @@ Cada taller declara su **prerequisito**. Sigue la ruta que te interese; todas pa
 
 > **Enlace entre talleres — requerimiento sembrado desde ④ hacia ⑤:** la sección [*Diseñar con eventos*](workshop-event-sourcing/secciones/disenar-con-eventos.md) del taller ④ introduce el **criterio** de diseño EDA —evento vs comando (eventual vs gRPC/request-reply), dependencia circular / acoplamiento entre servicios, coreografía vs orquestación, granularidad de topics— y **deja a ⑤ Microservicios el tratamiento a fondo** (sagas y orquestadores, transacciones distribuidas, comunicación y resiliencia entre N servicios). **Al construir ⑤, recoger este requerimiento** y enlazar de vuelta a esa sección.
 
+> **Enlace entre talleres — sembrado desde ④ hacia ③:** `el-almacen-directo` y `disenar-con-eventos` (taller ④) introducen, a nivel *razonar*, la regla **`1 transacción = 1 agregado`** (Evans/Vernon) y la **frontera del agregado como frontera de consistencia**. **③ Estilos y diseño arquitectónico** debe cubrir a fondo el **diseño táctico de DDD** (invariantes, tamaño y frontera del agregado, referencias por id, agregados vs entidades/value objects) — recoger este requerimiento al construirlo.
+
 ---
 
 ## Para autores (cómo se construye y mantiene la academia)
