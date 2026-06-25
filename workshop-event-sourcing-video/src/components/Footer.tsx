@@ -1,7 +1,9 @@
 import React from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 import { theme } from "../theme";
-import { Section } from "../data/sections";
+import { Section, sections } from "../data/sections";
+
+const TOTAL = String(sections.length).padStart(2, "0");
 
 /** Barra de progreso continua + pie con el nombre del taller y el número de sección.
  *  Recibe el total en frames para funcionar igual en la composición por-sección
@@ -30,7 +32,7 @@ export const Footer: React.FC<{ section: Section; totalInFrames: number }> = ({
       >
         <span>Taller · Event Sourcing — Academia de Ingeniería de Software</span>
         <span style={{ color: section.accent, fontWeight: 600 }}>
-          {String(section.number).padStart(2, "0")} / 05
+          {String(section.number).padStart(2, "0")} / {TOTAL}
         </span>
       </div>
       <div

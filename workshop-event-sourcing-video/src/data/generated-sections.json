@@ -1,0 +1,4433 @@
+[
+  {
+    "slug": "el-command-handler",
+    "number": 6,
+    "title": "El Command Handler",
+    "subtitle": "El secretario que hace logística",
+    "emoji": "📋",
+    "bridge": "El ciclo cargar→actuar→guardar quedó suelto en Program.cs; lo encapsulamos en una pieza.",
+    "objetivo": "Encapsular cargar→actuar→guardar y numerar cada hecho archivado.",
+    "oneLiner": "Una capa delgada por comando orquesta cargar→actuar→guardar; el agregado decide, y el stream envuelve cada hecho en un sobre con su versión.",
+    "concepts": [
+      "Command Handler",
+      "Responsabilidad única",
+      "Sobre EventoAlmacenado",
+      "Versión del evento",
+      "Idempotencia obedecida"
+    ],
+    "beats": [
+      {
+        "tag": "Un secretario para todo",
+        "code": [
+          "public class EmpresaCommandHandlers(EventStream<Empresa> stream)",
+          "{",
+          "    public void CambiarPlan(string nuevoPlan)",
+          "        => stream.Append(stream.Get().CambiarPlan(nuevoPlan));",
+          "",
+          "    public void Suspender(string motivo)",
+          "    {",
+          "        var hecho = stream.Get().Suspender(motivo);",
+          "        if (hecho is not null) stream.Append(hecho);",
+          "    }",
+          "}"
+        ],
+        "glow": [
+          0
+        ],
+        "note": "El secretario carga, pide la decisión y guarda; Program.cs ya no orquesta.",
+        "side": {
+          "kind": "list",
+          "title": "Lo que hace el secretario",
+          "items": [
+            "1. Get() — rehidrata la historia",
+            "2. pide la decisión al agregado",
+            "3. Append() — guarda el hecho",
+            "null = no-op → no guarda"
+          ]
+        }
+      },
+      {
+        "tag": "El dolor: no escala",
+        "note": "Hoy 2 operaciones, mañana 20, todas amontonadas en una clase tocada por todos.",
+        "side": {
+          "kind": "text",
+          "title": "Súper-secretario",
+          "text": "Una sola clase hace de todo. Por responsabilidad única, cada operación merece su propia clase: un especialista, no un secretario que hace de todo."
+        }
+      },
+      {
+        "tag": "Una clase por comando",
+        "code": [
+          "public class CambiarPlanHandler(EventStream<Empresa> stream)",
+          "{",
+          "    public void Handle(string nuevoPlan) =>",
+          "        stream.Append(stream.Get().CambiarPlan(nuevoPlan));",
+          "}",
+          "",
+          "public class SuspenderHandler(EventStream<Empresa> stream)",
+          "{",
+          "    public void Handle(string motivo)",
+          "    {",
+          "        var hecho = stream.Get().Suspender(motivo);",
+          "        if (hecho is not null) stream.Append(hecho);",
+          "    }",
+          "}"
+        ],
+        "glow": [
+          0
+        ],
+        "note": "Rompes el súper-secretario: cada comando su clase, con un método Handle.",
+        "side": {
+          "kind": "state",
+          "title": "Cómo ejecutas uno",
+          "rows": [
+            {
+              "k": "eliges la clase",
+              "v": "new SuspenderHandler(stream)"
+            },
+            {
+              "k": "y la llamas a mano",
+              "v": "handler.Handle(\"falta de pago\")"
+            }
+          ]
+        }
+      },
+      {
+        "tag": "El handler obedece, no decide",
+        "code": [
+          "var hecho = stream.Get().Suspender(motivo);",
+          "if (hecho is not null) stream.Append(hecho);"
+        ],
+        "glow": [
+          1
+        ],
+        "note": "La idempotencia la pone la Empresa; el handler solo la obedece (null → no guarda).",
+        "side": {
+          "kind": "text",
+          "title": "Reparto de roles",
+          "text": "El Aggregate Root tiene la lógica pura (decide, protege reglas). El Command Handler hace la logística (rehidratar, pedir, guardar). El handler obedece el null que decidió el agregado."
+        }
+      },
+      {
+        "tag": "Numerar: el sobre",
+        "code": [
+          "public record EventoAlmacenado(",
+          "    int Version, DateTime Timestamp, object EventData);",
+          "",
+          "public void Append(object hecho)",
+          "    => _historia.Add(",
+          "        new EventoAlmacenado(++_version, DateTime.UtcNow, hecho));",
+          "",
+          "public T Get()",
+          "{",
+          "    var entidad = new T();",
+          "    entidad.Load(_historia.Select(s => s.EventData));",
+          "    return entidad;",
+          "}"
+        ],
+        "glow": [
+          5
+        ],
+        "note": "++_version graba la posición fija del hecho en su sobre.",
+        "badge": "🎉 Cada hecho queda numerado",
+        "side": {
+          "kind": "state",
+          "title": "El sobre EventoAlmacenado",
+          "flashKey": "Version",
+          "rows": [
+            {
+              "k": "Version",
+              "v": "++_version → 1, 2, 3…"
+            },
+            {
+              "k": "Timestamp",
+              "v": "DateTime.UtcNow"
+            },
+            {
+              "k": "EventData",
+              "v": "el hecho (Append guarda, Get desenvuelve)"
+            }
+          ]
+        }
+      },
+      {
+        "tag": "¿Para qué el número?",
+        "note": "El sobre no lleva el id: el stream ya es de una empresa. El número será la llave de conflictos.",
+        "side": {
+          "kind": "text",
+          "title": "Semilla: concurrencia",
+          "text": "Hoy el número parece decorativo. Cuando haya varios escritores sobre el mismo stream, comparar \"¿la versión que esperabas sigue libre?\" evita que dos escrituras se pisen. Eso es concurrencia optimista, en El almacén en memoria."
+        }
+      }
+    ]
+  },
+  {
+    "slug": "el-despachador",
+    "number": 7,
+    "title": "El despachador: dado un comando, encuentra su handler",
+    "subtitle": "Rutea por tipo, sin switch",
+    "emoji": "📮",
+    "bridge": "Venimos de una clase por comando; pero eres tú quien elige y llama cada handler a mano.",
+    "objetivo": "Un punto único que rutea cualquier comando a su handler por tipo.",
+    "oneLiner": "Para rutear cualquier comando a su handler nacen el record por comando y el contrato ICommandHandler<T>; el Despachador los usa.",
+    "concepts": [
+      "Comando como record (tipo por intención)",
+      "ICommandHandler<T> (contrato común)",
+      "Despachador: Dictionary<Type, Action<object>>",
+      "Rutear por comando.GetType()",
+      "Mediador (≈ discovery + InvokeAsync de Wolverine)"
+    ],
+    "beats": [
+      {
+        "tag": "Lo despachas a mano",
+        "note": "Hoy tú eliges la clase e instancias el handler para cada comando.",
+        "code": [
+          "new SuspenderHandler(stream).Handle(\"falta de pago\");"
+        ],
+        "glow": [
+          0
+        ],
+        "side": {
+          "kind": "text",
+          "title": "El que despacha eres tú",
+          "text": "Para cada comando, sabes qué clase instanciar y la llamas a mano."
+        }
+      },
+      {
+        "tag": "El dolor: un switch que crece",
+        "note": "Cada comando nuevo añade una rama; quien despacha se acopla a todos.",
+        "code": [
+          "switch (algo)",
+          "{",
+          "  case \"cambiar plan\": new CambiarPlanHandler(stream)...",
+          "  case \"suspender\":    new SuspenderHandler(stream)...",
+          "  // … una rama más, para siempre",
+          "}"
+        ],
+        "glow": [
+          4
+        ],
+        "side": {
+          "kind": "text",
+          "title": "Lo que quieres",
+          "text": "\"Toma este comando, el que sea, encuentra su handler y llámalo.\""
+        }
+      },
+      {
+        "tag": "Pieza 1: un record por comando",
+        "note": "Con string, el tipo de todo es System.String: no se puede rutear por tipo.",
+        "code": [
+          "public record CambiarPlanDeEmpresa(string NuevoPlan);",
+          "public record SuspenderEmpresa(string Motivo);",
+          "",
+          "public void Handle(SuspenderEmpresa cmd) { ... cmd.Motivo ... }"
+        ],
+        "glow": [
+          1
+        ],
+        "side": {
+          "kind": "state",
+          "title": "string vs record",
+          "rows": [
+            {
+              "k": "Handle(string)",
+              "v": "tipo = System.String (colisiona)"
+            },
+            {
+              "k": "Handle(SuspenderEmpresa)",
+              "v": "tipo propio → ruteable"
+            }
+          ],
+          "flashKey": "Handle(SuspenderEmpresa)"
+        }
+      },
+      {
+        "tag": "Pieza 2: un contrato común",
+        "note": "Los handlers no comparten nada; necesitan un molde para tratarlos igual.",
+        "code": [
+          "public interface ICommandHandler<TCommand>",
+          "{",
+          "    void Handle(TCommand comando);",
+          "}",
+          "",
+          "class SuspenderHandler(...) : ICommandHandler<SuspenderEmpresa>"
+        ],
+        "glow": [
+          0
+        ],
+        "side": {
+          "kind": "text",
+          "title": "Interfaz, no clase abstracta",
+          "text": "No hay implementación que heredar, solo un contrato: \"sé manejar TCommand\"."
+        }
+      },
+      {
+        "tag": "La tabla: el Despachador",
+        "note": "Diccionario tipo→handler: registras una vez, despachas por GetType().",
+        "code": [
+          "public class Despachador",
+          "{",
+          "  Dictionary<Type, Action<object>> _handlers = new();",
+          "  public void Registrar<T>(ICommandHandler<T> handler)",
+          "    => _handlers[typeof(T)] = c => handler.Handle((T)c);",
+          "  public void Enviar(object comando)",
+          "    => _handlers[comando.GetType()](comando);",
+          "}"
+        ],
+        "glow": [
+          4
+        ],
+        "badge": "🎉 Despacho sin switch ni clases",
+        "side": {
+          "kind": "text",
+          "title": "El truco de la lambda",
+          "text": "T solo existe al Registrar; la lambda lo captura y queda como Action<object> uniforme. Sin reflexión, sin dynamic."
+        }
+      },
+      {
+        "tag": "Cosecha: esto lo hará Wolverine",
+        "note": "Registrar ≈ discovery (escanea y arma la tabla); Enviar ≈ bus.InvokeAsync.",
+        "code": [
+          "despachador.Registrar(new SuspenderHandler(stream));",
+          "object comando = new SuspenderEmpresa(\"falta de pago\");",
+          "despachador.Enviar(comando);  // encuentra el handler por su tipo"
+        ],
+        "glow": [
+          2
+        ],
+        "side": {
+          "kind": "state",
+          "title": "Tú → Wolverine",
+          "rows": [
+            {
+              "k": "Registrar",
+              "v": "Discovery.IncludeAssembly"
+            },
+            {
+              "k": "Enviar",
+              "v": "bus.InvokeAsync(comando)"
+            },
+            {
+              "k": "ICommandHandler<T>",
+              "v": "se vuelve opcional"
+            }
+          ],
+          "flashKey": "Enviar"
+        }
+      }
+    ]
+  },
+  {
+    "slug": "el-almacen-en-memoria",
+    "number": 8,
+    "title": "El almacén en memoria (Event Store)",
+    "subtitle": "Un cajón por empresa",
+    "emoji": "🗄️",
+    "bridge": "Venías despachando un comando; pero todo vive sobre un stream suelto. ¿Y con mil empresas?",
+    "objetivo": "Un almacén central que entregue la historia de cualquier empresa por su id",
+    "oneLiner": "Un almacén guarda un cajón de sobres por id; el stream te lo entrega para leer y escribir, y al guardar verifica la versión.",
+    "concepts": [
+      "Event Store",
+      "Dictionary id→eventos",
+      "id único de tres caras",
+      "concurrencia optimista",
+      "ConcurrencyException"
+    ],
+    "beats": [
+      {
+        "tag": "Cada empresa, su id",
+        "note": "Para guardar miles juntas, primero hay que distinguirlas: id en la clase base.",
+        "code": [
+          "public abstract class AggregateRoot",
+          "{",
+          "    public string Id { get; set; } = \"\";",
+          "    public void Load(IEnumerable<object> historia) ...",
+          "}"
+        ],
+        "glow": [
+          2
+        ],
+        "side": {
+          "kind": "text",
+          "title": "¿Por qué ahora?",
+          "text": "Una empresa en un stream único no necesitaba id. Con miles, es imprescindible."
+        }
+      },
+      {
+        "tag": "El almacén: un cajón por empresa",
+        "note": "Dictionary: la llave es el id; el valor, la lista de sobres de esa empresa.",
+        "code": [
+          "public class InMemoryEventStore",
+          "{",
+          "  private readonly Dictionary<string,",
+          "    List<EventoAlmacenado>> _cajones = new();",
+          "  public IEnumerable<EventoAlmacenado> GetEvents(string id)",
+          "  public void AppendEvent(string id, EventoAlmacenado e)",
+          "}"
+        ],
+        "glow": [
+          2
+        ],
+        "side": {
+          "kind": "list",
+          "title": "El id es siempre parámetro",
+          "items": [
+            "GetEvents(id) → trae ese cajón",
+            "AppendEvent(id, sobre) → mete en ese cajón",
+            "Bajo nivel: la app no lo toca directo"
+          ]
+        }
+      },
+      {
+        "tag": "El stream lo entrega el almacén",
+        "note": "El stream deja de ser dueño de la lista: se la pide al almacén con un id.",
+        "code": [
+          "var stream = store.AbrirStream<Empresa>(\"emp-7\");",
+          "// dentro del store:",
+          "public EventStream<T> AbrirStream<T>(string id)",
+          "    => new(this, id);  // se incluye a sí mismo"
+        ],
+        "glow": [
+          3
+        ],
+        "side": {
+          "kind": "text",
+          "title": "Andamio nuestro",
+          "text": "Este EventStream es un peldaño. El almacén de verdad te dará directamente la empresa; aquí desaparecerá."
+        }
+      },
+      {
+        "tag": "Un id, tres caras (el mismo valor)",
+        "note": "Llave del cajón, parámetro del almacén e identidad del agregado: un solo valor que viaja solo.",
+        "code": [
+          "public T Get() {",
+          "  var entidad = new T { Id = _aggregateId };",
+          "  var sobres = _store.GetEvents(_aggregateId).ToList();",
+          "  entidad.Load(sobres.Select(s => s.EventData));",
+          "  _version = sobres.Count==0 ? 0 : sobres[^1].Version;",
+          "}"
+        ],
+        "glow": [
+          1
+        ],
+        "side": {
+          "kind": "state",
+          "title": "El mismo id, tres usos",
+          "rows": [
+            {
+              "k": "almacén",
+              "v": "AbrirStream(\"emp-7\")"
+            },
+            {
+              "k": "stream→store",
+              "v": "llave del cajón"
+            },
+            {
+              "k": "agregado",
+              "v": "entidad.Id"
+            }
+          ],
+          "flashKey": "agregado"
+        }
+      },
+      {
+        "tag": "El handler busca por id",
+        "note": "El handler recibe el almacén, no un stream suelto; y el comando recupera su EmpresaId.",
+        "code": [
+          "public record SuspenderEmpresa(string EmpresaId, string Motivo);",
+          "public class SuspenderHandler(InMemoryEventStore store)",
+          "  : ICommandHandler<SuspenderEmpresa> {",
+          "  public void Handle(SuspenderEmpresa cmd) {",
+          "    var stream = store.AbrirStream<Empresa>(cmd.EmpresaId);",
+          "    var hecho = stream.Get().Suspender(cmd.Motivo);",
+          "    if (hecho is not null) stream.Append(hecho);",
+          "  }}"
+        ],
+        "glow": [
+          4
+        ],
+        "side": {
+          "kind": "output",
+          "title": "dotnet run",
+          "text": "emp-7: Constructora Andes, plan Premium\n(emp-9 también vive en su cajón; el test solo imprime emp-7)"
+        }
+      },
+      {
+        "tag": "Dos escritores chocan: la versión los caza",
+        "note": "B miró un estado que A ya cambió; la posición ocupada delata el choque.",
+        "badge": "🎉 Concurrencia optimista",
+        "code": [
+          "public void AppendEvent(string id, EventoAlmacenado evento) {",
+          "  var cajon = _cajones.GetValueOrDefault(id) ?? new();",
+          "  var versionActual = cajon.Count==0 ? 0 : cajon[^1].Version;",
+          "  if (evento.Version != versionActual + 1)",
+          "    throw new ConcurrencyException(...);",
+          "  cajon.Add(evento);",
+          "}"
+        ],
+        "glow": [
+          3
+        ],
+        "side": {
+          "kind": "text",
+          "title": "¿Por qué optimista?",
+          "text": "Asumes choques raros: no bloqueas a nadie, solo verificas al guardar. Si chocó, fallas y reintentas."
+        }
+      }
+    ]
+  },
+  {
+    "slug": "el-tiempo-de-espera",
+    "number": 9,
+    "title": "El tiempo de espera (async/await)",
+    "subtitle": "El hilo no se congela",
+    "emoji": "⏳",
+    "bridge": "El almacén vive en RAM; para sobrevivir a un reinicio hay que ir a una base de datos que tarda.",
+    "objetivo": "Hablar con algo que tarda sin congelar la aplicación mientras espera.",
+    "oneLiner": "El I/O tarda milisegundos; con Task + async/await propagados de abajo hacia arriba, el hilo se libera mientras espera en vez de congelarse.",
+    "concepts": [
+      "CPU vs I/O",
+      "Task / async / await",
+      "bolsa de hilos (pool)",
+      "CancellationToken",
+      "async hasta arriba"
+    ],
+    "beats": [
+      {
+        "tag": "El dolor: I/O tarda y bloquea",
+        "note": "I/O sale al mundo exterior: milisegundos. Esperar congelado deja el hilo inútil para otros.",
+        "side": {
+          "kind": "state",
+          "title": "CPU vs I/O",
+          "rows": [
+            {
+              "k": "CPU (switch Aplicar)",
+              "v": "nanosegundos"
+            },
+            {
+              "k": "I/O (PostgreSQL)",
+              "v": "milisegundos = eternidad"
+            },
+            {
+              "k": "hilo congelado",
+              "v": "no atiende a nadie más"
+            }
+          ],
+          "flashKey": "hilo congelado"
+        }
+      },
+      {
+        "tag": "Por qué no escala",
+        "note": "El pool de hilos es limitado: 100 peticiones bloqueadas = 100 trabajadores congelados, la app se cae.",
+        "side": {
+          "kind": "text",
+          "title": "Esperar bloqueando no escala",
+          "text": "Cada hilo es un trabajador; el pool es la bolsa. Si todos esperan al disco, las peticiones nuevas hacen fila y nadie avanza."
+        }
+      },
+      {
+        "tag": "La promesa: Task, async, await",
+        "note": "await dice: ve y haz el viaje; mientras tanto me libero para atender a otro; sigo justo aquí al volver.",
+        "side": {
+          "kind": "list",
+          "title": "El trío de C#",
+          "items": [
+            "Task<T> = promesa de un resultado futuro",
+            "async = el método tiene esperas largas",
+            "await = libera el hilo durante el viaje"
+          ]
+        }
+      },
+      {
+        "tag": "El almacén se vuelve async",
+        "code": [
+          "public Task<IEnumerable<EventoAlmacenado>>",
+          "  GetEventsAsync(string id, CancellationToken ct = default) =>",
+          "    Task.FromResult(...);",
+          "public Task AppendEventAsync(string id, EventoAlmacenado e,",
+          "  CancellationToken ct = default) {",
+          "    // ...valida versión...",
+          "    return Task.CompletedTask;",
+          "}"
+        ],
+        "glow": [
+          6
+        ],
+        "note": "En RAM no hay espera real: envolvemos en Task.FromResult / Task.CompletedTask, promesas ya cumplidas.",
+        "side": {
+          "kind": "state",
+          "title": "Nuevo en la firma",
+          "rows": [
+            {
+              "k": "devuelve",
+              "v": "Task / Task<T>"
+            },
+            {
+              "k": "recibe",
+              "v": "CancellationToken ct = default"
+            },
+            {
+              "k": "ct hoy",
+              "v": "hueco reservado, no se encadena"
+            }
+          ],
+          "flashKey": "ct hoy"
+        }
+      },
+      {
+        "tag": "La cascada sube: stream y handler",
+        "code": [
+          "public async Task<T> GetAsync() {",
+          "  var sobres = (await _store.GetEventsAsync(_id)).ToList();",
+          "  ...",
+          "}",
+          "public async Task HandleAsync(SuspenderEmpresa cmd,",
+          "    CancellationToken ct = default) {",
+          "  var empresa = await stream.GetAsync();   // I/O",
+          "  var hecho   = empresa.Suspender(cmd.Motivo); // CPU",
+          "  if (hecho is not null) await stream.AppendAsync(hecho);",
+          "}"
+        ],
+        "glow": [
+          1
+        ],
+        "note": "Si el almacén espera, el stream también, y el handler también. La decisión (CPU) en medio no espera.",
+        "side": {
+          "kind": "list",
+          "title": "Async hasta arriba",
+          "items": [
+            "InMemoryEventStore → Task",
+            "EventStream.GetAsync/AppendAsync",
+            "ICommandHandler.HandleAsync",
+            "Program.cs: await ..."
+          ]
+        }
+      },
+      {
+        "tag": "Las tres reglas de producción",
+        "note": "Sin .Result/.Wait (bloquean el pool); ct siempre en la firma; async da escalabilidad, no velocidad.",
+        "badge": "🎉 Las interfaces ya no mienten sobre la espera",
+        "side": {
+          "kind": "list",
+          "title": "🌱 Semilla de producción",
+          "items": [
+            "Nunca .Result ni .Wait() sobre un Task",
+            "Deja siempre CancellationToken en la firma",
+            "async = máquina de estados, no otro hilo",
+            "Ganas escalabilidad, no velocidad"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "slug": "inyeccion-de-dependencias",
+    "number": 10,
+    "title": "De `new` al contenedor (Inyección de Dependencias)",
+    "subtitle": "Que algo arme las piezas",
+    "emoji": "🧩",
+    "bridge": "Veníamos de async; aún armamos el handler con `new` a mano. ¿Quién lo arma?",
+    "objetivo": "Dejar de ensamblar con `new`; que un contenedor arme las piezas.",
+    "oneLiner": "Un contenedor de DI arma el grafo por ti —registro + reflexión del constructor + recursión— para que tus clases reciban sus dependencias ya armadas.",
+    "concepts": [
+      "Inversión de Control (IoC)",
+      "Inyección de Dependencias (DI)",
+      "ServiceCollection / tiempos de vida",
+      "Reflexión del constructor",
+      "DIP (depender de abstracciones)"
+    ],
+    "beats": [
+      {
+        "tag": "El infierno de los `new`",
+        "code": [
+          "var almacen = new InMemoryEventStore();",
+          "var handler = new SuspenderHandler(almacen);"
+        ],
+        "glow": [
+          1
+        ],
+        "note": "Hoy 2 líneas. Cada dependencia nueva multiplica el cableado a mano.",
+        "side": {
+          "kind": "text",
+          "title": "El dolor",
+          "text": "Si el store pide conexión Postgres + serializador JSON, repites el grafo por cada uno de tus 50 handlers."
+        }
+      },
+      {
+        "tag": "El cableado se vuelve pesadilla",
+        "code": [
+          "var conexion = new PostgresConnection(\"Host=localhost;…\");",
+          "var json     = new SerializadorJson();",
+          "var almacen  = new PostgresEventStore(conexion, json);",
+          "var handler  = new SuspenderHandler(almacen);",
+          "// … y por cada uno de los 50 handlers que tengas"
+        ],
+        "glow": [
+          4
+        ],
+        "note": "Armas los escritorios en vez de atender. Alguien debe armarlos por ti."
+      },
+      {
+        "tag": "Registra cómo se fabrica",
+        "code": [
+          "dotnet add package Microsoft.Extensions.DependencyInjection",
+          "var services = new ServiceCollection();",
+          "services.AddSingleton<InMemoryEventStore>();",
+          "services.AddTransient<SuspenderHandler>();",
+          "var proveedor = services.BuildServiceProvider();"
+        ],
+        "glow": [
+          3
+        ],
+        "note": "El recepcionista: le enseñas a fabricar cada pieza al arrancar.",
+        "side": {
+          "kind": "state",
+          "title": "Tiempos de vida",
+          "rows": [
+            {
+              "k": "AddSingleton",
+              "v": "una para toda la app"
+            },
+            {
+              "k": "AddScoped",
+              "v": "una por petición/mensaje"
+            },
+            {
+              "k": "AddTransient",
+              "v": "una nueva cada vez"
+            }
+          ],
+          "flashKey": "AddSingleton"
+        }
+      },
+      {
+        "tag": "Arma el grafo",
+        "code": [
+          "var almacen = proveedor.GetRequiredService<InMemoryEventStore>();",
+          "await almacen.AbrirStream<Empresa>(\"emp-7\").AppendAsync(...);",
+          "var handler = proveedor.GetRequiredService<SuspenderHandler>();",
+          "var cmd = new SuspenderEmpresa(\"emp-7\", \"falta de pago\");",
+          "await handler.HandleAsync(cmd);"
+        ],
+        "glow": [
+          3
+        ],
+        "note": "Pides el handler: lee su ctor, fabrica el store y se lo inyecta.",
+        "badge": "🎉 El recepcionista arma el grafo",
+        "side": {
+          "kind": "text",
+          "title": "IoC",
+          "text": "El control de crear dependencias pasa de tu clase a alguien externo: Inversión de Control."
+        }
+      },
+      {
+        "tag": "Desarma la magia",
+        "code": [
+          "private readonly Dictionary<Type, Type> _registro = new();",
+          "var ctor = concreto.GetConstructors().First();",
+          "var argumentos = ctor.GetParameters()",
+          "    .Select(p => Resolver(p.ParameterType))  // recursión",
+          "    .ToArray();",
+          "return Activator.CreateInstance(concreto, argumentos)!;"
+        ],
+        "glow": [
+          3
+        ],
+        "note": "No hay magia: diccionario + reflexión del ctor + recursión.",
+        "side": {
+          "kind": "list",
+          "title": "El corazón",
+          "items": [
+            "1. Diccionario interfaz→impl",
+            "2. Lee el ctor (reflexión)",
+            "3. Resuelve cada parámetro (recursión)",
+            "4. Activator.CreateInstance"
+          ]
+        }
+      },
+      {
+        "tag": "DIP/IoC/DI",
+        "note": "DI es el puente dominio↔infra; con 2 impls extraerás `IEventStore`.",
+        "side": {
+          "kind": "state",
+          "title": "Cuatro ideas distintas",
+          "rows": [
+            {
+              "k": "DIP",
+              "v": "depender de abstracciones (aún no)"
+            },
+            {
+              "k": "IoC",
+              "v": "algo externo crea"
+            },
+            {
+              "k": "DI",
+              "v": "pasar por ctor (los new ya eran DI)"
+            },
+            {
+              "k": "Contenedor",
+              "v": "ServiceCollection automatiza"
+            }
+          ],
+          "flashKey": "DIP"
+        }
+      }
+    ]
+  },
+  {
+    "slug": "docker-postgres",
+    "number": 11,
+    "title": "Persistencia real (Docker y PostgreSQL)",
+    "subtitle": "Que sobreviva al reinicio",
+    "emoji": "🐘",
+    "bridge": "El DI armó el grafo; ahora el almacén en RAM debe persistir de verdad.",
+    "objetivo": "Que la historia de las empresas sobreviva a un reinicio.",
+    "oneLiner": "Los eventos son documentos: Postgres + JSONB los guarda con ACID, Docker lo enciende, y el puente a mano revela el muro.",
+    "concepts": [
+      "Persistencia fuera del proceso",
+      "JSONB en PostgreSQL",
+      "Docker compose",
+      "Connection string",
+      "Serialización polimórfica"
+    ],
+    "beats": [
+      {
+        "tag": "El dolor: RAM se borra",
+        "note": "El InMemoryEventStore vive en RAM; reinicias y la historia se va a la basura.",
+        "side": {
+          "kind": "text",
+          "title": "La bomba de tiempo",
+          "text": "InMemoryEventStore → RAM. Apaga el proceso y el diario de TODAS las empresas desaparece."
+        }
+      },
+      {
+        "tag": "Tabla rígida",
+        "note": "Cada hecho tiene forma distinta; columnas fijas dan nulls o decenas de tablas.",
+        "code": [
+          "public record EmpresaRegistrada(string Nombre, string Plan);",
+          "public record PlanCambiado(string NuevoPlan);",
+          "public record EmpresaSuspendida(string Motivo);",
+          "public record EmpresaReactivada();"
+        ],
+        "glow": [
+          3
+        ],
+        "side": {
+          "kind": "list",
+          "title": "Dos malas salidas",
+          "items": [
+            "Una tabla por tipo → decenas de tablas",
+            "Tabla gigante con columnas en null",
+            "Motivo = null cuando es PlanCambiado"
+          ]
+        }
+      },
+      {
+        "tag": "Documento",
+        "note": "Un puñado de datos que, escrito, no cambia. Eso es un documento JSON.",
+        "code": [
+          "{ \"Nombre\": \"Constructora Andes\", \"Plan\": \"Básico\" }"
+        ],
+        "glow": [
+          0
+        ],
+        "badge": "🎉 No guardamos columnas: documentos",
+        "side": {
+          "kind": "text",
+          "title": "PostgreSQL + JSONB",
+          "text": "JSONB: guarda y consulta dentro del JSON con índices, velocidad NoSQL, sin perder ACID."
+        }
+      },
+      {
+        "tag": "Docker enciende",
+        "note": "En vez de instalar Postgres, un contenedor prefabricado listo en segundos.",
+        "code": [
+          "services:",
+          "  postgres:",
+          "    image: postgres:17-alpine",
+          "    container_name: gestion_eventstore",
+          "    environment:",
+          "      POSTGRES_USER: gestion",
+          "      POSTGRES_PASSWORD: dev_local_pwd",
+          "      POSTGRES_DB: gestion_eventstore",
+          "    ports:",
+          "      - \"5432:5432\""
+        ],
+        "glow": [
+          3
+        ],
+        "side": {
+          "kind": "output",
+          "title": "Levantar y comprobar",
+          "items": [
+            "$ docker compose up -d",
+            "$ docker ps",
+            "gestion_eventstore   Up"
+          ],
+          "text": "$ docker compose up -d\n$ docker ps\n  gestion_eventstore   ...   Up\n$ psql ... -c \"\\dt\" → Did not find any relations."
+        }
+      },
+      {
+        "tag": "Connection string",
+        "note": "La app necesita dirección y llave para abrir la bóveda encendida.",
+        "code": [
+          "Host=localhost;Port=5432;Database=gestion_eventstore;",
+          "Username=gestion;Password=dev_local_pwd"
+        ],
+        "glow": [
+          0
+        ],
+        "side": {
+          "kind": "output",
+          "title": "Bóveda viva, vacía",
+          "items": [
+            "$ psql ... -c \"\\dt\"",
+            "Did not find any relations."
+          ],
+          "text": "$ docker exec -it gestion_eventstore \\\\\n  psql -U gestion -d gestion_eventstore -c \"\\dt\"\nDid not find any relations.\nHost=localhost;Port=5432;Database=gestion_eventstore"
+        }
+      },
+      {
+        "tag": "El muro",
+        "note": "EventData es object; al leer, ¿era EmpresaRegistrada o PlanCambiado?",
+        "side": {
+          "kind": "list",
+          "title": "Plumbing a mano = semanas",
+          "items": [
+            "Conexión Npgsql + CREATE TABLE eventos",
+            "Serializar EventoAlmacenado a JSON",
+            "Guardar el nombre del tipo + switch al leer",
+            "Concurrencia, consultas, índices...",
+            "→ serialización polimórfica: hora de ADOPTAR"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "slug": "por-que-adoptar-herramientas",
+    "number": 12,
+    "title": "El momento de adoptar una herramienta",
+    "subtitle": "Adoptar con criterio",
+    "emoji": "🧰",
+    "bridge": "Postgres encendido, pero chocaste con un muro; antes de escalarlo, una decisión de ingeniería.",
+    "objetivo": "Tener el criterio para adoptar Marten y Wolverine, no por moda.",
+    "oneLiner": "Construiste el motor entero y lo entiendes por dentro; eso te da derecho a adoptar Marten y Wolverine con criterio, no por moda.",
+    "concepts": [
+      "Anti-cargo-cult: las 4 condiciones",
+      "Marten reemplaza tu event store",
+      "Wolverine reemplaza tu mediador",
+      "Critter Stack (mismo autor)",
+      "Afinar primero, revelar después"
+    ],
+    "beats": [
+      {
+        "tag": "Mira el motor que ya construiste",
+        "note": "Un motor de Event Sourcing real, hecho a mano: lo entiendes por dentro.",
+        "side": {
+          "kind": "list",
+          "title": "Tus piezas a mano",
+          "items": [
+            "eventos + evolve + AggregateRoot",
+            "EventStream (la historia de una empresa)",
+            "decide (emitir validando reglas)",
+            "CommandHandler + EventoAlmacenado.Version",
+            "InMemoryEventStore (id + concurrencia)",
+            "async/await + DI + Docker/Postgres"
+          ]
+        }
+      },
+      {
+        "tag": "El dolor: ¿y esto a producción tal cual?",
+        "note": "Lo que falta o resolviste 'de juguete' da miedo mantenerlo con clientes pagando.",
+        "side": {
+          "kind": "list",
+          "title": "Lo que aún duele",
+          "items": [
+            "Serialización polimórfica (object → su tipo)",
+            "Concurrencia optimista de verdad",
+            "Proyecciones / read models (CQRS)",
+            "Outbox transaccional",
+            "Multi-tenancy",
+            "Versionado / upcasting, testing sin BD"
+          ]
+        }
+      },
+      {
+        "tag": "Las dos herramientas hermanas: Critter Stack",
+        "note": "Marten y Wolverine hacen exactamente lo que tú ya entiendes, hecho por expertos.",
+        "side": {
+          "kind": "state",
+          "title": "Tu pieza → la reemplaza",
+          "rows": [
+            {
+              "k": "InMemoryEventStore + Postgres",
+              "v": "Marten"
+            },
+            {
+              "k": "CommandHandler + Save manual",
+              "v": "Wolverine"
+            },
+            {
+              "k": "bus de eventos (futuro)",
+              "v": "Wolverine"
+            },
+            {
+              "k": "multi-tenancy · proyecciones",
+              "v": "Marten"
+            }
+          ],
+          "flashKey": "InMemoryEventStore + Postgres"
+        }
+      },
+      {
+        "tag": "La regla: adoptar con criterio, no por moda",
+        "note": "Anti-cargo-cult: solo adoptas cuando cumples las cuatro condiciones.",
+        "side": {
+          "kind": "list",
+          "title": "Las 4 condiciones",
+          "items": [
+            "1. Sentiste la necesidad (el muro real)",
+            "2. Sabes qué hace (lo construiste a mano)",
+            "3. Sabes cómo lo hace (abres la caja)",
+            "4. Puedes depurarla (no es caja negra)"
+          ]
+        }
+      },
+      {
+        "tag": "El plan en dos tiempos, no un cambio brusco",
+        "note": "Afinar el motor a su forma vuelve la revelación un 'ah, esto ya lo tenía'.",
+        "badge": "🎉 Adoptar = intercambio 1:1, no rediseño",
+        "side": {
+          "kind": "list",
+          "title": "Dos tiempos",
+          "items": [
+            "1. Afinar tu motor a su forma de producción",
+            "2. Revelar Marten y Wolverine (renombrar 1:1)"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "slug": "el-agregado-acumula",
+    "number": 13,
+    "title": "El agregado que acumula",
+    "subtitle": "Levanta, no devuelve",
+    "emoji": "📥",
+    "bridge": "Vienes de decidir adoptar herramientas; primero afinas tu motor a su forma de producción.",
+    "objetivo": "Que la Empresa acumule sus hechos en una lista, en vez de devolverlos.",
+    "oneLiner": "El agregado deja de devolver sus hechos y pasa a acumularlos con Raise; el handler solo drena la lista, tenga 0, 1 o 5.",
+    "concepts": [
+      "Raise (levantar un hecho)",
+      "UncommittedEvents (cambios sin confirmar)",
+      "drenar la lista",
+      "idempotencia en el agregado",
+      "forma de producción"
+    ],
+    "beats": [
+      {
+        "tag": "El handler de hoy: devuelve y archiva",
+        "code": [
+          "var empresa = await stream.GetAsync();",
+          "var hecho   = empresa.Suspender(cmd.Motivo);",
+          "if (hecho is not null) await stream.AppendAsync(hecho);"
+        ],
+        "glow": [
+          2
+        ],
+        "note": "Suspender devuelve UN hecho y el handler lo archiva. Funciona... pero arrastra olores.",
+        "side": {
+          "kind": "list",
+          "title": "Dos olores",
+          "items": [
+            "El if (hecho is not null) es idempotencia filtrada al handler",
+            "Un comando solo puede emitir UN hecho"
+          ]
+        }
+      },
+      {
+        "tag": "El dolor: devolver un hecho no escala",
+        "note": "El handler conoce reglas del agregado, y no modela emitir DOS hechos en un paso.",
+        "side": {
+          "kind": "text",
+          "title": "La salida",
+          "text": "Que la empresa RECUERDE lo que decidió: cada decisión levanta (Raise) un hecho a una lista, y el handler solo la drena."
+        }
+      },
+      {
+        "tag": "Refactor 1: AggregateRoot acumula",
+        "code": [
+          "private readonly List<object> _uncommittedEvents = new();",
+          "public IReadOnlyList<object> UncommittedEvents",
+          "    => _uncommittedEvents.AsReadOnly();",
+          "public void ClearUncommittedEvents() => _uncommittedEvents.Clear();",
+          "protected void Raise(object hecho) => _uncommittedEvents.Add(hecho);"
+        ],
+        "glow": [
+          4
+        ],
+        "note": "Raise (protected) encola; UncommittedEvents (solo lectura) deja mirar, no tocar.",
+        "side": {
+          "kind": "state",
+          "title": "Por qué List<object>",
+          "rows": [
+            {
+              "k": "tipo",
+              "v": "object, no Evento"
+            },
+            {
+              "k": "razón",
+              "v": "los records no tienen base común"
+            },
+            {
+              "k": "Raise",
+              "v": "protected: solo la empresa levanta"
+            }
+          ]
+        }
+      },
+      {
+        "tag": "Empresa: los tres métodos ahora son void + Raise",
+        "code": [
+          "public void CambiarPlan(string nuevoPlan) {",
+          "  if (Suspendida) throw new ReglaDeNegocioException(...);",
+          "  Raise(new PlanCambiado(nuevoPlan)); }",
+          "public void Suspender(string motivo) {",
+          "  if (Suspendida) return;   // idempotencia: no encola",
+          "  Raise(new EmpresaSuspendida(motivo)); }",
+          "public void Reactivar() => Raise(new EmpresaReactivada());"
+        ],
+        "glow": [
+          4
+        ],
+        "note": "Validación lanza, idempotencia ahora hace return (no encola), Reactivar solo levanta."
+      },
+      {
+        "tag": "Refactor 2: el handler solo drena",
+        "code": [
+          "empresa.Suspender(cmd.Motivo);          // decide -> encola",
+          "foreach (var hecho in empresa.UncommittedEvents)",
+          "    await stream.AppendAsync(hecho);    // drena lo que haya",
+          "empresa.ClearUncommittedEvents();"
+        ],
+        "glow": [
+          1
+        ],
+        "note": "Desaparece el if (hecho is not null): si no encoló, el foreach no archiva nada.",
+        "badge": "🎉 La regla vive entera en el agregado",
+        "side": {
+          "kind": "list",
+          "title": "El gesto siempre igual",
+          "flashKey": "drena",
+          "items": [
+            "decide",
+            "drena",
+            "limpia"
+          ]
+        }
+      },
+      {
+        "tag": "Comprueba: suspender dos veces deja 3 hechos",
+        "code": [
+          "await new SuspenderHandler(store).HandleAsync(...\"falta de pago\");",
+          "await new SuspenderHandler(store).HandleAsync(...\"otra vez\");",
+          "var historia = await store.GetEventsAsync(\"emp-7\");"
+        ],
+        "glow": [
+          1
+        ],
+        "note": "El segundo Suspender no encola; el handler, sin ningún if, no archiva esa vez.",
+        "side": {
+          "kind": "output",
+          "title": "dotnet run",
+          "text": "Constructora Andes: plan Premium, suspendida; 3 hechos"
+        }
+      }
+    ]
+  },
+  {
+    "slug": "aplicar-al-levantar",
+    "number": 14,
+    "title": "Aplicar al levantar",
+    "subtitle": "Decidir y reflejarlo al instante",
+    "emoji": "⚡",
+    "bridge": "Venimos de acumular hechos; pero la empresa decide y su estado no se entera.",
+    "objetivo": "Que al levantar un hecho el estado cambie al instante.",
+    "oneLiner": "Raise pasa a encolar Y aplicar, y cada hecho muda su mutación a un Apply(T) público que el switch solo enruta.",
+    "concepts": [
+      "Raise aplica al instante",
+      "Aplicar directo vs Raise encola+aplica",
+      "un Apply por tipo, público",
+      "switch como enrutador (no dynamic)",
+      "rehidratar por convención"
+    ],
+    "beats": [
+      {
+        "tag": "El dolor: decide pero no se entera",
+        "code": [
+          "var emp = await stream.GetAsync();   // plan Básico",
+          "emp.CambiarPlan(\"Premium\");",
+          "Console.WriteLine(emp.Plan);   // 👉 imprime \"Básico\" 😕"
+        ],
+        "glow": [
+          2
+        ],
+        "note": "Raise encoló el hecho pero no lo aplicó: la instancia sigue diciendo Básico.",
+        "side": {
+          "kind": "state",
+          "title": "emp en memoria",
+          "rows": [
+            {
+              "k": "Plan",
+              "v": "Básico"
+            },
+            {
+              "k": "UncommittedEvents",
+              "v": "[PlanCambiado]"
+            }
+          ],
+          "flashKey": "Plan"
+        }
+      },
+      {
+        "tag": "Por qué duele de verdad",
+        "note": "Contraintuitivo, y una 2ª decisión validaría contra el estado viejo (if Suspendida ve lo de antes).",
+        "side": {
+          "kind": "list",
+          "title": "Dos problemas",
+          "items": [
+            "Un objeto que decide debería reflejarlo",
+            "2ª decisión ve estado viejo → deja pasar lo que debió rechazar"
+          ]
+        }
+      },
+      {
+        "tag": "Refactor 1: Raise también aplica",
+        "code": [
+          "protected void Raise(object hecho)",
+          "{",
+          "    _uncommittedEvents.Add(hecho);   // lo recuerda",
+          "    Aplicar(hecho);                  // …y ahora lo aplica",
+          "}"
+        ],
+        "glow": [
+          3
+        ],
+        "note": "Una línea: Raise encola y además aplica. Ahora emp.Plan == Premium al instante.",
+        "side": {
+          "kind": "state",
+          "title": "emp tras el refactor",
+          "rows": [
+            {
+              "k": "Plan",
+              "v": "Premium"
+            },
+            {
+              "k": "refleja",
+              "v": "al instante"
+            }
+          ],
+          "flashKey": "Plan"
+        }
+      },
+      {
+        "tag": "La asimetría: Load NO encola",
+        "note": "Load llama Aplicar directo (reproduce el pasado); Raise aplica Y encola (hecho nuevo a persistir).",
+        "side": {
+          "kind": "text",
+          "title": "Reproducir vs decidir",
+          "text": "Reproducir la historia no genera hechos nuevos. Decidir, sí."
+        }
+      },
+      {
+        "tag": "Refactor 2: un Apply por tipo, público",
+        "code": [
+          "protected override void Aplicar(object hecho)",
+          "{",
+          "    switch (hecho)",
+          "    {",
+          "        case PlanCambiado e: Apply(e); break;",
+          "        case EmpresaSuspendida e: Apply(e); break;",
+          "    }",
+          "}",
+          "public void Apply(PlanCambiado e) => Plan = e.NuevoPlan;",
+          "public void Apply(EmpresaSuspendida e) => Suspendida = true;"
+        ],
+        "glow": [
+          8
+        ],
+        "note": "El switch solo ENRUTA; la mutación se muda a un Apply(T) público (router seguro, sin dynamic).",
+        "side": {
+          "kind": "list",
+          "title": "Cuídate de dos cosas",
+          "items": [
+            "case EmpresaSuspendida e: para ligar la variable",
+            "borra mutaciones que queden en el switch (compilan duplicadas en silencio)"
+          ]
+        }
+      },
+      {
+        "tag": "El nombre: rehidratar por convención",
+        "note": "Apply(T) públicos = el gancho de la herramienta: Marten los llama uno a uno al rehidratar.",
+        "badge": "🎉 Tu Apply(PlanCambiado) ya es lo que Marten invoca",
+        "side": {
+          "kind": "text",
+          "title": "Convergencia preventiva",
+          "text": "Reescribes hoy para que, en el reveal, no toques ni una línea del agregado."
+        }
+      }
+    ]
+  },
+  {
+    "slug": "la-version-del-agregado",
+    "number": 15,
+    "title": "La versión es del agregado",
+    "subtitle": "El número vuelve a casa",
+    "emoji": "🔢",
+    "bridge": "Ya hay versión en el sobre y concurrencia optimista; pero el agregado no sabe en qué versión está.",
+    "objetivo": "Que empresa.Version diga en qué versión cargó el agregado.",
+    "oneLiner": "La versión deja de estar atrapada en el EventStream y vive en AggregateRoot.Version: el agregado sabe en qué versión cargó, justo lo que compara la concurrencia.",
+    "concepts": [
+      "AggregateRoot.Version",
+      "get; protected set;",
+      "Load sube, Raise no",
+      "versión persistida",
+      "concurrencia optimista"
+    ],
+    "beats": [
+      {
+        "tag": "El número está escondido",
+        "note": "La versión cargada vive en EventStream._version privado; el agregado no la conoce.",
+        "code": [
+          "private int _version;        // dentro del EventStream",
+          "// y en el sobre EventoAlmacenado.Version"
+        ],
+        "glow": [
+          0
+        ],
+        "side": {
+          "kind": "text",
+          "title": "El dolor",
+          "text": "Cargas emp-7, preguntas '¿en qué versión estás?' y la Empresa no sabe responder. El número está desperdigado y, peor: va a desaparecer."
+        }
+      },
+      {
+        "tag": "Dale su hogar: AggregateRoot.Version",
+        "note": "Propiedad de solo-lectura-desde-fuera; el agregado por fin conoce su versión.",
+        "code": [
+          "public int Version { get; protected set; }"
+        ],
+        "glow": [
+          0
+        ],
+        "side": {
+          "kind": "state",
+          "title": "protected set",
+          "rows": [
+            {
+              "k": "get",
+              "v": "público"
+            },
+            {
+              "k": "set",
+              "v": "protected (nadie lo falsea)"
+            },
+            {
+              "k": "dueño",
+              "v": "el propio agregado"
+            }
+          ]
+        }
+      },
+      {
+        "tag": "Load la sube, un hecho a la vez",
+        "note": "Cada hecho persistido reproducido sube la versión cargada; al terminar = versión del último.",
+        "code": [
+          "public void Load(IEnumerable<object> historia)",
+          "{",
+          "    foreach (var hecho in historia)",
+          "    {",
+          "        Aplicar(hecho);",
+          "        Version++;   // cada hecho persistido sube",
+          "    }",
+          "}"
+        ],
+        "glow": [
+          5
+        ],
+        "side": {
+          "kind": "text",
+          "title": "Por qué aquí",
+          "text": "Load reproduce hechos YA guardados, así que cada uno representa una versión real persistida."
+        }
+      },
+      {
+        "tag": "Raise NO toca Version",
+        "note": "Un hecho recién decidido aún no está persistido; sigues en la versión con la que cargaste.",
+        "code": [
+          "protected void Raise(object hecho)",
+          "{",
+          "    _uncommittedEvents.Add(hecho);",
+          "    Aplicar(hecho);   // encola y aplica, NO sube Version",
+          "}"
+        ],
+        "glow": [
+          3
+        ],
+        "side": {
+          "kind": "state",
+          "title": "Cargas en 3 y decides",
+          "flashKey": "sin confirmar",
+          "rows": [
+            {
+              "k": "Version",
+              "v": "3 (persistida)"
+            },
+            {
+              "k": "sin confirmar",
+              "v": "1 hecho"
+            }
+          ]
+        }
+      },
+      {
+        "tag": "El stream lee la versión del agregado",
+        "note": "GetAsync ya no recalcula: la versión sale del propio agregado rehidratado.",
+        "code": [
+          "entidad.Load(sobres.Select(s => s.EventData));",
+          "_version = entidad.Version;   // antes: sobres[^1].Version"
+        ],
+        "glow": [
+          1
+        ],
+        "side": {
+          "kind": "output",
+          "title": "dotnet run",
+          "items": [
+            "cargada en versión 3",
+            "tras decidir: versión 3, 1 sin confirmar"
+          ],
+          "text": "cargada en versión 3\ntras decidir: versión 3, 1 sin confirmar"
+        }
+      },
+      {
+        "tag": "Sobrevive al swap y Marten la poblará",
+        "note": "El EventStream-ventana desaparecerá; el almacén directo y Marten leen esta misma Version.",
+        "badge": "🎉 La versión vive en el agregado",
+        "side": {
+          "kind": "list",
+          "title": "Semillas",
+          "items": [
+            "El almacén directo lee Version del agregado, sin intermediario",
+            "Marten rellena este mismo { get; protected set; } al rehidratar",
+            "Es lo que la concurrencia optimista compara al escribir"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "slug": "el-almacen-directo",
+    "number": 16,
+    "title": "El almacén directo (y la Unit of Work)",
+    "subtitle": "Háblale directo, guarda una vez",
+    "emoji": "🗄️",
+    "bridge": "La versión ya vive en el agregado; ahora jubilamos el EventStream-ventana y guardamos directo.",
+    "objetivo": "Cargar y guardar directo al almacén con un solo SaveChangesAsync.",
+    "oneLiner": "El EventStream-ventana se jubila: le hablas directo al almacén y una Unit of Work persiste todo lo que tocaste con un solo SaveChangesAsync.",
+    "concepts": [
+      "Unit of Work",
+      "almacén directo",
+      "StartStream / Get",
+      "concurrencia optimista",
+      "1 transacción = 1 agregado"
+    ],
+    "beats": [
+      {
+        "tag": "El handler hace de plomero",
+        "note": "Cada handler repite foreach + Clear: fontanería de persistencia que estorba.",
+        "code": [
+          "var empresa = await stream.GetAsync();",
+          "empresa.CambiarPlan(cmd.NuevoPlan);",
+          "foreach (var hecho in empresa.UncommittedEvents)",
+          "    await stream.AppendAsync(hecho);",
+          "empresa.ClearUncommittedEvents();"
+        ],
+        "glow": [
+          2
+        ],
+        "side": {
+          "kind": "text",
+          "title": "El dolor de fondo",
+          "text": "El EventStream es ventana a UNA empresa; una operación real podría tocar varias y guardarlas juntas."
+        }
+      },
+      {
+        "tag": "Intento ingenuo: solo recuerdo lo que nace",
+        "note": "El Get te da el agregado y se olvida de él; SaveChanges solo drena _iniciados.",
+        "code": [
+          "private readonly List<AggregateRoot> _iniciados = new();",
+          "public void StartStream(AggregateRoot ar) => _iniciados.Add(ar);",
+          "ar.Load(cajon.Select(s => s.EventData));",
+          "return Task.FromResult<T?>(ar);   // te lo doy… y me olvido",
+          "foreach (var ar in _iniciados)    // SOLO lo que nació",
+          "    Volcar(ar);"
+        ],
+        "glow": [
+          3
+        ],
+        "side": {
+          "kind": "list",
+          "title": "Una sola lista",
+          "items": [
+            "_iniciados ← StartStream (nace aquí)",
+            "Get NO apunta lo que carga"
+          ]
+        }
+      },
+      {
+        "tag": "Cargar → cambiar → guardar… se pierde",
+        "note": "PlanCambiado quedó colgando: no rastreas lo cargado, al guardar lo pierdes.",
+        "code": [
+          "store.StartStream(creada);",
+          "await store.SaveChangesAsync();   // alta OK",
+          "await new CambiarPlanHandler(store)",
+          "    .HandleAsync(new CambiarPlanDeEmpresa(\"emp-7\",\"Premium\"));",
+          "var empresa = await store.GetAggregateRootAsync<Empresa>(\"emp-7\");",
+          "Console.WriteLine(empresa!.Plan);   // imprime \"Básico\""
+        ],
+        "glow": [
+          5
+        ],
+        "side": {
+          "kind": "output",
+          "title": "Consola",
+          "text": "💥 Básico   (esperabas Premium)"
+        }
+      },
+      {
+        "tag": "La cura: dos listas = Unit of Work",
+        "note": "Get ahora apunta lo cargado en _modificados; el almacén recuerda lo que tocaste.",
+        "code": [
+          "private readonly List<AggregateRoot> _iniciados   = new();",
+          "private readonly List<AggregateRoot> _modificados = new();",
+          "ar.Load(cajon.Select(s => s.EventData));",
+          "_modificados.Add(ar);   // lo rastreo para drenarlo"
+        ],
+        "glow": [
+          3
+        ],
+        "badge": "🎉 Nace la Unit of Work",
+        "side": {
+          "kind": "state",
+          "title": "La Unit of Work",
+          "rows": [
+            {
+              "k": "_iniciados",
+              "v": "nacieron aquí (StartStream)"
+            },
+            {
+              "k": "_modificados",
+              "v": "cargados con Get para mutar"
+            }
+          ],
+          "flashKey": "_modificados"
+        }
+      },
+      {
+        "tag": "Un solo SaveChangesAsync drena todo",
+        "note": "Antes de volcar lo modificado verifica actual != ar.Version: concurrencia optimista.",
+        "code": [
+          "foreach (var ar in _modificados.Where(",
+          "    a => a.UncommittedEvents.Count > 0))",
+          "{",
+          "    if (actual != ar.Version)",
+          "        throw new ConcurrencyException(...);",
+          "    Volcar(ar, desdeVersion: ar.Version);",
+          "}",
+          "_iniciados.Clear(); _modificados.Clear();"
+        ],
+        "glow": [
+          3
+        ],
+        "side": {
+          "kind": "text",
+          "title": "Único punto de persistencia",
+          "text": "Drena _iniciados y _modificados de un golpe, valida versión y limpia el rastreo."
+        }
+      },
+      {
+        "tag": "Los handlers ya no drenan",
+        "note": "Vuelven a cargar, decidir, guardar; el foreach/Clear desaparecen.",
+        "code": [
+          "var empresa = await store",
+          "    .GetAggregateRootAsync<Empresa>(cmd.EmpresaId, ct)",
+          "    ?? throw new InvalidOperationException(...);",
+          "empresa.CambiarPlan(cmd.NuevoPlan);",
+          "await store.SaveChangesAsync(ct);"
+        ],
+        "glow": [
+          4
+        ],
+        "side": {
+          "kind": "output",
+          "title": "dotnet run",
+          "text": "Constructora Andes: plan Premium, suspendida, versión 3"
+        }
+      }
+    ]
+  },
+  {
+    "slug": "revelar-marten",
+    "number": 17,
+    "title": "El gran reveal: Marten reemplaza tu almacén",
+    "subtitle": "Renombrar e intercambiar",
+    "emoji": "🎉",
+    "bridge": "Tu motor ya tiene la forma del canon; ahora enchufamos Marten sobre Postgres real.",
+    "objetivo": "Reemplazar tu almacén por uno sobre Marten sin tocar el dominio.",
+    "oneLiner": "Como tu motor ya tenía la forma del canon, adoptar Marten es extraer IEventStore y mapear 1:1 tus métodos: un swap de una línea.",
+    "concepts": [
+      "IEventStore (extraer interfaz)",
+      "MartenEventStore mapea 1:1",
+      "AggregateStreamAsync rehidrata con tus Apply",
+      "AddMarten + el swap de una línea",
+      "mt_events en JSONB sobre Postgres"
+    ],
+    "beats": [
+      {
+        "tag": "Los handlers dependen del concreto",
+        "note": "Para cambiar de almacén, los handlers no pueden depender de InMemoryEventStore.",
+        "code": [
+          "public class CambiarPlanHandler(InMemoryEventStore store)",
+          "    : ICommandHandler<CambiarPlanDeEmpresa>"
+        ],
+        "glow": [
+          0
+        ],
+        "side": {
+          "kind": "text",
+          "title": "El dolor",
+          "text": "Atado a un tipo concreto, no hay forma de intercambiar la implementación."
+        }
+      },
+      {
+        "tag": "Extrae el contrato IEventStore",
+        "note": "Por fin hay 2ª implementación (Marten) que justifica abstraer.",
+        "code": [
+          "public interface IEventStore",
+          "{",
+          "    void StartStream(AggregateRoot agregado);",
+          "    Task<T?> GetAggregateRootAsync<T>(string id, ...);",
+          "    Task SaveChangesAsync(CancellationToken ct = default);",
+          "    Task<bool> ExistsAsync<T>(string id, ...);",
+          "}"
+        ],
+        "glow": [
+          0
+        ],
+        "side": {
+          "kind": "list",
+          "title": "Los handlers ahora",
+          "items": [
+            "RegistrarEmpresaHandler(IEventStore store)",
+            "CambiarPlanHandler(IEventStore store)",
+            "SuspenderHandler(IEventStore store)",
+            "Compila: todo igual"
+          ]
+        }
+      },
+      {
+        "tag": "Instala Marten, escribe MartenEventStore",
+        "note": "Cada método es tu almacén directo, mapeado a la API de Marten.",
+        "code": [
+          "dotnet add package Marten",
+          "session.Events.StartStream(ar.Id, ar.UncommittedEvents);",
+          "await querySession.Events.AggregateStreamAsync<T>(id, ...);",
+          "session.Events.Append(ar.Id, ar.UncommittedEvents);",
+          "await session.SaveChangesAsync(ct);"
+        ],
+        "glow": [
+          2
+        ],
+        "side": {
+          "kind": "state",
+          "title": "Mapeo 1:1",
+          "rows": [
+            {
+              "k": "StartStream",
+              "v": "Events.StartStream"
+            },
+            {
+              "k": "Get...Async",
+              "v": "AggregateStreamAsync"
+            },
+            {
+              "k": "volcar hechos",
+              "v": "Events.Append"
+            },
+            {
+              "k": "SaveChangesAsync",
+              "v": "session.SaveChangesAsync"
+            },
+            {
+              "k": "ExistsAsync",
+              "v": "FetchStreamStateAsync"
+            }
+          ],
+          "flashKey": "Get...Async"
+        }
+      },
+      {
+        "tag": "Lo que NO cambió",
+        "note": "Marten rehidrata llamando tus Apply(T) públicos por convención.",
+        "code": [
+          "// ni Empresa, ni Apply(T), ni decide, ni handlers,",
+          "// ni IEventStore cambian.",
+          "AggregateStreamAsync<Empresa>(id) // usa tus Apply"
+        ],
+        "glow": [
+          2
+        ],
+        "side": {
+          "kind": "text",
+          "title": "El por qué",
+          "text": "Por eso en Aplicar al levantar hicimos los Apply publicos y por tipo. Tu motor era la forma que Marten esperaba."
+        }
+      },
+      {
+        "tag": "Configura Marten y haz el swap",
+        "note": "Una sola línea registra IEventStore apuntando a Marten.",
+        "code": [
+          "services.AddMarten(options =>",
+          "{",
+          "    options.Connection(\"Host=localhost;...\");",
+          "    options.Events.StreamIdentity = StreamIdentity.AsString;",
+          "    options.Events.EventNamingStyle = SmarterTypeName;",
+          "}).UseLightweightSessions();",
+          "",
+          "services.AddScoped<IEventStore, MartenEventStore>();"
+        ],
+        "glow": [
+          7
+        ],
+        "badge": "🎉 Swap de una línea, dominio intacto",
+        "side": {
+          "kind": "text",
+          "title": "SmarterTypeName",
+          "text": "Guarda el nombre del tipo del evento y deserializa al tipo correcto: el muro de Postgres, resuelto."
+        }
+      },
+      {
+        "tag": "Asómate al SQL: mt_events",
+        "note": "Marten crea sola la tabla; tus hechos viven en JSONB sobre Postgres.",
+        "code": [
+          "docker exec -it gestion_eventstore psql -U gestion \\",
+          "  -d gestion_eventstore -c \"\\dt\"",
+          "SELECT version, type, data FROM mt_events",
+          "  ORDER BY version;"
+        ],
+        "glow": [
+          2
+        ],
+        "side": {
+          "kind": "output",
+          "title": "mt_events",
+          "items": [
+            "version | type              | data",
+            "1       | empresa_registrada | {...}",
+            "2       | plan_cambiado      | {...}",
+            "el diario que disenaste, ya en Postgres"
+          ],
+          "text": "version | type               | data\n1       | empresa_registrada | {...}  (JSONB)\n2       | plan_cambiado      | {...}  (JSONB)\nuna fila por hecho: el diario, ya en Postgres"
+        }
+      }
+    ]
+  },
+  {
+    "slug": "revelar-wolverine",
+    "number": 18,
+    "title": "El gran reveal (2): Wolverine y el commit automático",
+    "subtitle": "El guardar, automático",
+    "emoji": "🐺",
+    "bridge": "Marten reemplazó tu almacén; falta Wolverine: el despacho, el contenedor y el SaveChanges.",
+    "objetivo": "Que Wolverine descubra handlers y guarde solo al terminar el comando.",
+    "oneLiner": "Wolverine descubre handlers por convención y corre un middleware más AutoApplyTransactions: el handler queda en cargar y decidir, el guardar es automático.",
+    "concepts": [
+      "Descubrimiento por convención",
+      "Middleware After/Finally",
+      "AutoApplyTransactions",
+      "WolverineFx.RuntimeCompilation",
+      "IMessageBus.InvokeAsync"
+    ],
+    "beats": [
+      {
+        "tag": "El dolor: dos plomerías a mano",
+        "note": "Cada handler repite SaveChanges; tú armas despacho y contenedor de handlers.",
+        "side": {
+          "kind": "list",
+          "title": "Plomería repetida",
+          "items": [
+            "await store.SaveChangesAsync(ct) en cada handler",
+            "El despachador rutea comando→handler",
+            "Mini-contenedor construye handlers (DI)"
+          ]
+        }
+      },
+      {
+        "tag": "Borra el SaveChangesAsync del handler",
+        "code": [
+          "public class CambiarPlanHandler(IEventStore store)",
+          "    : ICommandHandler<CambiarPlanDeEmpresa>",
+          "{",
+          "  public async Task HandleAsync(CambiarPlanDeEmpresa cmd, ...)",
+          "  {",
+          "    var empresa = await store.GetAggregateRootAsync<Empresa>(...)",
+          "      ?? throw new InvalidOperationException(...);",
+          "    empresa.CambiarPlan(cmd.NuevoPlan);  // sin SaveChangesAsync",
+          "  }",
+          "}"
+        ],
+        "glow": [
+          7
+        ],
+        "note": "Handler queda en cargar y decidir; Wolverine lo halla por su método HandleAsync."
+      },
+      {
+        "tag": "El middleware drena los pendientes",
+        "code": [
+          "public class UnitOfWorkMiddleware(IEventStore eventStore)",
+          "{",
+          "  public void After()   // handler corrió bien",
+          "  {",
+          "    if (eventStore is not MartenEventStore m) return;",
+          "    foreach (var ar in m.ModificadosConCambios)",
+          "      m.AppendEvents(ar.Id, ar.UncommittedEvents);",
+          "  }",
+          "  public void Finally() { /* limpia rastreo y pendientes */ }",
+          "}"
+        ],
+        "glow": [
+          6
+        ],
+        "note": "After appendea los hechos a la sesión; Finally limpia. Ojo: el middleware NO comitea."
+      },
+      {
+        "tag": "Instala los dos paquetes",
+        "code": [
+          "dotnet add package WolverineFx.Marten",
+          "dotnet add package WolverineFx.RuntimeCompilation"
+        ],
+        "glow": [
+          1
+        ],
+        "note": "Desde Wolverine 6 el codegen vive aparte; sin él, UseRuntimeCompilation no existe y no arranca.",
+        "side": {
+          "kind": "output",
+          "title": "Sin RuntimeCompilation",
+          "items": [
+            "App no arranca",
+            "Wolverine sin compilador Roslyn",
+            "Excepción al iniciar"
+          ],
+          "text": "$ dotnet run\nUseRuntimeCompilation() no existe\nWolverine sin compilador Roslyn\n[FATAL] excepción al iniciar — la app no arranca"
+        }
+      },
+      {
+        "tag": "Cablea Wolverine en el arranque",
+        "code": [
+          "builder.UseWolverine(options =>",
+          "{",
+          "  options.Discovery",
+          "    .IncludeAssembly(typeof(CambiarPlanHandler).Assembly);",
+          "  options.UseRuntimeCompilation();",
+          "  options.Services.AddMarten(...).IntegrateWithWolverine();",
+          "  options.Policies.AddMiddleware<UnitOfWorkMiddleware>();",
+          "  options.Policies.AutoApplyTransactions();",
+          "});",
+          "builder.Services.AddScoped<IEventStore, MartenEventStore>();"
+        ],
+        "glow": [
+          7
+        ],
+        "note": "Discovery halla handlers, middleware prepara; reemplaza despachador, contenedor y SaveChanges del host.",
+        "side": {
+          "kind": "list",
+          "title": "Qué hace cada línea",
+          "items": [
+            "Discovery → encuentra handlers",
+            "RuntimeCompilation → genera despacho",
+            "IntegrateWithWolverine → outbox/inbox",
+            "AutoApplyTransactions → commit"
+          ]
+        }
+      },
+      {
+        "tag": "El commit, automático (sin magia)",
+        "code": [
+          "await bus.InvokeAsync(new SuspenderEmpresa(\"emp-7\", \"falta de pago\"))"
+        ],
+        "glow": [
+          0
+        ],
+        "note": "InvokeAsync resuelve el handler, corre middleware y AutoApplyTransactions comitea la sesión.",
+        "badge": "🎉 El guardar es automático",
+        "side": {
+          "kind": "state",
+          "title": "Por comando",
+          "rows": [
+            {
+              "k": "Middleware After",
+              "v": "appendea"
+            },
+            {
+              "k": "Middleware Finally",
+              "v": "limpia"
+            },
+            {
+              "k": "AutoApplyTransactions",
+              "v": "comitea"
+            }
+          ],
+          "flashKey": "AutoApplyTransactions"
+        }
+      }
+    ]
+  },
+  {
+    "slug": "reflexion-vs-codegen",
+    "number": 19,
+    "title": "Levanta la última magia: reflexión vs codegen",
+    "subtitle": "Si parece magia, ábrela",
+    "emoji": "🪄",
+    "bridge": "Wolverine descubre handlers por convención; ¿cómo, sin reflexión lenta en cada comando?",
+    "objetivo": "Ver que las herramientas generan código al arrancar, no reflexionan en caliente",
+    "oneLiner": "Wolverine y Marten no reflexionan por llamada: en el arranque generan código C# legible que llama tu Handle/Apply directo, auditable y sin caja negra.",
+    "concepts": [
+      "reflexión por llamada",
+      "codegen en el arranque",
+      "UseRuntimeCompilation",
+      "código auditable",
+      "reflexión en tests"
+    ],
+    "beats": [
+      {
+        "tag": "Recuerda: tú usaste reflexión",
+        "code": [
+          "Activator.CreateInstance(tipo)",
+          "metodo.Invoke(agregado, new[]{evento})"
+        ],
+        "glow": [
+          0
+        ],
+        "note": "Tu mini-contenedor resolvía dependencias inspeccionando tipos; flexible, pero con costo.",
+        "side": {
+          "kind": "list",
+          "title": "Reflexión a mano",
+          "items": [
+            "Type / GetConstructors",
+            "Activator.CreateInstance",
+            "Apply por MethodInfo"
+          ]
+        }
+      },
+      {
+        "tag": "El dolor: lento y falla tarde",
+        "glow": [],
+        "note": "Inspeccionar y llamar por MethodInfo en cada petición es lento; un handler ausente revienta en ejecución, no al compilar.",
+        "side": {
+          "kind": "state",
+          "title": "Costos de reflexionar por llamada",
+          "rows": [
+            {
+              "k": "velocidad",
+              "v": "más lenta (cada llamada)"
+            },
+            {
+              "k": "errores",
+              "v": "en ejecución"
+            },
+            {
+              "k": "red del compilador",
+              "v": "perdida"
+            }
+          ],
+          "flashKey": "errores"
+        }
+      },
+      {
+        "tag": "El salto: generar código al arrancar",
+        "code": [
+          "UseRuntimeCompilation",
+          "// arranque: escribe una clase C# que llama tu Handle"
+        ],
+        "glow": [
+          0
+        ],
+        "note": "En vez de reflexionar en caliente, Wolverine escribe y compila una clase real una sola vez, y la reutiliza.",
+        "badge": "🎉 Se decide al arrancar, no en caliente",
+        "side": {
+          "kind": "output",
+          "title": "La clase generada hace, directo:",
+          "items": [
+            "crea el handler",
+            "resuelve el IEventStore",
+            "Handle(cmd, store, ct)",
+            "After() → comitea → Finally()"
+          ],
+          "text": "crea el handler → resuelve IEventStore\nHandle(cmd, store, ct)\nAfter() → comitea la sesión\nFinally()   // C# real, sin reflexión"
+        }
+      },
+      {
+        "tag": "Marten hace lo mismo",
+        "code": [
+          "Apply(EmpresaRegistrada)",
+          "Apply(PlanCambiado)"
+        ],
+        "glow": [
+          0
+        ],
+        "note": "Para rehidratar Empresa, Marten genera código que llama tus Apply en orden; no busca métodos por reflexión en cada lectura.",
+        "side": {
+          "kind": "text",
+          "title": "Por qué la Critter Stack es rápida E inspeccionable",
+          "text": "Codegen en el arranque + SQL contra mt_events pre-gestionado: el rendimiento de lo escrito a mano, sin escribirlo a mano."
+        }
+      },
+      {
+        "tag": "Ábrela tú: vuelca el código generado",
+        "code": [
+          "return await app.RunJasperFxCommands(args);",
+          "dotnet run -- codegen preview",
+          "dotnet run -- codegen write"
+        ],
+        "glow": [
+          0
+        ],
+        "note": "Enchufa JasperFx en el Program; luego vuelca a consola o a Internal/Generated/ el código de CambiarPlanDeEmpresa.",
+        "side": {
+          "kind": "state",
+          "title": "No es caja negra",
+          "rows": [
+            {
+              "k": "preview",
+              "v": "imprime en consola"
+            },
+            {
+              "k": "write",
+              "v": "→ Internal/Generated/"
+            },
+            {
+              "k": "SQL de Marten",
+              "v": "ConsoleMartenLogger()"
+            }
+          ],
+          "flashKey": "write"
+        }
+      },
+      {
+        "tag": "Y aun así: reflexión en tests",
+        "glow": [],
+        "note": "El TestStore del equipo rehidrata buscando tus Apply por reflexión: en pruebas no importa el arranque, sí la simplicidad.",
+        "side": {
+          "kind": "state",
+          "title": "Cada herramienta donde encaja",
+          "rows": [
+            {
+              "k": "producción",
+              "v": "codegen (rendimiento)"
+            },
+            {
+              "k": "tests",
+              "v": "reflexión (simplicidad)"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "slug": "dos-vertientes",
+    "number": 20,
+    "title": "Las dos vertientes de persistencia",
+    "subtitle": "La tuya vs la nativa",
+    "emoji": "🔀",
+    "bridge": "Levantada la magia del codegen, ves que Marten/Wolverine recomiendan OTRO camino para cargar y guardar.",
+    "objetivo": "Dominar las dos formas de cargar/guardar un agregado y por qué el equipo eligió la suya.",
+    "oneLiner": "Hay dos vertientes: la nativa (menos código, concurrencia gratis) y la capa del equipo (testeable, público/privado, control) — tu trabajo es dominar ambas.",
+    "concepts": [
+      "FetchForWriting<T>",
+      "[Aggregate] handler workflow",
+      "IEventStore + AggregateStreamAsync",
+      "Trade-offs y mantenimiento",
+      "Traducir entre vertientes"
+    ],
+    "beats": [
+      {
+        "tag": "Recuerda: construiste tu capa",
+        "note": "IEventStore, MartenEventStore, UoW, middleware — la forma del equipo, con control.",
+        "code": [
+          "IEventStore + MartenEventStore",
+          "  AggregateStreamAsync  // cargar (replay)",
+          "  Events.Append          // escribir",
+          "MartenUnitOfWork + UnitOfWorkMiddleware"
+        ],
+        "glow": [
+          1
+        ],
+        "side": {
+          "kind": "text",
+          "title": "Tu camino",
+          "text": "El agregado acumula (Raise), el almacén drena. Más código propio, a cambio de control."
+        }
+      },
+      {
+        "tag": "Marten recomienda FetchForWriting",
+        "note": "Una llamada carga el agregado y deja la sesión lista para anexar; concurrencia optimista incluida.",
+        "code": [
+          "var stream = await session.Events",
+          "    .FetchForWriting<Empresa>(cmd.EmpresaId, ct);",
+          "if (stream.Aggregate.Suspendida) throw ...;",
+          "stream.AppendOne(new PlanCambiado(cmd.NuevoPlan));",
+          "await session.SaveChangesAsync(ct);  // concurrencia gratis"
+        ],
+        "glow": [
+          0
+        ],
+        "side": {
+          "kind": "state",
+          "title": "Nativo vs tu capa",
+          "rows": [
+            {
+              "k": "concurrencia",
+              "v": "gratis (a mano con ar.Version era tuya)"
+            },
+            {
+              "k": "se parece a",
+              "v": "decidir y devolver el hecho"
+            },
+            {
+              "k": "código",
+              "v": "menos"
+            }
+          ],
+          "flashKey": "concurrencia"
+        }
+      },
+      {
+        "tag": "Wolverine lo automatiza: [Aggregate]",
+        "note": "El atributo carga, te inyecta el agregado y persiste lo que devuelvas; sin SaveChangesAsync.",
+        "code": [
+          "[Aggregate]   // marca el parámetro a cargar/guardar",
+          "public static PlanCambiado Handle(",
+          "    CambiarPlanDeEmpresa cmd, Empresa empresa)",
+          "{",
+          "  if (empresa.Suspendida) throw ...;",
+          "  return new PlanCambiado(cmd.NuevoPlan); // se anexa",
+          "}"
+        ],
+        "glow": [
+          0
+        ],
+        "side": {
+          "kind": "text",
+          "title": "Tu UoWMiddleware vs [Aggregate]",
+          "text": "El pegamento que guardaba al final ahora lo genera Wolverine y no se ve. Más automático, más caja negra."
+        }
+      },
+      {
+        "tag": "El dolor: ¿por qué no migrar todo?",
+        "note": "FetchForWriting te ata a una sesión Marten real: no hay TestStore en memoria ni público/privado.",
+        "side": {
+          "kind": "list",
+          "title": "Por qué el equipo eligió su capa",
+          "items": [
+            "Testear sin BD: TestStore implementa IEventStore",
+            "Público vs privado: GetPublicEvents para EDA",
+            "Portabilidad: el dominio depende de TU IEventStore"
+          ]
+        }
+      },
+      {
+        "tag": "Sé honesto: lo que cuesta",
+        "note": "La capa es tuya, cada bug es tuyo; la concurrencia y traducir la doc también son tuyas.",
+        "side": {
+          "kind": "list",
+          "title": "Costos",
+          "items": [
+            "Más código que mantener correcto",
+            "Concurrencia optimista es TU responsabilidad",
+            "Replay caro sin snapshots en streams largos",
+            "Divergencia del camino recomendado"
+          ]
+        }
+      },
+      {
+        "tag": "El salto: dominar y traducir",
+        "note": "No hay correcta: dominar ambas y traducir entre ellas mantiene viva la plantilla del equipo.",
+        "badge": "🎉 El núcleo de tu rol",
+        "code": [
+          "// el creador: FetchForWriting + [Aggregate]",
+          "// tu capa: AggregateStreamAsync + Append + UoW",
+          "// traduce: misma idea, distinto cableado"
+        ],
+        "glow": [
+          2
+        ],
+        "side": {
+          "kind": "text",
+          "title": "Cómo mantenerla",
+          "text": "Pliega la mejora a la capa si aún necesitas tests sin BD / público-privado; migra a lo nativo solo si gana mucho y no los necesitas."
+        }
+      }
+    ]
+  },
+  {
+    "slug": "publico-vs-privado",
+    "number": 21,
+    "title": "Dos tipos de hecho: público vs privado",
+    "subtitle": "Etiqueta lo que cruza",
+    "emoji": "🚪",
+    "bridge": "Ya dominas ambas vertientes de persistencia; ahora distingue qué hechos salen del servicio.",
+    "objetivo": "Marcar hechos públicos vs privados y separarlos por caminos distintos.",
+    "oneLiner": "No todo hecho cruza la frontera: con interfaces marcadoras vacías etiquetas los que salen y el agregado los separa con OfType.",
+    "concepts": [
+      "Interfaz marcadora",
+      "IPublicEvent / IPrivateEvent",
+      "OfType<T>()",
+      "Frontera del servicio (EDA)",
+      "Contrato público = API hacia afuera"
+    ],
+    "beats": [
+      {
+        "tag": "Primer instinto: un bool",
+        "code": [
+          "public record EmpresaSuspendida(string Motivo, bool EsExterno = true);",
+          "public record PlanCambiado(string Plan, bool EsExterno = false);"
+        ],
+        "glow": [
+          0
+        ],
+        "note": "Un bool EsExterno por evento: suspensión cruza, plan no.",
+        "side": {
+          "kind": "text",
+          "title": "La frontera",
+          "text": "Suspender interesa a facturación/reportes; cambiar de plan quizá solo adentro."
+        }
+      },
+      {
+        "tag": "Leer la bandera",
+        "code": [
+          "var publicos = _uncommittedEvents.Where(e => ((dynamic)e).EsExterno);"
+        ],
+        "glow": [
+          0
+        ],
+        "note": "Para filtrar caes en (dynamic): pierdes el chequeo de tipos.",
+        "side": {
+          "kind": "text",
+          "title": "Olor a problema",
+          "text": "(dynamic) apaga el compilador: cualquier evento sin el campo pasa."
+        }
+      },
+      {
+        "tag": "Llega un hecho nuevo",
+        "code": [
+          "public record EmpresaReactivada();   // sin el bool EsExterno!"
+        ],
+        "glow": [
+          0
+        ],
+        "note": "Compila. Pero (dynamic).EsExterno revienta en runtime sobre él.",
+        "side": {
+          "kind": "state",
+          "title": "Dos formas de fallar",
+          "rows": [
+            {
+              "k": "sin el campo",
+              "v": "crash en runtime"
+            },
+            {
+              "k": "campo en false",
+              "v": "nunca cruza, en silencio"
+            },
+            {
+              "k": "qué falló",
+              "v": "nada te obligó a marcarlo"
+            }
+          ],
+          "flashKey": "qué falló"
+        }
+      },
+      {
+        "tag": "El salto: interfaz marcadora",
+        "code": [
+          "public interface IEvent;",
+          "public interface IPublicEvent  : IEvent;",
+          "public interface IPrivateEvent : IEvent;"
+        ],
+        "glow": [
+          1
+        ],
+        "note": "Una interfaz vacía etiqueta el tipo: en su firma, no en un campo.",
+        "badge": "🎉 El compilador entiende la frontera",
+        "side": {
+          "kind": "text",
+          "title": "Vive con el tipo",
+          "text": "Ser público se escribe implementando la interfaz, no en un bool que se olvida."
+        }
+      },
+      {
+        "tag": "Marcar los que salen",
+        "code": [
+          "public record EmpresaSuspendida(string Motivo) : IPublicEvent;",
+          "public record EmpresaReactivada()              : IPublicEvent;",
+          "// EmpresaRegistrada y PlanCambiado NO marcan nada"
+        ],
+        "glow": [
+          0
+        ],
+        "note": "La mayoría no marca nada: ser público es decisión deliberada.",
+        "side": {
+          "kind": "list",
+          "title": "Quién marca qué",
+          "items": [
+            "EmpresaSuspendida → IPublicEvent",
+            "EmpresaReactivada → IPublicEvent",
+            "EmpresaRegistrada → sin marcar",
+            "PlanCambiado → sin marcar"
+          ]
+        }
+      },
+      {
+        "tag": "Separar con OfType<T>()",
+        "code": [
+          "public IPublicEvent[]  GetPublicEvents()  =>",
+          "    _uncommittedEvents.OfType<IPublicEvent>().ToArray();",
+          "public IPrivateEvent[] GetPrivateEvents() =>",
+          "    _uncommittedEvents.OfType<IPrivateEvent>().ToArray();"
+        ],
+        "glow": [
+          0
+        ],
+        "note": "OfType<T>() devuelve solo los del tipo pedido; ignora el resto.",
+        "side": {
+          "kind": "output",
+          "title": "dotnet run",
+          "items": [
+            "sin confirmar: 2",
+            "públicos: 1 (EmpresaSuspendida)",
+            "privados: 0"
+          ],
+          "text": "sin confirmar: 2\npúblicos: 1 (EmpresaSuspendida)\nprivados: 0"
+        }
+      }
+    ]
+  },
+  {
+    "slug": "senders-y-sobre",
+    "number": 22,
+    "title": "Quién se lleva los hechos: senders y el sobre",
+    "subtitle": "Dos enviadores, un sobre",
+    "emoji": "✉️",
+    "bridge": "El agregado ya separa públicos y privados; ahora, ¿quién se los lleva y con qué contexto?",
+    "objetivo": "Dos enviadores por caminos distintos y un sobre con los metadatos",
+    "oneLiner": "Los hechos salen por dos enviadores (público→broker, privado→bus interno) y el contexto viaja en un sobre que envuelve el evento sin ensuciarlo.",
+    "concepts": [
+      "IPublicEventSender / IPrivateEventSender",
+      "groupId = orden FIFO por grupo",
+      "Sobre = metadatos de contexto",
+      "TestPublicEventSender (doble de test)",
+      "DeliveryOptions de Wolverine"
+    ],
+    "beats": [
+      {
+        "tag": "¿Dónde va el contexto?",
+        "note": "El record es limpio; meter TenantId/UserId dentro ensucia el contrato público.",
+        "code": [
+          "public record EmpresaSuspendida(string Motivo);",
+          "// receptor necesita: ¿qué tenant? ¿qué usuario?"
+        ],
+        "glow": [
+          0
+        ],
+        "side": {
+          "kind": "text",
+          "title": "El conflicto",
+          "text": "Evento limpio vs. contexto necesario. Si lo metes dentro, acoplas el contrato a tu infraestructura."
+        }
+      },
+      {
+        "tag": "Los dos enviadores",
+        "note": "Dos senders dejan explícito que van por caminos distintos; el groupId es para orden.",
+        "code": [
+          "public interface IPublicEventSender",
+          "{",
+          "    Task PublishAsync(params IPublicEvent[] eventos);",
+          "    Task PublishAsync(string groupId,",
+          "                      params IPublicEvent[] eventos);",
+          "}",
+          "public interface IPrivateEventSender { /* idem */ }"
+        ],
+        "glow": [
+          0,
+          6
+        ],
+        "side": {
+          "kind": "list",
+          "title": "Por qué DOS",
+          "items": [
+            "Público → broker externo (RabbitMQ, Service Bus)",
+            "Privado → bus interno del servicio",
+            "groupId → orden FIFO dentro de un grupo"
+          ]
+        }
+      },
+      {
+        "tag": "Doble que acumula",
+        "note": "TestPublicEventSender solo guarda lo enviado: lo inspeccionas ahora y lo reusas en tests.",
+        "code": [
+          "public class TestPublicEventSender",
+          "    : IPublicEventSender",
+          "{",
+          "    private readonly List<IPublicEvent> _enviados",
+          "        = new();",
+          "    public IReadOnlyList<IPublicEvent> Enviados",
+          "        => _enviados.AsReadOnly();",
+          "    public Task PublishAsync(",
+          "        params IPublicEvent[] eventos)",
+          "    {",
+          "        _enviados.AddRange(eventos);",
+          "        return Task.CompletedTask;",
+          "    }",
+          "}"
+        ],
+        "glow": [
+          10
+        ],
+        "side": {
+          "kind": "text",
+          "title": "🌱 groupId no hace nada aún",
+          "text": "El doble lo ignora y solo acumula. El orden FIFO lo respeta el broker real, no tú."
+        }
+      },
+      {
+        "tag": "El sobre",
+        "note": "Un record envuelve el evento con sus metadatos; el evento viaja dentro, intacto.",
+        "code": [
+          "public record Sobre(",
+          "    object Payload,",
+          "    string TenantId,",
+          "    string? UserId = null,",
+          "    string? GroupId = null);"
+        ],
+        "glow": [
+          1
+        ],
+        "badge": "🎉 El evento sigue limpio; el contexto viaja aparte",
+        "side": {
+          "kind": "state",
+          "title": "Sobre",
+          "rows": [
+            {
+              "k": "Payload",
+              "v": "EmpresaSuspendida"
+            },
+            {
+              "k": "TenantId",
+              "v": "emp-7"
+            },
+            {
+              "k": "UserId",
+              "v": "(opcional)"
+            },
+            {
+              "k": "GroupId",
+              "v": "(opcional)"
+            }
+          ],
+          "flashKey": "Payload"
+        }
+      },
+      {
+        "tag": "Lado público",
+        "note": "El agregado separó el público y el sender lo publicó; el groupId pidió orden.",
+        "code": [
+          "var sender = new TestPublicEventSender();",
+          "await sender.PublishAsync(\"grupo-emp-7\",",
+          "                          emp.GetPublicEvents());",
+          "Console.WriteLine($\"enviados al bus público: \" +",
+          "    $\"{sender.Enviados.Count} (EmpresaSuspendida)\");"
+        ],
+        "glow": [
+          1
+        ],
+        "side": {
+          "kind": "output",
+          "title": "consola",
+          "items": [
+            "enviados al bus público: 1 (EmpresaSuspendida)"
+          ],
+          "text": "> dotnet run\nenviados al bus público: 1 (EmpresaSuspendida)\n\nEmpresaRegistrada (no público) no salió."
+        }
+      },
+      {
+        "tag": "Es DeliveryOptions",
+        "note": "Tu Sobre es el DeliveryOptions de Wolverine; la plantilla lo estampa al publicar, no tú.",
+        "side": {
+          "kind": "text",
+          "title": "🌱 Semilla",
+          "text": "WolverinePublicEventSender / WolverinePrivateEventSender publican con IMessageBus.PublishAsync(evento, sobre). El tenant lo resuelve un ITenantResolver."
+        }
+      }
+    ]
+  },
+  {
+    "slug": "outbox-inbox",
+    "number": 23,
+    "title": "El proceso que se cae: Outbox e Inbox",
+    "subtitle": "Nunca pierdas un hecho",
+    "emoji": "📬",
+    "bridge": "Ya tienes senders que publican; pero guardar y publicar son dos escrituras que pueden romperse.",
+    "objetivo": "Un hecho nunca guardado sin anunciar; nunca procesado dos veces.",
+    "oneLiner": "El outbox une el guardar y el anunciar en una transacción; un relay reintenta; el inbox evita duplicar. Marten+Wolverine ya lo traen.",
+    "concepts": [
+      "Doble escritura (dual write)",
+      "Outbox transaccional + relay",
+      "Inbox idempotente",
+      "At-least-once vs exactly-once",
+      "UseDurableOutbox/Inbox"
+    ],
+    "beats": [
+      {
+        "tag": "El dolor: dos escrituras, una caída",
+        "code": [
+          "await store.SaveChangesAsync(ct);     // 1. queda en Postgres ✅",
+          "// 💥 si el proceso muere AQUÍ…",
+          "await sender.PublishAsync(hecho);     // 2. nunca corre"
+        ],
+        "glow": [
+          1
+        ],
+        "note": "BD y broker son dos sistemas; no se escribe en ambos de forma atómica.",
+        "side": {
+          "kind": "state",
+          "title": "Tras la caída",
+          "flashKey": "broker",
+          "rows": [
+            {
+              "k": "Postgres",
+              "v": "hecho guardado ✅"
+            },
+            {
+              "k": "broker",
+              "v": "nunca anunciado ❌"
+            }
+          ]
+        }
+      },
+      {
+        "tag": "Idea: convertir dos escrituras en una",
+        "note": "Guarda el mensaje en la MISMA transacción que el hecho, en una tabla outbox.",
+        "side": {
+          "kind": "text",
+          "title": "El truco clásico",
+          "text": "Hecho + mensaje nacen juntos (outbox). Un relay de fondo drena la bandeja y reintenta hasta entregar. Si el proceso muere, el mensaje sigue ahí."
+        }
+      },
+      {
+        "tag": "Outbox ingenuo: guardar encola el mensaje",
+        "code": [
+          "public void GuardarConOutbox(object hecho)",
+          "{",
+          "    _eventos.Add(hecho);",
+          "    _outbox.Add((Guid.NewGuid().ToString(), hecho));",
+          "}"
+        ],
+        "glow": [
+          3
+        ],
+        "note": "El hecho y su anuncio se encolan en la misma operación: nunca se separan.",
+        "side": {
+          "kind": "list",
+          "title": "AlmacenConOutbox",
+          "items": [
+            "_eventos: el hecho",
+            "_outbox: (Id, Msg)",
+            "Pendientes => _outbox.Count"
+          ]
+        }
+      },
+      {
+        "tag": "El relay drena; el inbox no reprocesa",
+        "code": [
+          "foreach (var (id, msg) in _outbox.ToList())",
+          "{",
+          "    if (!inbox.YaProcesado(id)) bus.Publicar(id, msg);",
+          "    _outbox.RemoveAll(p => p.Id == id);",
+          "}"
+        ],
+        "glow": [
+          2
+        ],
+        "note": "El relay entrega al-menos-una-vez; el inbox (HashSet de ids) evita procesar dos veces.",
+        "side": {
+          "kind": "output",
+          "title": "Comprueba",
+          "items": [
+            "pendientes en outbox: 1",
+            "DrenarOutbox x2 (segundo: nada nuevo)",
+            "publicados: 1, pendientes: 0"
+          ],
+          "text": "$ dotnet run\npendientes en outbox: 1\npublicados: 1, pendientes: 0"
+        }
+      },
+      {
+        "tag": "Las dos mitades: outbox + inbox",
+        "note": "Outbox asegura que lo guardado se envía; inbox que lo recibido se procesa una sola vez.",
+        "side": {
+          "kind": "state",
+          "title": "Entrega confiable",
+          "rows": [
+            {
+              "k": "outbox",
+              "v": "productor: no se pierde"
+            },
+            {
+              "k": "inbox",
+              "v": "consumidor: no se duplica"
+            },
+            {
+              "k": "garantía",
+              "v": "ni pierde ni duplica"
+            }
+          ]
+        }
+      },
+      {
+        "tag": "Marten + Wolverine ya lo traen",
+        "code": [
+          "options.Policies.UseDurableOutboxOnAllSendingEndpoints();",
+          "options.Policies.UseDurableInboxOnAllListeners();"
+        ],
+        "glow": [
+          0
+        ],
+        "note": "IntegrateWithWolverine guarda el mensaje en la transacción de Marten; no lo escribes en prod.",
+        "badge": "🎉 outbox/inbox transaccional gratis",
+        "side": {
+          "kind": "text",
+          "title": "Durable vs inline",
+          "text": "Durable: relay de fondo que sobrevive caídas (host largo). SendInline: enviar en el acto, sin outbox, para serverless (Azure Functions) donde no hay relay."
+        }
+      }
+    ]
+  },
+  {
+    "slug": "transportes-rabbitmq-asb",
+    "number": 24,
+    "title": "Transportes reales: RabbitMQ y Azure Service Bus",
+    "subtitle": "Hechos públicos, broker real",
+    "emoji": "📡",
+    "bridge": "Tienes outbox durable; falta el último tramo: conectar tus IPublicEvent a un broker real.",
+    "objetivo": "Rutear IPublicEvent a un broker y suscribirte a otro servicio, solo config.",
+    "oneLiner": "Conectar tus hechos públicos a un broker es solo configuración: un exchange por servicio en RabbitMQ, topics en ASB, y la regla de oro es que todo público tenga ruta.",
+    "concepts": [
+      "broker / exchange / cola",
+      "AutoProvision",
+      "outbox/inbox durable",
+      "un exchange por servicio",
+      "nada de EDA in-memory"
+    ],
+    "beats": [
+      {
+        "tag": "Levantar RabbitMQ en Docker",
+        "code": [
+          "  rabbitmq:",
+          "    image: rabbitmq:4-management",
+          "    ports:",
+          "      - \"5672:5672\"   # AMQP",
+          "      - \"15672:15672\" # panel web"
+        ],
+        "glow": [
+          1
+        ],
+        "note": "Segundo servicio junto a Postgres; panel en localhost:15672 (guest/guest).",
+        "side": {
+          "kind": "state",
+          "title": "ConnectionStrings",
+          "rows": [
+            {
+              "k": "postgres",
+              "v": "ya lo tenías"
+            },
+            {
+              "k": "rabbitmq",
+              "v": "amqp://guest:guest@localhost:5672"
+            }
+          ],
+          "flashKey": "rabbitmq"
+        }
+      },
+      {
+        "tag": "Conectar y dejar que Wolverine cree todo",
+        "code": [
+          "dotnet add package WolverineFx.RabbitMQ",
+          "using Wolverine.RabbitMQ;",
+          "options.UseRabbitMqUsingNamedConnection(\"rabbitmq\")",
+          "       .AutoProvision();"
+        ],
+        "glow": [
+          2
+        ],
+        "note": "Conexión nombrada: la URL sale de tu config. AutoProvision crea exchanges/colas.",
+        "side": {
+          "kind": "text",
+          "title": "AutoProvision",
+          "text": "Wolverine crea los buzones/colas si no existen — cómodo en dev."
+        }
+      },
+      {
+        "tag": "Publicar cada IPublicEvent a su exchange",
+        "code": [
+          "options.Policies.UseDurableOutboxOnAllSendingEndpoints();",
+          "var contratos = typeof(EmpresaSuspendida).Assembly;",
+          "foreach (var tipo in contratos.GetTypes()",
+          "    .Where(t => t.IsAssignableTo(typeof(IPublicEvent))))",
+          "  options.PublishMessage(tipo)",
+          "    .ToRabbitExchange(\"gestion-empresas\").UseDurableOutbox();"
+        ],
+        "glow": [
+          5
+        ],
+        "note": "Un exchange por servicio. El foreach escanea el ensamblado; privados no salen.",
+        "side": {
+          "kind": "list",
+          "title": "Ruteo por tipo",
+          "items": [
+            "IPublicEvent → al exchange",
+            "IPrivateEvent → no sale",
+            "sin marcar → no sale"
+          ]
+        }
+      },
+      {
+        "tag": "Suscribirte a otro servicio (inbox durable)",
+        "code": [
+          "options.ListenToRabbitQueue(\"gestion-empresas.cola\",",
+          "    c => c.BindExchange(\"facturacion\"))",
+          "  .UseDurableInbox();"
+        ],
+        "glow": [
+          1
+        ],
+        "note": "Creas una cola y la atas (BindExchange) al exchange de quien quieras oír.",
+        "side": {
+          "kind": "text",
+          "title": "Bind",
+          "text": "Atar una cola a un exchange para que reciba sus mensajes."
+        }
+      },
+      {
+        "tag": "Mismo patrón en Azure Service Bus",
+        "code": [
+          "dotnet add package WolverineFx.AzureServiceBus",
+          "options.UseAzureServiceBus(",
+          "  builder.Configuration.GetConnectionString(\"AsbConnection\")!);",
+          "options.PublishMessage<EmpresaSuspendida>()",
+          "  .ToAzureServiceBusTopic(\"empresas\").UseDurableOutbox();"
+        ],
+        "glow": [
+          3
+        ],
+        "note": "Topics en vez de exchanges; ASB toma el connection string literal, no nombrado.",
+        "side": {
+          "kind": "state",
+          "title": "RabbitMQ vs ASB",
+          "rows": [
+            {
+              "k": "buzón",
+              "v": "exchange / topic"
+            },
+            {
+              "k": "conexión",
+              "v": "nombrada / literal"
+            },
+            {
+              "k": "outbox",
+              "v": "UseDurableOutbox (igual)"
+            }
+          ],
+          "flashKey": "buzón"
+        }
+      },
+      {
+        "tag": "La regla de oro: todo público tiene ruta",
+        "badge": "🎉 Nada de EDA in-memory",
+        "note": "Un IPublicEvent sin ruta cae a cola local y muere: bug silencioso. Declara siempre su ruta.",
+        "side": {
+          "kind": "output",
+          "title": "Sin ruta declarada",
+          "items": [
+            "Wolverine no falla...",
+            "→ cola local en memoria",
+            "→ otro servicio nunca lo ve",
+            "→ TenantId no se propaga"
+          ],
+          "text": "IPublicEvent sin ToRabbitExchange/Topic\nWolverine NO falla (sin excepcion)\n-> cola local en memoria: nadie lo recibe\nTenantId del sobre no se propaga (bug silencioso)"
+        }
+      }
+    ]
+  },
+  {
+    "slug": "disenar-con-eventos",
+    "number": 25,
+    "title": "Diseñar con eventos",
+    "subtitle": "El criterio lo pones tú",
+    "emoji": "🧭",
+    "bridge": "Ya publicas un IPublicEvent al broker; ahora las decisiones de diseño que ninguna librería toma.",
+    "objetivo": "Razonar cuatro decisiones EDA sobre un caso real, no usar eventos por inercia.",
+    "oneLiner": "El broker publica lo que le des; el diseño es tuyo: topic por servicio, evento solo si no esperas respuesta, ojo al ciclo, ¿quién coordina?",
+    "concepts": [
+      "Topic por servicio + ruteo por tipo",
+      "Evento (hecho) vs comando (pregunta)",
+      "Acoplamiento temporal y dependencia circular",
+      "Coreografía vs orquestación",
+      "El mismo evento cambia de ROL"
+    ],
+    "beats": [
+      {
+        "tag": "El caso real del equipo",
+        "note": "RegistroObligacionCreado dispara TerceroCreado o TerceroRechazado: ¿uno o dos topics?",
+        "side": {
+          "kind": "text",
+          "title": "Cuatro preguntas escondidas",
+          "text": "Topics, evento vs comando, ciclo, coordinador. Una por una."
+        }
+      },
+      {
+        "tag": "Decisión 1: granularidad de topics",
+        "code": [
+          "TerceroCreado -> exchange del SERVICIO de terceros",
+          "TerceroRechazado -> el MISMO exchange",
+          "consumidor filtra por TIPO (routing key)"
+        ],
+        "glow": [
+          2
+        ],
+        "note": "Un exchange por servicio + ruteo por tipo: sin que los topics proliferen. Táctico.",
+        "side": {
+          "kind": "state",
+          "rows": [
+            {
+              "k": "por-evento",
+              "v": "topics finos, proliferan"
+            },
+            {
+              "k": "por-servicio",
+              "v": "agrupa, consumidor elige ✅"
+            }
+          ],
+          "flashKey": "por-servicio"
+        }
+      },
+      {
+        "tag": "Decisión 2: ¿evento o lo fuerzas?",
+        "code": [
+          "evento  = \"esto ya pasó\"  (no espero respuesta)",
+          "comando = \"haz esto\"      (espero resultado)",
+          "¿espero un evento de vuelta para seguir? -> smell"
+        ],
+        "glow": [
+          2
+        ],
+        "note": "Esperar respuesta por eventos = request-reply disfrazado: lo peor del async y del sync.",
+        "side": {
+          "kind": "state",
+          "rows": [
+            {
+              "k": "¿necesito el resultado?",
+              "v": "pregunta -> gRPC/HTTP"
+            },
+            {
+              "k": "no lo necesito",
+              "v": "hecho -> evento"
+            }
+          ],
+          "flashKey": "¿necesito el resultado?"
+        }
+      },
+      {
+        "tag": "El consumidor también: comando disfrazado",
+        "note": "Si un handler valida y puede RECHAZAR, no reacciona a un hecho: es un comando explícito.",
+        "side": {
+          "kind": "list",
+          "items": [
+            "Handler que cambia estado y puede fallar",
+            "= comando disfrazado de evento",
+            "Khorikov: domain events = efectos fuera de la BD"
+          ]
+        }
+      },
+      {
+        "tag": "Decisión 3: el acoplamiento que esconden",
+        "note": "Ciclo A->B->B->A en el mismo proceso de negocio = saga implícita sin dueño.",
+        "side": {
+          "kind": "list",
+          "items": [
+            "Desacoplan en ESPACIO, acoplan en TIEMPO/FLUJO",
+            "Dependencia circular = recuperarse es pesadilla",
+            "smell != antipatrón: vale la pena mirarlo"
+          ]
+        }
+      },
+      {
+        "tag": "Decisión 4: coreografía vs orquestación",
+        "note": "Notificaciones sueltas: coreografía. Proceso con pasos y compensaciones: orquestación.",
+        "badge": "🎉 El mismo evento cambia de ROL",
+        "side": {
+          "kind": "state",
+          "rows": [
+            {
+              "k": "Coreografía",
+              "v": "sin coordinador, proceso invisible"
+            },
+            {
+              "k": "Orquestación",
+              "v": "saga: pasos explícitos ✅"
+            },
+            {
+              "k": "En el stream",
+              "v": "es ESTADO (ES)"
+            },
+            {
+              "k": "Al publicar",
+              "v": "es MENSAJE (EDA)"
+            }
+          ],
+          "flashKey": "Al publicar"
+        }
+      }
+    ]
+  },
+  {
+    "slug": "serverless-azure-functions",
+    "number": 26,
+    "title": "Serverless: la plantilla en Azure Functions",
+    "subtitle": "Host efímero, eventos inline",
+    "emoji": "⚡",
+    "bridge": "Ya publicas eventos al broker; ahora el host muere entre llamadas y la config se rompe.",
+    "objetivo": "Correr tu sistema event-sourced en Azure Functions sin perder eventos.",
+    "oneLiner": "Una Function es efímera: no hay relay que vacíe el outbox ni clúster que coordinar, así que se envía inline con gemelos serverless.",
+    "concepts": [
+      "dotnet-isolated",
+      "ManualOnly",
+      "DurabilityMode.Solo",
+      "SendInline()",
+      "at-least-once vs pérdida"
+    ],
+    "beats": [
+      {
+        "tag": "Subes la config del contenedor",
+        "note": "Tomas tu host largo con UseDurableOutbox y lo despliegas a una Function.",
+        "code": [
+          "options.HabilitarAzureServiceBus(cs);",
+          "options.PublicarEvento<EmpresaSuspendida>(\"empresas\");",
+          "// UseDurableOutbox() + DurabilityMode.Balanced"
+        ],
+        "glow": [
+          2
+        ],
+        "side": {
+          "kind": "text",
+          "title": "Asunción oculta",
+          "text": "Todo asume un HOST LARGO: un proceso que nunca se apaga, con hilos de fondo."
+        }
+      },
+      {
+        "tag": "Dolor: dos cosas fallan",
+        "note": "Wolverine ni arranca; y aunque lo arregles, los eventos nunca llegan.",
+        "side": {
+          "kind": "list",
+          "items": [
+            "1. Wolverine estalla al inicializar (descubre extensiones)",
+            "2. EmpresaSuspendida se guarda en el outbox… y se queda ahí para siempre"
+          ]
+        }
+      },
+      {
+        "tag": "¿Por qué el outbox no entrega?",
+        "note": "El outbox durable necesita un proceso de fondo (relay) que vacíe la tabla.",
+        "side": {
+          "kind": "state",
+          "rows": [
+            {
+              "k": "Host largo",
+              "v": "relay vivo vacía la tabla"
+            },
+            {
+              "k": "Function",
+              "v": "se apaga al responder"
+            },
+            {
+              "k": "Quién corre el relay",
+              "v": "nadie"
+            }
+          ],
+          "flashKey": "Quién corre el relay"
+        }
+      },
+      {
+        "tag": "¿Por qué no arranca? dotnet-isolated",
+        "note": "Tu código corre aparte del host; el auto-descubrimiento tropieza con una DLL.",
+        "side": {
+          "kind": "text",
+          "title": "La cura",
+          "text": "Desactivar el auto-descubrimiento y registrar las extensiones a mano (ManualOnly)."
+        }
+      },
+      {
+        "tag": "El salto: gemelos serverless",
+        "note": "Mismo dominio y handlers; cambia el host, la durabilidad y el envío.",
+        "badge": "🎉 Tres diferencias, no más",
+        "code": [
+          "builder.Services.AddWolverineRuntimeCompilation();",
+          "builder.Services.AddWolverine(ExtensionDiscovery.ManualOnly, o =>",
+          "{",
+          "    o.Durability.Mode = DurabilityMode.Solo;",
+          "});"
+        ],
+        "glow": [
+          1
+        ],
+        "side": {
+          "kind": "state",
+          "rows": [
+            {
+              "k": "Cableado",
+              "v": "AddWolverine(ManualOnly) sobre IServiceCollection"
+            },
+            {
+              "k": "Descubrir",
+              "v": "manual (dotnet-isolated rompe el auto)"
+            },
+            {
+              "k": "Durabilidad",
+              "v": "Solo, no Balanced"
+            }
+          ],
+          "flashKey": "Durabilidad"
+        }
+      },
+      {
+        "tag": "El envío: inline, no outbox",
+        "note": "Sin relay que reintente, el evento sale en el acto durante la invocación.",
+        "code": [
+          "options.HabilitarAzureServiceBusParaServerLess(cs);",
+          "// SystemQueuesAreEnabled(false)",
+          "options.PublicarEventoServerless<EmpresaSuspendida>(\"empresas\");",
+          "// SendInline()"
+        ],
+        "glow": [
+          2
+        ],
+        "side": {
+          "kind": "text",
+          "title": "⚖️ El tradeoff",
+          "text": "SendInline pierde la red del outbox: si el bus cae o la función muere, ese evento se pierde. Eventos críticos → host largo."
+        }
+      }
+    ]
+  },
+  {
+    "slug": "cqrs-proyecciones",
+    "number": 27,
+    "title": "El lado de lectura: CQRS y proyecciones",
+    "subtitle": "Leer sin rehidratar todo",
+    "emoji": "🔎",
+    "bridge": "Veníamos de hospedar (serverless); ahora la app también lee, no solo escribe.",
+    "objetivo": "Un modelo de lectura al día que responde sin reproducir cada stream.",
+    "oneLiner": "CQRS separa la lectura: una proyección pliega los hechos en un documento consultable que Marten mantiene en Live, Inline o Async.",
+    "concepts": [
+      "CQRS: separar lectura de escritura",
+      "Proyección = fold de eventos a vista",
+      "SingleStreamProjection + Apply",
+      "Live / Inline / Async",
+      "IQuerySession.Query<T>() con LINQ"
+    ],
+    "beats": [
+      {
+        "tag": "Rehidratar cada stream",
+        "code": [
+          "foreach (var id in todosLosIds)",
+          "{",
+          "  var empresa = await store.GetAggregateRootAsync<Empresa>(id);",
+          "  if (empresa!.Suspendida) ...",
+          "}"
+        ],
+        "glow": [
+          2
+        ],
+        "note": "Reproducir la película de cada empresa solo para mirar un bool.",
+        "side": {
+          "kind": "text",
+          "title": "El dolor",
+          "text": "Para 1 empresa va bien; para miles de streams es inviable."
+        }
+      },
+      {
+        "tag": "Modelo de lectura",
+        "code": [
+          "public class EmpresaResumen",
+          "{",
+          "  public string Id { get; set; } = \"\";",
+          "  public string Nombre { get; set; } = \"\";",
+          "  public string Plan { get; set; } = \"\";",
+          "  public bool   Suspendida { get; set; }",
+          "}"
+        ],
+        "glow": [
+          0
+        ],
+        "note": "Una tabla/documento optimizado para consultar, no el agregado.",
+        "side": {
+          "kind": "text",
+          "title": "Idea CQRS",
+          "text": "Escritura guarda hechos; lectura mantiene un modelo aparte."
+        }
+      },
+      {
+        "tag": "La proyección",
+        "code": [
+          "public partial class EmpresaResumenProjection",
+          "  : SingleStreamProjection<EmpresaResumen, string>",
+          "{",
+          "  public void Apply(EmpresaRegistrada e, EmpresaResumen r)",
+          "  { r.Nombre = e.Nombre; r.Plan = e.Plan; }",
+          "  public void Apply(EmpresaSuspendida e, EmpresaResumen r)",
+          "    => r.Suspendida = true;",
+          "}"
+        ],
+        "glow": [
+          3
+        ],
+        "note": "Mismo estilo que tus Apply: cada hecho actualiza el resumen.",
+        "badge": "🎉 Un fold de eventos en una vista",
+        "side": {
+          "kind": "text",
+          "title": "partial obligatorio",
+          "text": "Marten 9.10+ genera el dispatcher; sin partial revienta al arrancar."
+        }
+      },
+      {
+        "tag": "Cuándo se calcula",
+        "code": [
+          "options.Projections.Add<EmpresaResumenProjection>(",
+          "    ProjectionLifecycle.Inline);   // o .Async, o .Live"
+        ],
+        "glow": [
+          1
+        ],
+        "note": "El lifecycle decide cuándo se actualiza el resumen.",
+        "side": {
+          "kind": "list",
+          "title": "Tres modos",
+          "items": [
+            "Live: al consultar (reproduce, cero almacén)",
+            "Inline: misma transacción (consistencia fuerte)",
+            "Async: daemon de fondo (consistencia eventual)"
+          ]
+        }
+      },
+      {
+        "tag": "Consultar LINQ",
+        "code": [
+          "await using var querySession = store.QuerySession();",
+          "var suspendidas = await querySession.Query<EmpresaResumen>()",
+          "    .Where(e => e.Suspendida)",
+          "    .ToListAsync(CancellationToken.None);"
+        ],
+        "glow": [
+          1
+        ],
+        "note": "IQuerySession sobre IDocumentStore: consultar sin reproducir.",
+        "side": {
+          "kind": "output",
+          "title": "Resultado (ejemplo)",
+          "items": [
+            "[ {Suspendida: true}, {Suspendida: true} ]"
+          ],
+          "text": "emp-7: Constructora Andes, Premium, Suspendida\n(1 fila — solo las que cumplen .Where)"
+        }
+      },
+      {
+        "tag": "La plantilla",
+        "note": "IProjectionStore + daemon los da el equipo; las proyecciones, tú.",
+        "side": {
+          "kind": "state",
+          "title": "Reparto",
+          "rows": [
+            {
+              "k": "Plantilla",
+              "v": "IProjectionStore.Query<T>, AddAsyncDaemon"
+            },
+            {
+              "k": "Marten",
+              "v": "SingleStreamProjection, los modos"
+            },
+            {
+              "k": "Tú",
+              "v": "EmpresaResumen + sus Apply"
+            }
+          ],
+          "flashKey": "Tú"
+        }
+      }
+    ]
+  },
+  {
+    "slug": "versionado-upcasting",
+    "number": 28,
+    "title": "Versionado y upcasting de eventos",
+    "subtitle": "Leer el pasado intacto",
+    "emoji": "🪨",
+    "bridge": "Tras separar lectura con proyecciones, tu código evoluciona pero los eventos viejos siguen ahí.",
+    "objetivo": "Evolucionar la forma de un evento sin romper la lectura de los hechos viejos.",
+    "oneLiner": "Los eventos son piedra: cambios aditivos los toleran los viejos; los que rompen se resuelven con upcasting, una traducción viejo→nuevo al leer.",
+    "concepts": [
+      "Eventos inmutables",
+      "Cambio aditivo tolerante",
+      "Cambio que rompe",
+      "Upcasting (mecanismo de Marten)",
+      "Eventos públicos = contrato"
+    ],
+    "beats": [
+      {
+        "tag": "El dolor: cambiaste el evento, el pasado no",
+        "code": [
+          "public record PlanCambiado(string NuevoPlan);",
+          "// hoy quieres saber QUIÉN lo cambió:",
+          "public record PlanCambiado(string NuevoPlan, string CambiadoPor);"
+        ],
+        "glow": [
+          2
+        ],
+        "note": "Miles de eventos viejos no tienen CambiadoPor; el diario es para siempre.",
+        "side": {
+          "kind": "text",
+          "title": "El conflicto",
+          "text": "El record evoluciona, pero los hechos ya guardados son piedra: no se editan."
+        }
+      },
+      {
+        "tag": "Estrategia 1: campo opcional con default",
+        "code": [
+          "public record PlanCambiado(",
+          "    string NuevoPlan,",
+          "    string CambiadoPor = \"desconocido\");"
+        ],
+        "glow": [
+          2
+        ],
+        "note": "Aditivo y opcional: el evento viejo deserializa, el campo nuevo queda en su default.",
+        "side": {
+          "kind": "state",
+          "title": "Evento viejo al leer",
+          "rows": [
+            {
+              "k": "NuevoPlan",
+              "v": "\"Premium\""
+            },
+            {
+              "k": "CambiadoPor",
+              "v": "\"desconocido\""
+            }
+          ],
+          "flashKey": "CambiadoPor"
+        }
+      },
+      {
+        "tag": "La regla: nunca quites ni renombres a la ligera",
+        "note": "Aditivo opcional no rompe; quitar, renombrar o cambiar tipo sí rompe a los viejos.",
+        "side": {
+          "kind": "list",
+          "title": "Qué rompe a los viejos",
+          "items": [
+            "Quitar un campo",
+            "Renombrar un campo",
+            "Cambiar su tipo",
+            "Dividir un evento en dos"
+          ]
+        }
+      },
+      {
+        "tag": "Estrategia 2: cuando el cambio rompe",
+        "code": [
+          "public record PlanCambiadoV1(string Plan);",
+          "public record PlanCambiado(string NuevoPlan, string CambiadoPor);"
+        ],
+        "glow": [
+          0
+        ],
+        "note": "v1 es lo persistido; v2 es lo que tu código usa hoy. Hay que traducir al leer.",
+        "side": {
+          "kind": "text",
+          "title": "El salto",
+          "text": "No edites el pasado: traduce viejo→nuevo en el momento de leerlo."
+        }
+      },
+      {
+        "tag": "El upcaster: traduce v1 → v2 al leer",
+        "code": [
+          "static PlanCambiado Upcast(PlanCambiadoV1 viejo)",
+          "    => new(viejo.Plan, CambiadoPor: \"desconocido\");"
+        ],
+        "glow": [
+          1
+        ],
+        "note": "Función viejo→nuevo que corre al cargar; tu código solo conoce PlanCambiado.",
+        "badge": "🎉 Eso es upcasting",
+        "side": {
+          "kind": "text",
+          "title": "Mecanismo de Marten",
+          "text": "Lo registras en Marten; la plantilla solo fija EventNamingStyle.SmarterTypeName."
+        }
+      },
+      {
+        "tag": "Cuidado extra: los eventos públicos son contrato",
+        "note": "Un IPublicEvent lo consumen otros servicios: versiónalo con v2 nueva, no solo upcaster interno.",
+        "side": {
+          "kind": "state",
+          "title": "Coste de versionar",
+          "rows": [
+            {
+              "k": "Evento privado",
+              "v": "upcaster y listo"
+            },
+            {
+              "k": "IPublicEvent",
+              "v": "contrato: publica v2, mantén v1"
+            }
+          ],
+          "flashKey": "IPublicEvent"
+        }
+      }
+    ]
+  },
+  {
+    "slug": "multitenancy-aislamiento",
+    "number": 29,
+    "title": "¿De quién son estos eventos?",
+    "subtitle": "De un cliente a muchos",
+    "emoji": "🏢",
+    "bridge": "Tras versionar eventos, la plataforma sirve a muchas empresas: sus datos no deben mezclarse.",
+    "objetivo": "Aislar datos por tenant: la llave deja de ser solo el id.",
+    "oneLiner": "El id solo es único dentro de un cliente; entre clientes la llave real del stream es la tupla (tenant, id) — el Conjoined de Marten.",
+    "concepts": [
+      "Tenant",
+      "Aislamiento ortogonal",
+      "Llave (tenant, id)",
+      "TenancyStyle.Conjoined",
+      "Tenant al abrir sesión"
+    ],
+    "beats": [
+      {
+        "tag": "El almacén usa el id como llave",
+        "note": "Heredado: el stream se identifica solo por el id del agregado.",
+        "code": [
+          "// llave del stream = id del agregado",
+          "store.StartStream(empresa);   // id \"emp-7\""
+        ],
+        "glow": [
+          1
+        ],
+        "side": {
+          "kind": "text",
+          "title": "La llave hoy",
+          "text": "Una sola dimensión: el id. Funciona con un cliente."
+        }
+      },
+      {
+        "tag": "Dos tenants, el mismo id",
+        "note": "sinco y acme registran cada uno su emp-7: misma llave.",
+        "code": [
+          "store.StartStream(empresaDeSinco);   // id \"emp-7\"",
+          "store.StartStream(empresaDeAcme);    // id \"emp-7\""
+        ],
+        "glow": [
+          1
+        ],
+        "side": {
+          "kind": "state",
+          "title": "Streams por id",
+          "rows": [
+            {
+              "k": "emp-7 (sinco)",
+              "v": "Constructora Andes"
+            },
+            {
+              "k": "emp-7 (acme)",
+              "v": "??? se pisó"
+            }
+          ],
+          "flashKey": "emp-7 (acme)"
+        }
+      },
+      {
+        "tag": "El dolor: las historias se pisan",
+        "note": "Al cargar emp-7, ¿de quién es? El id no es único entre tenants.",
+        "code": [
+          "// 💥 al cargar \"emp-7\", ¿de quién es?",
+          "// la llave (el id) no es única entre tenants"
+        ],
+        "glow": [
+          0
+        ],
+        "side": {
+          "kind": "text",
+          "title": "El id es ortogonal al tenant",
+          "text": "Único dentro de un cliente, no entre clientes."
+        }
+      },
+      {
+        "tag": "Refactor: la llave es (tenant, id)",
+        "note": "La tupla separa los streams; el id deja de viajar solo.",
+        "code": [
+          "Dictionary<(string Tenant, string Id), string> _streams;",
+          "void Guardar(string tenant, string id, string nombre)",
+          "  => _streams[(tenant, id)] = nombre;",
+          "string? Cargar(string tenant, string id)",
+          "  => _streams.GetValueOrDefault((tenant, id));"
+        ],
+        "glow": [
+          0
+        ],
+        "side": {
+          "kind": "output",
+          "title": "Comprueba",
+          "items": [
+            "sinco/emp-7 → Constructora Andes",
+            "acme/emp-7  → Otra Empresa SA",
+            "streams totales: 2"
+          ],
+          "text": "sinco/emp-7 → Constructora Andes\nacme/emp-7  → Otra Empresa SA\nstreams totales: 2"
+        }
+      },
+      {
+        "tag": "Esa tupla ya existe: TenancyStyle.Conjoined",
+        "note": "Marten: mismas tablas, columna tenant_id por fila. Dos líneas.",
+        "badge": "🎉 Tu tupla = Conjoined de Marten",
+        "code": [
+          "options.Events.TenancyStyle = TenancyStyle.Conjoined;",
+          "options.Policies.AllDocumentsAreMultiTenanted();"
+        ],
+        "glow": [
+          0
+        ],
+        "side": {
+          "kind": "list",
+          "title": "Conjoined",
+          "items": [
+            "Tablas compartidas entre tenants",
+            "Cada fila lleva columna tenant_id",
+            "Aislamiento transparente"
+          ]
+        }
+      },
+      {
+        "tag": "El tenant se fija al abrir la sesión",
+        "note": "No por parámetro: viaja en la sesión. ¿De dónde sale? Próxima sección.",
+        "code": [
+          "store.LightweightSession(\"sinco\");   // tenant aquí"
+        ],
+        "glow": [
+          0
+        ],
+        "side": {
+          "kind": "text",
+          "title": "🌱 Semilla",
+          "text": "¿De dónde sale el tenantId? Lo resuelves en la siguiente sección."
+        }
+      }
+    ]
+  },
+  {
+    "slug": "resolver-el-tenant",
+    "number": 30,
+    "title": "¿De dónde sale el tenant? Resuélvelo, no lo pidas",
+    "subtitle": "Resuelve, no arrastres",
+    "emoji": "🪪",
+    "bridge": "La llave ya es (tenant, id); ahora dejamos de arrastrar tenantId a mano.",
+    "objetivo": "Esconder el tenant tras \"dime el tenant actual\", resuelto del borde.",
+    "oneLiner": "El tenant no se pasa por parámetro: se resuelve del contexto con ITenantResolver, leyendo headers HTTP confiables que un gateway ya estampó.",
+    "concepts": [
+      "ITenantResolver",
+      "TrustedHeadersTenantResolver",
+      "Headers confiables (X-Tenant-Id)",
+      "IHttpContextAccessor",
+      "Lanzar si falta"
+    ],
+    "beats": [
+      {
+        "tag": "El dolor: tenantId por todas partes",
+        "code": [
+          "await store.GetAggregateRootAsync<Empresa>(tenantId, id, ct);",
+          "await sender.PublishAsync(tenantId, evento);"
+        ],
+        "glow": [
+          1
+        ],
+        "note": "Ensucia cada firma; olvidarlo filtra datos entre clientes.",
+        "side": {
+          "kind": "text",
+          "title": "Un olvido = fuga",
+          "text": "El tenantId arrastrado en Guardar/Cargar/comando es fácil de olvidar. Olvidarlo mezcla datos de dos clientes."
+        }
+      },
+      {
+        "tag": "Salto: resolver, no pasar",
+        "code": [
+          "public interface ITenantResolver",
+          "{",
+          "    string TenantId { get; }",
+          "    string UserId { get; }",
+          "}"
+        ],
+        "glow": [
+          0
+        ],
+        "note": "Una interfaz mínima responde quién es el tenant de esta operación.",
+        "badge": "🎉 El tenant se resuelve del contexto",
+        "side": {
+          "kind": "list",
+          "title": "ITenantResolver",
+          "items": [
+            "TenantId",
+            "UserId",
+            "Lo inyectas donde haga falta"
+          ]
+        }
+      },
+      {
+        "tag": "Impl confiable: leer headers HTTP",
+        "code": [
+          "public class TrustedHeadersTenantResolver(IHttpContextAccessor accessor)",
+          "{",
+          "    public string TenantId => Leer(\"X-Tenant-Id\");",
+          "    public string UserId   => Leer(\"X-User-Id\");",
+          "    private string Leer(string header) {",
+          "      var valor = accessor.HttpContext?.Request",
+          "                 .Headers[header].FirstOrDefault();",
+          "      if (string.IsNullOrWhiteSpace(valor))",
+          "        throw new InvalidOperationException($\"Falta '{header}'.\");",
+          "      return valor; } }"
+        ],
+        "glow": [
+          7
+        ],
+        "note": "Un gateway ya autenticó y estampó los headers; tu app los lee como verdad.",
+        "side": {
+          "kind": "state",
+          "title": "La regla",
+          "rows": [
+            {
+              "k": "Header presente",
+              "v": "se usa como tenant"
+            },
+            {
+              "k": "Header ausente",
+              "v": "lanza (no default)"
+            }
+          ],
+          "flashKey": "Header ausente"
+        }
+      },
+      {
+        "tag": "Registrarlo con el accessor",
+        "code": [
+          "services.AddHttpContextAccessor();",
+          "services.AddScoped<ITenantResolver, TrustedHeadersTenantResolver>();"
+        ],
+        "glow": [
+          0
+        ],
+        "note": "AddHttpContextAccessor entrega la petición en curso a la clase.",
+        "side": {
+          "kind": "output",
+          "title": "Por qué lanzar y no default",
+          "text": "Un request sin tenant es un bug de infraestructura, no algo que adivinar."
+        }
+      },
+      {
+        "tag": "Ponerle nombre: es la plantilla 1:1",
+        "note": "ITenantResolver/TrustedHeadersTenantResolver de la plantilla; ese TenantId abre la sesión por tenant en Marten.",
+        "side": {
+          "kind": "list",
+          "title": "Coincide con la plantilla",
+          "items": [
+            "Misma interfaz TenantId/UserId",
+            "Mismos headers X-Tenant-Id/X-User-Id",
+            "Mismo lanzar si falta",
+            "Sin HttpContext: el tenant viaja con el mensaje"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "slug": "tenant-viaja-con-el-mensaje",
+    "number": 31,
+    "title": "El tenant viaja con el mensaje",
+    "subtitle": "El sobre lleva el tenant",
+    "emoji": "✉️",
+    "bridge": "Resolviste el tenant de un header HTTP; pero el daemon no tiene request ni headers.",
+    "objetivo": "Que el tenant viaje en el sobre y se resuelva sin HTTP.",
+    "oneLiner": "Fuera del request no hay headers, pero el tenant viajó en el sobre: un resolver lo lee y un proxy elige la fuente.",
+    "concepts": [
+      "IMessageContext.TenantId",
+      "DeliveryOptions { TenantId }",
+      "WolverineMessageContextTenantResolver",
+      "ProxyTenantResolver",
+      "Una sola ITenantResolver"
+    ],
+    "beats": [
+      {
+        "tag": "El daemon no tiene request",
+        "code": [
+          "public async Task Handle(EmpresaSuspendida e,",
+          "    ITenantResolver tenant)",
+          "{",
+          "    var t = tenant.TenantId;   // 💥 no hay HttpContext",
+          "}"
+        ],
+        "glow": [
+          4
+        ],
+        "note": "Un handler disparado por la cola no tiene HttpContext: el resolver de headers revienta.",
+        "side": {
+          "kind": "state",
+          "title": "El handler del worker",
+          "rows": [
+            {
+              "k": "Disparado por",
+              "v": "la cola (no HTTP)"
+            },
+            {
+              "k": "HttpContext",
+              "v": "no existe"
+            },
+            {
+              "k": "tenant.TenantId",
+              "v": "💥 revienta"
+            }
+          ],
+          "flashKey": "tenant.TenantId"
+        }
+      },
+      {
+        "tag": "El tenant sí viajó en el sobre",
+        "code": [
+          "await bus.PublishAsync(evento, new DeliveryOptions",
+          "    { TenantId = tenant.TenantId }",
+          "    .WithHeader(\"user_id\", tenant.UserId));"
+        ],
+        "glow": [
+          2
+        ],
+        "note": "Al publicar se estampa el TenantId en el sobre; Wolverine lo propaga al receptor.",
+        "side": {
+          "kind": "text",
+          "title": "El otro extremo del hilo",
+          "text": "Sin DeliveryOptions.TenantId, el IMessageContext.TenantId del receptor llega null. El UserId viaja como header user_id."
+        }
+      },
+      {
+        "tag": "Resolver del mensaje",
+        "code": [
+          "public class WolverineMessageContextTenantResolver(",
+          "    IMessageContext messageContext) : ITenantResolver",
+          "{",
+          "    public string TenantId => messageContext.TenantId",
+          "        ?? throw new InvalidOperationException(...);",
+          "    public string UserId => messageContext.Envelope?",
+          "        .Headers.GetValueOrDefault(\"user_id\") ?? throw ...;",
+          "}"
+        ],
+        "glow": [
+          4
+        ],
+        "note": "Mismo ITenantResolver, otra fuente: el sobre del mensaje en vez de HttpContext.",
+        "side": {
+          "kind": "state",
+          "title": "IMessageContext (lo inyecta Wolverine)",
+          "rows": [
+            {
+              "k": "TenantId",
+              "v": "del sobre propagado"
+            },
+            {
+              "k": "Envelope.Headers",
+              "v": "user_id"
+            },
+            {
+              "k": "hermano de",
+              "v": "IMessageBus"
+            }
+          ],
+          "flashKey": "TenantId"
+        }
+      },
+      {
+        "tag": "Un proxy elige",
+        "code": [
+          "public class ProxyTenantResolver(",
+          "    IMessageContext ctx, IHttpContextAccessor accessor)",
+          "    : ITenantResolver",
+          "{",
+          "  private readonly ITenantResolver _real =",
+          "    accessor.HttpContext is not null",
+          "      ? new TrustedHeadersTenantResolver(accessor)",
+          "      : new WolverineMessageContextTenantResolver(ctx);",
+          "}"
+        ],
+        "glow": [
+          6
+        ],
+        "note": "Elige por presencia de HttpContext —no con try/catch— para no ensuciar el log.",
+        "badge": "🎉 Una sola ITenantResolver, dos mundos",
+        "side": {
+          "kind": "list",
+          "title": "El proxy decide",
+          "items": [
+            "Hay HttpContext → TrustedHeadersTenantResolver",
+            "No hay → WolverineMessageContextTenantResolver",
+            "El dominio no sabe cuál es"
+          ]
+        }
+      },
+      {
+        "tag": "Registrar",
+        "code": [
+          "services.AddHttpContextAccessor();",
+          "services.AddScoped<ITenantResolver, ProxyTenantResolver>();"
+        ],
+        "glow": [
+          2
+        ],
+        "note": "El hilo: publicar estampa el sobre → Wolverine propaga → resolver lee → Marten abre sesión.",
+        "side": {
+          "kind": "output",
+          "title": "El hilo del tenant, completo",
+          "items": [
+            "publicar: DeliveryOptions { TenantId }",
+            "Wolverine propaga → IMessageContext",
+            "resolver lo lee",
+            "Marten abre sesión por tenant"
+          ],
+          "text": "publicar → mete TenantId en el sobre (DeliveryOptions)\nWolverine → lo propaga al IMessageContext del receptor\nresolver → lo lee y abre la sesión Marten por tenant\nUserId viaja aparte, como header user_id del sobre"
+        }
+      }
+    ]
+  },
+  {
+    "slug": "teststore",
+    "number": 32,
+    "title": "Probar sin base de datos: el TestStore",
+    "subtitle": "Lógica pura, cero infraestructura",
+    "emoji": "🧪",
+    "bridge": "El tenant ya viaja en el sobre; ahora cobramos el cheque: testear sin Postgres.",
+    "objetivo": "Un IEventStore en memoria: siembras, ejecutas, observas hechos nuevos.",
+    "oneLiner": "Tus handlers dependen de IEventStore, no de Marten: un TestStore en memoria rehidrata por reflexión, sin Postgres ni mocks.",
+    "concepts": [
+      "IEventStore en memoria",
+      "rehidratar reproduciendo hechos",
+      "reflexión vs switch",
+      "Given/Then: previos/nuevos",
+      "TestStore de la plantilla"
+    ],
+    "beats": [
+      {
+        "tag": "El dolor: el almacén real necesita Postgres",
+        "note": "MartenEventStore exige conexión viva: tests lentos y flojos. Pero los handlers solo piden IEventStore.",
+        "side": {
+          "kind": "text",
+          "title": "Lo que el test no quiere",
+          "text": "Postgres + Marten + mocks. Tus handlers dependen de la interfaz IEventStore, no de Marten. Basta otra implementación, en memoria."
+        }
+      },
+      {
+        "tag": "Intento ingenuo: rehidratar a pie con un switch",
+        "code": [
+          "private static void ApplyEvent(Empresa ar, object evento)",
+          "{",
+          "    switch (evento)",
+          "    {",
+          "        case EmpresaRegistrada e: ar.Apply(e); break;",
+          "        case EmpresaSuspendida e: ar.Apply(e); break;",
+          "        case EmpresaReactivada e: ar.Apply(e); break;",
+          "        // … una rama MÁS por cada hecho nuevo",
+          "    }",
+          "}"
+        ],
+        "glow": [
+          7
+        ],
+        "note": "Para rehidratar, un foreach aplica cada hecho; un switch rutea por tipo al Apply correcto.",
+        "side": {
+          "kind": "list",
+          "title": "El cableado crece con…",
+          "items": [
+            "cada hecho nuevo (otra rama)",
+            "cada agregado (copias el bloque)",
+            "y nadie te avisa si olvidas una"
+          ]
+        }
+      },
+      {
+        "tag": "El salto: que C# busque solo el Apply (reflexión)",
+        "code": [
+          "private static void ApplyEvent<T>(T ar, object evento)",
+          "{",
+          "    var metodo = _cache.GetOrAdd((typeof(T), evento.GetType()),",
+          "        llave => llave.Item1.GetMethod(\"Apply\", new[]{llave.Item2}));",
+          "    metodo?.Invoke(ar, new[] { evento });",
+          "}"
+        ],
+        "glow": [
+          2
+        ],
+        "note": "Reflexión: C# busca el Apply(tipo) que encaje, cacheado. Un solo ApplyEvent sirve para cualquier agregado.",
+        "badge": "🎉 Cero switch: vale para todo agregado",
+        "side": {
+          "kind": "state",
+          "title": "switch a mano → reflexión",
+          "rows": [
+            {
+              "k": "al sumar hecho",
+              "v": "tocar código → nada"
+            },
+            {
+              "k": "otro agregado",
+              "v": "copiar bloque → reusa"
+            },
+            {
+              "k": "costo",
+              "v": "mantenimiento → arranque (no importa en test)"
+            }
+          ],
+          "flashKey": "al sumar hecho"
+        }
+      },
+      {
+        "tag": "El TestStore: dos diccionarios, Given y Then",
+        "code": [
+          "public class TestStore : IEventStore",
+          "{",
+          "    Dictionary<string,List<object>> _previos = new(); // Given",
+          "    Dictionary<string,List<object>> _nuevos  = new(); // Then",
+          "    public void AppendPreviousEvents(string id, params object[] e)",
+          "    public IEnumerable<object> GetNewEvents(string id)",
+          "    public Task<T?> GetAggregateRootAsync<T>(string id, ...)"
+        ],
+        "glow": [
+          2
+        ],
+        "note": "_previos = historia que siembras; _nuevos = hechos que el handler produce. GetAggregateRoot rehidrata reproduciéndolos.",
+        "side": {
+          "kind": "list",
+          "title": "Implementa solo lo necesario",
+          "items": [
+            "AppendPreviousEvents (Given)",
+            "GetNewEvents (Then)",
+            "GetAggregateRootAsync rehidrata + rastrea",
+            "SaveChanges drena UncommittedEvents → _nuevos"
+          ]
+        }
+      },
+      {
+        "tag": "Comprueba: siembra, rehidrata, verifica — sin BD",
+        "code": [
+          "var store = new TestStore();",
+          "store.AppendPreviousEvents(\"emp-7\",",
+          "    new EmpresaRegistrada(\"Constructora Andes\", \"Básico\"),",
+          "    new EmpresaSuspendida(\"falta de pago\"));",
+          "var emp = store.GetAggregateRoot<Empresa>(\"emp-7\");",
+          "Console.WriteLine($\"{emp!.Nombre}, plan {emp.Plan}, ...\");"
+        ],
+        "glow": [
+          4
+        ],
+        "note": "Sembraste dos hechos como pasado; el TestStore reprodujo la empresa por reflexión, sin Postgres ni Marten.",
+        "side": {
+          "kind": "output",
+          "title": "Consola",
+          "text": "Constructora Andes, plan Básico, suspendida=True"
+        }
+      },
+      {
+        "tag": "El nombre: el TestStore de la plantilla, 1:1",
+        "note": "Es Cosmos.EventSourcing.Testing.Utilities: usa Activator.CreateInstance(nonPublic:true) y deja el time-travel sin implementar.",
+        "side": {
+          "kind": "state",
+          "title": "Dos matices del real",
+          "rows": [
+            {
+              "k": "instanciar",
+              "v": "Activator.CreateInstance(nonPublic:true)"
+            },
+            {
+              "k": "time-travel",
+              "v": "NotImplementedException"
+            },
+            {
+              "k": "reflexión aquí",
+              "v": "elección correcta: flexibilidad > arranque"
+            }
+          ],
+          "flashKey": "reflexión aquí"
+        }
+      }
+    ]
+  },
+  {
+    "slug": "given-when-then",
+    "number": 33,
+    "title": "Given-When-Then: probar decisiones",
+    "subtitle": "Tests que leen hechos",
+    "emoji": "✅",
+    "bridge": "Ya tienes el TestStore en memoria; falta una forma limpia de escribir los tests.",
+    "objetivo": "Una base de test Given/When/Then sobre el TestStore, sin base de datos.",
+    "oneLiner": "Un test de ES es Given (hechos previos) → When (un comando) → Then (los hechos emitidos), no filas; legible con AwesomeAssertions, sin BD ni mocks.",
+    "concepts": [
+      "Given-When-Then",
+      "CommandHandlerTestBase",
+      "BeEquivalentTo",
+      "probar hechos, no filas",
+      "ICommandHandler<T> inyectable"
+    ],
+    "beats": [
+      {
+        "tag": "El dolor: Arrange-Act-Assert crudo",
+        "note": "Crear store, sembrar, instanciar, ejecutar, comparar: se repite y oculta lo esencial.",
+        "side": {
+          "kind": "list",
+          "title": "A pelo, cada test repite",
+          "items": [
+            "crear el store",
+            "sembrar eventos",
+            "instanciar el handler",
+            "ejecutarlo y sacar eventos",
+            "compararlos a mano"
+          ]
+        }
+      },
+      {
+        "tag": "Nombrar tres verbos del dominio",
+        "note": "Lo natural en ES: Given la historia, When el comando, Then los hechos nuevos.",
+        "side": {
+          "kind": "list",
+          "title": "La gramática",
+          "items": [
+            "Given — hechos que ya pasaron",
+            "When — ejecuto un comando",
+            "Then — hechos nuevos emitidos",
+            "And — el estado resultante"
+          ]
+        }
+      },
+      {
+        "tag": "La base: Given/Then/And sobre TestStore",
+        "code": [
+          "public abstract class CommandHandlerTestBase",
+          "{",
+          "  protected string AggregateId = \"emp-7\";",
+          "  protected readonly TestStore EventStore = new();",
+          "  protected void Given(params object[] eventos) =>",
+          "    EventStore.AppendPreviousEvents(AggregateId, eventos);",
+          "  protected void Then(params object[] esperados) =>",
+          "    EventStore.GetNewEvents(AggregateId)",
+          "      .Should().BeEquivalentTo(esperados);",
+          "  protected void And<T,TR>(Func<T,TR> proy, TR esp)",
+          "    where T : AggregateRoot, new() =>",
+          "    proy(EventStore.GetAggregateRoot<T>(AggregateId))",
+          "      .Should().Be(esp);",
+          "}"
+        ],
+        "glow": [
+          6
+        ],
+        "note": "Given siembra, Then compara hechos con BeEquivalentTo, And afirma el estado rehidratado."
+      },
+      {
+        "tag": "WhenAsync ejecuta el handler genérico",
+        "code": [
+          "public abstract class CommandHandlerAsyncTest<TCommand>",
+          "  : CommandHandlerTestBase",
+          "{",
+          "  protected abstract ICommandHandler<TCommand> Handler { get; }",
+          "  protected async Task WhenAsync(TCommand cmd) {",
+          "    await Handler.HandleAsync(cmd);",
+          "    EventStore.SaveChanges();",
+          "  }",
+          "}"
+        ],
+        "glow": [
+          3
+        ],
+        "note": "Por esto conservamos ICommandHandler<T>: la base inyecta el TestStore y ejecuta genéricamente.",
+        "side": {
+          "kind": "text",
+          "title": "Por qué compila",
+          "text": "El handler recibe IEventStore (no InMemoryEventStore), y el TestStore es un IEventStore: le pasas el doble de test."
+        }
+      },
+      {
+        "tag": "El test se lee como la especificación",
+        "code": [
+          "[Fact]",
+          "public async Task Cambiar_plan_activa_emite_PlanCambiado()",
+          "{",
+          "  Given(new EmpresaRegistrada(\"Constructora Andes\",\"Básico\"));",
+          "  await WhenAsync(new CambiarPlanDeEmpresa(AggregateId,\"Premium\"));",
+          "  Then(new PlanCambiado(\"Premium\"));",
+          "  And<Empresa,string>(e => e.Plan, \"Premium\");",
+          "}"
+        ],
+        "glow": [
+          5
+        ],
+        "note": "Then compara la LISTA de hechos producidos, no filas; And cubre el estado derivado.",
+        "badge": "🎉 dotnet test → Superado: 1",
+        "side": {
+          "kind": "output",
+          "title": "dotnet test",
+          "text": "Superado: 1 — sin Postgres, sin Marten, sin mocks"
+        }
+      },
+      {
+        "tag": "Un verbo más: afirmar lo publicado",
+        "note": "La plantilla añade ThenIsPublishedPublicly/Privately con los Test…EventSender, sin broker.",
+        "side": {
+          "kind": "text",
+          "title": "🌱 Semilla",
+          "text": "Pruebas todo sin BD ni mocks porque el dominio es puro y el handler habla con IEventStore: el pago de las dos vertientes."
+        }
+      }
+    ]
+  },
+  {
+    "slug": "extension-members",
+    "number": 34,
+    "title": "El idioma de la plantilla: extension members de C#14",
+    "subtitle": "Declara el receptor una vez",
+    "emoji": "🧩",
+    "bridge": "Del test Given→When→Then pasamos a leer cómo la plantilla escribe su capa.",
+    "objetivo": "Entender y escribir el bloque extension(...) de C# 14.",
+    "oneLiner": "La plantilla envuelve la API directa con extension members de C#14: el receptor y sus restricciones se declaran una vez, no en cada método.",
+    "concepts": [
+      "método de extensión clásico (this)",
+      "extension(...) de C# 14",
+      "receptor compartido",
+      "*Extensions.cs del equipo",
+      "PrivateAssets=all"
+    ],
+    "beats": [
+      {
+        "tag": "El this repetido",
+        "code": [
+          "public static class QueryableExtensions",
+          "{",
+          "    public static Task<List<T>> ToListAsync<T>(",
+          "        this IQueryable<T> fuente, CancellationToken ct)",
+          "        where T : notnull => …;",
+          "    public static Task<bool> AnyAsync<T>(",
+          "        this IQueryable<T> fuente, CancellationToken ct)",
+          "        where T : notnull => …;",
+          "}"
+        ],
+        "glow": [
+          3
+        ],
+        "note": "Cada helper repite this IQueryable<T> y where T : notnull.",
+        "side": {
+          "kind": "text",
+          "title": "El dolor",
+          "text": "Cinco helpers sobre IQueryable<T> = repetir el receptor cinco veces."
+        }
+      },
+      {
+        "tag": "Agrupar con extension(...)",
+        "code": [
+          "public static class QueryableExtensions",
+          "{",
+          "    extension<T>(IQueryable<T> fuente) where T : notnull",
+          "    {",
+          "        public Task<IReadOnlyList<T>> ToListAsync(CancellationToken ct)",
+          "            => Marten.QueryableExtensions.ToListAsync(fuente, ct);",
+          "        public Task<bool> AnyAsync(CancellationToken ct)",
+          "            => Marten.QueryableExtensions",
+          "                .AnyAsync((IMartenQueryable<T>)fuente, ct);",
+          "    }",
+          "}"
+        ],
+        "glow": [
+          2
+        ],
+        "note": "El receptor y sus restricciones se declaran UNA vez para el bloque.",
+        "badge": "🎉 C# 14: extension members",
+        "side": {
+          "kind": "state",
+          "title": "Qué cambió",
+          "flashKey": "receptor",
+          "rows": [
+            {
+              "k": "this por método",
+              "v": "no"
+            },
+            {
+              "k": "receptor",
+              "v": "una vez en el bloque"
+            },
+            {
+              "k": "se usa",
+              "v": "fuente directamente"
+            },
+            {
+              "k": ".csproj en .NET 10",
+              "v": "no se toca"
+            }
+          ]
+        }
+      },
+      {
+        "tag": "Se llama igual",
+        "code": [
+          "var nums = new[] { 1, 2, 3 }.AsQueryable();",
+          "Console.WriteLine($\"¿hay alguno > 5? {nums.HayMayorQue(5)}\");",
+          "",
+          "extension<T>(IQueryable<T> fuente) where T : notnull",
+          "{",
+          "    public bool HayMayorQue(int x)",
+          "        => fuente.Cast<int>().Any(n => n > x);",
+          "}"
+        ],
+        "glow": [
+          1
+        ],
+        "note": "Se invoca como cualquier extensión; el método vive en el bloque.",
+        "side": {
+          "kind": "output",
+          "title": "dotnet run",
+          "items": [
+            "¿hay alguno > 5? False"
+          ],
+          "text": "> dotnet run\n¿hay alguno > 5? False\n\n// nums.HayMayorQue(5) — llamada como extensión normal"
+        }
+      },
+      {
+        "tag": "Toda la capa",
+        "note": "Cada *Extensions.cs del equipo envuelve la API directa con este idioma.",
+        "side": {
+          "kind": "list",
+          "title": "Escritos con extension(...)",
+          "items": [
+            "AgregarConfiguracionMartenComandos",
+            "UsarWolverineParaComandos",
+            "HabilitarRabbitMq",
+            "AgregarTenantResolverConHeadersConfiables"
+          ]
+        }
+      },
+      {
+        "tag": "1:1 + NuGet",
+        "note": "QueryableExtensions y TaskAggregateRootExtensions; Marten con PrivateAssets=all.",
+        "side": {
+          "kind": "state",
+          "title": "Detalles fieles",
+          "flashKey": "PrivateAssets=all",
+          "rows": [
+            {
+              "k": "QueryableExtensions",
+              "v": "ToListAsync/AnyAsync/FirstOrDefaultAsync"
+            },
+            {
+              "k": "TaskAggregateRootExtensions",
+              "v": "Tap/Map sobre Task<T>"
+            },
+            {
+              "k": "PrivateAssets=all",
+              "v": "no filtra Marten al consumidor"
+            },
+            {
+              "k": "vs doc oficial",
+              "v": "el creador usa this clásico"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "slug": "nuget-empaquetado",
+    "number": 35,
+    "title": "Empaquetar y publicar como NuGet",
+    "subtitle": "Distribuir la plantilla",
+    "emoji": "📦",
+    "bridge": "Las extensiones que escribiste no viven en una app: son librería que el equipo consume.",
+    "objetivo": "Empaquetar la plantilla: LOCKSTEP, Directory.Build.props y workflow de publicación.",
+    "oneLiner": "Varios paquetes NuGet con versión LOCKSTEP, un Directory.Build.props que desacopla AssemblyVersion de PackageVersion, y un release manual delegado a la organización.",
+    "concepts": [
+      "LOCKSTEP",
+      "Directory.Build.props",
+      "AssemblyVersion vs PackageVersion",
+      "PrivateAssets=all",
+      "workflow reusable"
+    ],
+    "beats": [
+      {
+        "tag": "Varios paquetes interdependientes",
+        "note": "Versiones sueltas → matriz de compatibilidad imposible de mantener.",
+        "side": {
+          "kind": "list",
+          "title": "Paquetes que dependen entre sí",
+          "items": [
+            "Abstractions",
+            "CritterStack",
+            "Testing.Utilities"
+          ]
+        }
+      },
+      {
+        "tag": "El salto: versionar LOCKSTEP",
+        "note": "Todos salen con UNA versión por release y un solo tag v*.",
+        "badge": "🎉 Una versión, un tag, todos a la vez",
+        "side": {
+          "kind": "state",
+          "title": "Release",
+          "rows": [
+            {
+              "k": "versión",
+              "v": "la misma para todos"
+            },
+            {
+              "k": "tag",
+              "v": "v<MAJOR.MINOR.PATCH>"
+            },
+            {
+              "k": "deps internas",
+              "v": "se resuelven solas"
+            }
+          ],
+          "flashKey": "deps internas"
+        }
+      },
+      {
+        "tag": "Desacoplar las versiones",
+        "note": "Si horneas la versión en AssemblyVersion → FileNotFoundException en runtime (sdk#12322).",
+        "code": [
+          "<!-- Directory.Build.props (raíz) -->",
+          "<AssemblyVersion>0.0.0.0</AssemblyVersion>",
+          "<FileVersion Condition=\"'$(Version)' != ''\">",
+          "  ...Regex.Replace($(Version),'[-+].*$','')</FileVersion>"
+        ],
+        "glow": [
+          1
+        ],
+        "side": {
+          "kind": "state",
+          "title": "Versionado",
+          "rows": [
+            {
+              "k": "AssemblyVersion",
+              "v": "fijo 0.0.0.0"
+            },
+            {
+              "k": "PackageVersion",
+              "v": "la inyecta el release"
+            }
+          ],
+          "flashKey": "AssemblyVersion"
+        }
+      },
+      {
+        "tag": "PackageId y Version no se hornean",
+        "note": "PackageId = nombre del proyecto; la Version la inyecta el workflow al empaquetar.",
+        "code": [
+          "dotnet pack -p:Version=X"
+        ],
+        "glow": [
+          0
+        ],
+        "side": {
+          "kind": "text",
+          "title": "El .csproj solo declara",
+          "text": "Title, Authors, Description, README, Icon y sus dependencias — ni Version ni PackageId."
+        }
+      },
+      {
+        "tag": "PrivateAssets para no filtrar",
+        "note": "Usas Marten puertas adentro sin imponérselo al consumidor como dependencia transitiva.",
+        "code": [
+          "<PackageReference Include=\"Marten\" Version=\"...\"",
+          "                  PrivateAssets=\"all\" />"
+        ],
+        "glow": [
+          1
+        ]
+      },
+      {
+        "tag": "El workflow de publicación",
+        "note": "Manual (workflow_dispatch), delegado a un reusable de la organización; paquetes-nuget.yml es la fuente de verdad.",
+        "code": [
+          "on:",
+          "  workflow_dispatch:",
+          "uses: Cosmos-SincoERP/.github/.../",
+          "  _reusable-nuget-publish-batch.yml@v1",
+          "secrets: inherit"
+        ],
+        "glow": [
+          2
+        ],
+        "side": {
+          "kind": "text",
+          "title": "paquetes-nuget.yml",
+          "text": "Vive en la raíz de .github/ (no en workflows/). Lista package_id + project_path; los tests no se listan."
+        }
+      }
+    ]
+  },
+  {
+    "slug": "capstone",
+    "number": 36,
+    "title": "Capstone: un bounded context de punta a punta",
+    "subtitle": "Tu motor tiene nombre",
+    "emoji": "🌳",
+    "bridge": "Ya empaquetaste la plantilla como NuGet; ahora ensambla todo y descubre qué construiste.",
+    "objetivo": "Ensamblar todo en un bounded context y reconocer la plantilla del equipo.",
+    "oneLiner": "El motor que construiste a mano —agregado, IEventStore/Marten, Wolverine, EDA, proyecciones, tenancy, tests— es Cosmos.BuildingBlocks, y lo entiendes por dentro.",
+    "concepts": [
+      "Bounded context completo",
+      "Ensamblar, no inventar",
+      "El gran reveal",
+      "Cosmos.BuildingBlocks",
+      "Las 7 preguntas"
+    ],
+    "beats": [
+      {
+        "tag": "Empezamos con amnesia",
+        "note": "De un foreach sobre cuatro variables a un motor completo de Event Sourcing.",
+        "side": {
+          "kind": "text",
+          "title": "De dónde venimos",
+          "text": "Empresa sin memoria → diario de hechos → 35 secciones de dolor y solución."
+        }
+      },
+      {
+        "tag": "Reúne las 7 piezas de la Empresa",
+        "note": "No hay conceptos nuevos: solo ensamblar lo que ya dominas.",
+        "side": {
+          "kind": "list",
+          "title": "El reto: punta a punta",
+          "items": [
+            "Agregado Empresa: Raise / Apply(T) / Version",
+            "IEventStore respaldado por MartenEventStore",
+            "ICommandHandler<T> + Wolverine + middleware",
+            "IPublicEvent al broker con outbox; privados al bus",
+            "Proyección EmpresaResumen (CQRS)",
+            "Multi-tenancy: ITenantResolver híbrido",
+            "Tests Given-When-Then sobre TestStore"
+          ]
+        }
+      },
+      {
+        "tag": "El dolor: piezas sueltas y anónimas",
+        "note": "Cada pieza la sufriste a mano, pero nunca le pusimos nombre al conjunto.",
+        "side": {
+          "kind": "state",
+          "title": "Lo construido a mano",
+          "rows": [
+            {
+              "k": "AggregateRoot",
+              "v": "acumula + Apply(T) + Version"
+            },
+            {
+              "k": "IEventStore",
+              "v": "+ MartenEventStore"
+            },
+            {
+              "k": "UnitOfWorkMiddleware",
+              "v": "comitea"
+            },
+            {
+              "k": "IPublicEvent",
+              "v": "outbox al broker"
+            },
+            {
+              "k": "ITenantResolver",
+              "v": "aislamiento por tenant"
+            },
+            {
+              "k": "TestStore",
+              "v": "tests sin BD"
+            }
+          ],
+          "flashKey": "AggregateRoot"
+        }
+      },
+      {
+        "tag": "El reveal: eso tiene nombre",
+        "note": "Durante 32 secciones lo evitamos: es la plantilla del equipo, casi línea por línea.",
+        "badge": "🎉 Construiste Cosmos.BuildingBlocks",
+        "code": [
+          "AggregateRoot      -> Cosmos.EventSourcing.Abstractions",
+          "IEventStore        -> Cosmos.EventSourcing.CritterStack",
+          "IEvent/IPublicEvent-> Cosmos.EventDriven.Abstractions",
+          "ITenantResolver    -> Cosmos.MultiTenancy",
+          "TestStore          -> Cosmos.EventSourcing.Testing"
+        ],
+        "glow": [
+          1
+        ],
+        "side": {
+          "kind": "text",
+          "title": "No es caja negra",
+          "text": "Al abrir Cosmos.BuildingBlocks verás tu propio motor: lo puedes leer, depurar y evolucionar."
+        }
+      },
+      {
+        "tag": "Las 7 preguntas que ya respondes",
+        "note": "Diario vs foto, evolve/decide, el reveal 1:1, las dos vertientes, outbox, tenancy, tests.",
+        "side": {
+          "kind": "list",
+          "title": "Sin titubear",
+          "items": [
+            "¿Por qué el diario y no la foto?",
+            "¿Qué es evolve, decide, Aggregate Root, Event Store, UoW?",
+            "¿Cómo mapea a Marten/Wolverine y por qué 1:1?",
+            "¿Por qué capa propia y no FetchForWriting?",
+            "¿Cómo viaja un hecho público (outbox/inbox)?",
+            "¿Cómo se aísla cada tenant en HTTP vs daemon?",
+            "¿Cómo se prueba todo sin base de datos?"
+          ]
+        }
+      },
+      {
+        "tag": "Sostenerlo y evolucionarlo",
+        "note": "Traduce mejoras de Marten/Wolverine a la capa propia; recuerda las divergencias.",
+        "code": [
+          "git commit --allow-empty -m \"ES · Capstone\" \\",
+          "  -m \"<tu respuesta, con tus palabras>\"",
+          "git push"
+        ],
+        "glow": [
+          0
+        ],
+        "side": {
+          "kind": "text",
+          "title": "🌳 Lo lograste",
+          "text": "Ningún recuadro te dio el motor: lo construiste tú, pieza a pieza. Sigue construyendo."
+        }
+      }
+    ]
+  }
+]

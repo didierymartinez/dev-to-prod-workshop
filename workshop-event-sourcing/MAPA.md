@@ -1,5 +1,7 @@
 # 🗺️ Mapa del taller — qué construyes en cada sección (y qué aprendes)
 
+> 📖 ¿Buscas el **panorama como relato** (sin código, de corrido)? → [`NARRATIVA.md`](NARRATIVA.md). Este mapa es la **referencia detallada** por sección (retos, qué aprendes, a qué pieza real converge).
+
 Este taller es **hands-on**: en cada sección **te reto a escribir el código tú mismo** (te describo qué construir, lo intentas, y luego revelo una forma de hacerlo en un bloque `<details>`). Lo que es idioma nuevo de C# —demasiado para inventarlo de cero— **se te muestra** directamente.
 
 Este mapa, para cada sección, te dice:

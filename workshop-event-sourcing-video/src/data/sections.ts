@@ -1,6 +1,8 @@
 // Contenido de cada sección del taller, en datos.
 // Fiel a los .md de workshop-event-sourcing/secciones/ (objetivo, dolor, código real, "en una frase").
 // Para añadir una sección: agrega un objeto a `sections` y aparecerá una composición nueva sola.
+import { Beat } from "../components/BeatSequence";
+import generatedRaw from "./generated-sections.json";
 
 export type SectionCode = {
   caption: string;
@@ -23,20 +25,24 @@ export type Section = {
   // suelto funciona, DESPUÉS se agrupa en la clase) → va después. Por defecto va antes.
   discoveryAfterMechanism?: boolean;
   objetivo: string;
-  pain: { title: string; text: string };
+  pain?: { title: string; text: string };
   // Mecanismo animado (la "evolución/flujo" del concepto, lo que de verdad enseña).
   mechanism?:
     | "diario-vs-foto"
     | "replay-evolve"
     | "engine-switch"
     | "repository"
-    | "decide";
+    | "decide"
+    | "beats"; // motor data-driven (secciones 6+): la secuencia vive en `beats`
+  // Beats del mecanismo data-driven (cuando mechanism === "beats").
+  beats?: Beat[];
   code?: SectionCode;
   oneLiner: string;
   concepts: string[];
 };
 
-export const sections: Section[] = [
+// Las 5 primeras tienen mecanismo bespoke (animaciones a medida, validadas).
+const BESPOKE: Section[] = [
   {
     number: 1,
     slug: "el-diario-de-una-empresa",
@@ -234,3 +240,21 @@ export const sections: Section[] = [
     concepts: ["decide", "Patrón Decider", "Validación", "Idempotencia"],
   },
 ];
+
+// Secciones 6-36: generadas (motor data-driven `beats`). El acento se asigna por paleta
+// según el número, y el mecanismo es "beats". El contenido viene de generated-sections.json.
+const PALETTE = [
+  "#FFB454", "#4ECDC4", "#C792EA", "#6BCB77", "#FF8B6B",
+  "#5BA8FF", "#F78FB3", "#E0C341", "#9D7CFF", "#48C9B0",
+];
+
+type GeneratedSection = Omit<Section, "accent" | "mechanism">;
+
+const generated: Section[] = (generatedRaw as unknown as GeneratedSection[]).map((g) => ({
+  ...g,
+  accent: PALETTE[((g.number ?? 1) - 1) % PALETTE.length],
+  mechanism: "beats" as const,
+}));
+
+export const sections: Section[] = [...BESPOKE, ...generated];
+

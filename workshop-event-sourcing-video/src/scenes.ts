@@ -10,6 +10,7 @@ import { REPOSITORY_DURATION } from "./components/RepositoryFlow";
 import { DECIDE_DURATION } from "./components/DecideFlow";
 import { LOOSE_TO_CLASS_DURATION } from "./components/LooseToClass";
 import { CODE_LEAP_DURATION } from "./components/CodeLeap";
+import { beatsDuration } from "./components/BeatSequence";
 
 export type SceneKind =
   | "title"
@@ -28,8 +29,8 @@ const clampN = (lo: number, v: number, hi: number) => Math.max(lo, Math.min(hi, 
 const textDuration = (text: string, perWord = 7.5, base = 60): number =>
   clampN(150, Math.round(base + text.trim().split(/\s+/).length * perWord), 400);
 
-const mechanismDuration = (m: NonNullable<Section["mechanism"]>): number => {
-  switch (m) {
+const mechanismDuration = (section: Section): number => {
+  switch (section.mechanism) {
     case "diario-vs-foto":
       return DIARIO_VS_FOTO_DURATION;
     case "replay-evolve":
@@ -40,6 +41,10 @@ const mechanismDuration = (m: NonNullable<Section["mechanism"]>): number => {
       return REPOSITORY_DURATION;
     case "decide":
       return DECIDE_DURATION;
+    case "beats":
+      return beatsDuration(section.beats?.length ?? 1);
+    default:
+      return 0;
   }
 };
 
@@ -60,6 +65,7 @@ const MECHANISMS_WITH_CODE = new Set<Section["mechanism"]>([
   "engine-switch",
   "repository",
   "decide",
+  "beats",
 ]);
 
 export function buildScenes(section: Section): SceneDesc[] {
@@ -81,7 +87,7 @@ export function buildScenes(section: Section): SceneDesc[] {
     ? { kind: "discovery", durationInFrames: discoveryDuration(section.discovery) }
     : null;
   const mechScene: SceneDesc | null = section.mechanism
-    ? { kind: "mechanism", durationInFrames: mechanismDuration(section.mechanism) }
+    ? { kind: "mechanism", durationInFrames: mechanismDuration(section) }
     : section.pain
       ? { kind: "pain", durationInFrames: 160 }
       : null;

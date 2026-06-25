@@ -1,6 +1,9 @@
 # El tiempo de espera (async/await)
 
-Tienes el flujo completo de event sourcing… pero vive en RAM. Cuando el programa se apaga, el `InMemoryEventStore` se va a la basura con toda su historia. Para que las empresas sobrevivan a un reinicio, hay que enviar los hechos **fuera del proceso**: a una base de datos real. Y eso trae un costo nuevo: **el tiempo de espera**.
+Tienes el flujo completo de event sourcing… pero vive en RAM. Cuando el programa se apaga, el `InMemoryEventStore` se va a la basura con toda su historia. Para que las empresas sobrevivan a un reinicio habrá que enviar los hechos **fuera del proceso**, a una base de datos real — y eso trae un costo nuevo: **el tiempo de espera**.
+
+> [!NOTE]
+> Aún **no** persistimos en esta sección (Postgres llega en unas secciones, en [Docker y PostgreSQL](docker-postgres.md)); aquí **preparamos la forma `async`** para que, cuando aparezca la espera real, el código ya **no tenga que cambiar**. Hoy el almacén sigue en RAM — pero con firmas asíncronas.
 
 ## 🎯 El Objetivo
 
