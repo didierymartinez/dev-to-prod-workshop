@@ -15,6 +15,13 @@ export type Section = {
   subtitle: string;
   emoji: string;
   accent: string; // hex de 6 dígitos (se le concatena alfa en estilos)
+  // Puente con la sección anterior: de dónde venimos → por qué seguimos (hilo narrativo).
+  bridge?: string;
+  // Descubrimiento grande que esta sección hace "sentir" (salto conceptual marcado).
+  discovery?: "loose-to-class" | "ifs-to-switch" | "wrapper-to-generic" | "insert-to-decide";
+  // Si el descubrimiento es CONSECUENCIA del mecanismo (p. ej. §2: primero el replay
+  // suelto funciona, DESPUÉS se agrupa en la clase) → va después. Por defecto va antes.
+  discoveryAfterMechanism?: boolean;
   objetivo: string;
   pain: { title: string; text: string };
   // Mecanismo animado (la "evolución/flujo" del concepto, lo que de verdad enseña).
@@ -56,6 +63,10 @@ export const sections: Section[] = [
     emoji: "⏪",
     accent: "#4ECDC4",
     mechanism: "replay-evolve",
+    discovery: "loose-to-class",
+    discoveryAfterMechanism: true,
+    bridge:
+      "Ya decidimos guardar el diario, no la foto. Pero, ¿cómo recalculo el estado de hoy en código —leyendo esos hechos— en vez de guardarlo?",
     objetivo:
       "¿Cómo recalculo el estado de hoy leyendo el diario, en vez de guardarlo? Recorriendo los hechos de principio a fin y acumulando.",
     pain: {
@@ -93,6 +104,8 @@ export const sections: Section[] = [
     emoji: "⚙️",
     accent: "#C792EA",
     mechanism: "engine-switch",
+    bridge:
+      "Reconstruir funcionó con un foreach lleno de ifs. Pero ese if crece feo: un hecho nuevo es otro if, y con una Factura copiarías todo el bucle. Vamos a domarlo.",
     objetivo:
       "Que el motor que lee la historia y reconstruye el estado sea limpio (no un if interminable) y reutilizable: que sirva para la Empresa hoy y para una Factura mañana, sin copiar y pegar.",
     pain: {
@@ -145,6 +158,9 @@ export const sections: Section[] = [
     emoji: "📦",
     accent: "#6BCB77",
     mechanism: "repository",
+    discovery: "wrapper-to-generic",
+    bridge:
+      "Ya tienes un motor de replay limpio. Pero para «despertar» a la empresa todavía le pasas a mano una lista cruda de hechos. Vamos a encapsularla.",
     objetivo:
       "Dejar de manosear listas crudas: un envoltorio que sea dueño de la historia de una empresa y exponga solo dos puertas — «anota esto» (Append) y «dame la empresa» (Get).",
     pain: {
@@ -183,6 +199,9 @@ export const sections: Section[] = [
     emoji: "🧭",
     accent: "#FF8B6B",
     mechanism: "decide",
+    discovery: "insert-to-decide",
+    bridge:
+      "Ya lees y escribes la historia con el stream. Pero los hechos los fabricas a mano desde afuera, sin que nadie vigile las reglas. ¿Quién decide que la empresa puede cambiar?",
     objetivo:
       "Que la Empresa emita sus propios hechos —protegiendo sus reglas— en vez de que se los insertemos por la fuerza con Append. La empresa decide; no le insertan hechos.",
     pain: {

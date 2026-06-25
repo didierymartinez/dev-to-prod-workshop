@@ -9,6 +9,7 @@ import { ENGINE_SWITCH_DURATION } from "./components/EngineSwitch";
 import { REPOSITORY_DURATION } from "./components/RepositoryFlow";
 import { DECIDE_DURATION } from "./components/DecideFlow";
 import { LOOSE_TO_CLASS_DURATION } from "./components/LooseToClass";
+import { CODE_LEAP_DURATION } from "./components/CodeLeap";
 
 export type SceneKind =
   | "title"
@@ -46,11 +47,20 @@ const discoveryDuration = (d: NonNullable<Section["discovery"]>): number => {
   switch (d) {
     case "loose-to-class":
       return LOOSE_TO_CLASS_DURATION;
+    case "ifs-to-switch":
+    case "wrapper-to-generic":
+    case "insert-to-decide":
+      return CODE_LEAP_DURATION;
   }
 };
 
 // Mecanismos que ya MUESTRAN el código sincronizado adentro → no repetir una escena de código aparte.
-const MECHANISMS_WITH_CODE = new Set<Section["mechanism"]>(["replay-evolve"]);
+const MECHANISMS_WITH_CODE = new Set<Section["mechanism"]>([
+  "replay-evolve",
+  "engine-switch",
+  "repository",
+  "decide",
+]);
 
 export function buildScenes(section: Section): SceneDesc[] {
   const scenes: SceneDesc[] = [];
@@ -63,16 +73,21 @@ export function buildScenes(section: Section): SceneDesc[] {
 
   scenes.push({ kind: "objetivo", durationInFrames: textDuration(section.objetivo) });
 
-  // El descubrimiento grande (p. ej. variables sueltas → clase Empresa): se marca aparte.
-  if (section.discovery) {
-    scenes.push({ kind: "discovery", durationInFrames: discoveryDuration(section.discovery) });
-  }
+  // El descubrimiento grande (salto conceptual) y el mecanismo animado. El ORDEN sigue el
+  // hilo conductor de la sección: por defecto el descubrimiento (el salto) va ANTES del
+  // mecanismo (que muestra el resultado); pero cuando el salto es CONSECUENCIA del mecanismo
+  // (§2: primero el replay suelto funciona, después se agrupa en la clase) va DESPUÉS.
+  const discScene: SceneDesc | null = section.discovery
+    ? { kind: "discovery", durationInFrames: discoveryDuration(section.discovery) }
+    : null;
+  const mechScene: SceneDesc | null = section.mechanism
+    ? { kind: "mechanism", durationInFrames: mechanismDuration(section.mechanism) }
+    : section.pain
+      ? { kind: "pain", durationInFrames: 160 }
+      : null;
 
-  // El corazón: el MECANISMO animado (la evolución/flujo del concepto).
-  if (section.mechanism) {
-    scenes.push({ kind: "mechanism", durationInFrames: mechanismDuration(section.mechanism) });
-  } else if (section.pain) {
-    scenes.push({ kind: "pain", durationInFrames: 160 });
+  for (const sc of section.discoveryAfterMechanism ? [mechScene, discScene] : [discScene, mechScene]) {
+    if (sc) scenes.push(sc);
   }
 
   // Código como beat aparte SOLO si el mecanismo no lo muestra ya sincronizado.

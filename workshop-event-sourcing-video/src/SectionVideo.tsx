@@ -8,7 +8,9 @@ import { Background } from "./components/Background";
 import { Footer } from "./components/Footer";
 import {
   TitleScene,
+  BridgeScene,
   ObjectiveScene,
+  DiscoveryScene,
   PainScene,
   MechanismScene,
   CodeScene,
@@ -20,8 +22,12 @@ const renderScene = (sc: SceneDesc, section: Section) => {
   switch (sc.kind) {
     case "title":
       return <TitleScene {...props} />;
+    case "bridge":
+      return <BridgeScene {...props} />;
     case "objetivo":
       return <ObjectiveScene {...props} />;
+    case "discovery":
+      return <DiscoveryScene {...props} />;
     case "pain":
       return <PainScene {...props} />;
     case "mechanism":

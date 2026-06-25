@@ -10,6 +10,8 @@ Encapsular ese "cargar → actuar → guardar" en una pieza con un solo trabajo,
 
 La `Empresa` (el agregado) se concentra en **vivir y hacer cumplir sus reglas**: decide y emite hechos. Pero, ¿acaso la empresa va a rehidratarse y guardar los hechos cada vez? No. Para eso tiene un **secretario** que: (1) carga su historia desde el stream, (2) la rehidrata, (3) le presenta la intención, y (4) **guarda** el hecho que la empresa emita. Ese secretario es el **Command Handler**.
 
+> 💡 **¿Por qué se llama "Command Handler"?** El nombre son sus dos mitades. Un **comando** (*command*) es una **orden**: la *intención* de que algo pase —"cambia el plan", "suspende"—, en imperativo (lo distinguiste del **evento**, que ya pasó, en [Decidir el futuro](decidir-el-futuro.md)). Un **handler** es quien la **maneja/atiende**. Así que un *Command Handler* es, literal, **"el que atiende una orden"**: recibe la intención y hace la logística para cumplirla. En la analogía: la **orden** que le pasas al secretario es el *comando*; el **secretario** que la procesa es el *handler*. *(Por ahora esa orden viaja como **parámetros sueltos** a un método —`CambiarPlan(string nuevoPlan)`—; en [El despachador](el-despachador.md) tomará forma de **objeto con su propio tipo**, un `record`-comando. Pero el nombre ya dice qué hace la pieza: maneja un comando.)*
+
 ## El handler: primer intento (con los parámetros sueltos)
 
 Empecemos por lo **concreto y directo**: una clase que orqueste **cargar → decidir → guardar** para la `Empresa`, recibiendo los parámetros **sueltos**.

@@ -1,158 +1,142 @@
 import React from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 import { theme } from "../theme";
-import { EASE, clamp, EventCard, Caption } from "./mechanics";
+import { EASE, clamp, Caption } from "./mechanics";
 
-// Mecanismo de «El diario de una empresa»: el contraste en movimiento.
-// La FOTO se sobrescribe (UPDATE → el valor viejo se TACHA y se va: el pasado se destruye).
-// El DIARIO anexa cada hecho (nada se borra; el estado de hoy se reconstruye).
+// Mecanismo de «El diario de una empresa», siguiendo su hilo de descubrimientos:
+// (1) la foto se sobrescribe con cada UPDATE (tacha el pasado) vs el diario que anexa;
+// (2) AMNESIA: el jefe hace 3 preguntas y la foto responde "ni idea", el diario responde;
+// (3) se le pone NOMBRE: Event Sourcing, y cada renglón es un evento.
 
 const OPS = [
-  "Registrada — plan Básico",
-  "Cambió a plan Premium",
-  "Suspendida — falta de pago",
+  { label: "Registrada — plan Básico", set: { Plan: "Básico", Estado: "activa" } as Partial<Foto>, oldField: null, card: { name: "EmpresaRegistrada", detail: '"Básico"' } },
+  { label: "Cambió a plan Premium", set: { Plan: "Premium" } as Partial<Foto>, oldField: "Plan" as const, card: { name: "PlanCambiado", detail: '"Premium"' } },
+  { label: "Suspendida — falta de pago", set: { Estado: "Suspendida" } as Partial<Foto>, oldField: "Estado" as const, card: { name: "EmpresaSuspendida", detail: '"falta de pago"' } },
 ];
-const FOTO = [
-  { Plan: "Básico", Estado: "activa" },
-  { Plan: "Premium", Estado: "activa" },
-  { Plan: "Premium", Estado: "Suspendida" },
-];
-// valor que el UPDATE DESTRUYE en cada beat (null = no había viejo)
-const FOTO_OLD: { Plan: string | null; Estado: string | null }[] = [
-  { Plan: null, Estado: null },
-  { Plan: "Básico", Estado: null },
-  { Plan: null, Estado: "activa" },
-];
-const DIARIO = [
-  { name: "EmpresaRegistrada", detail: '"Básico"' },
-  { name: "PlanCambiado", detail: '"Premium"' },
-  { name: "EmpresaSuspendida", detail: '"falta de pago"' },
+type Foto = { Plan: string; Estado: string };
+const fotoAt = (i: number): Foto => {
+  let f: Foto = { Plan: "—", Estado: "—" };
+  for (let k = 0; k <= i; k++) f = { ...f, ...OPS[k].set };
+  return f;
+};
+const OLD_VALUE: Record<string, string> = { Plan: "Básico", Estado: "activa" };
+
+const QA = [
+  { q: "¿Desde cuándo es Premium?", diario: "desde el hecho #2" },
+  { q: "¿Por qué está suspendida?", diario: "por falta de pago (#3)" },
+  { q: "¿Cuántas veces la reactivaron?", diario: "el diario lo cuenta" },
 ];
 
-export const INTRO = 12;
-export const BEAT = 58;
-export const HOLD = 70;
-export const DIARIO_VS_FOTO_DURATION = INTRO + OPS.length * BEAT + HOLD;
+const INTRO = 14;
+const OP = 52;
+const QA_STEP = 46;
+const opsEnd = INTRO + OPS.length * OP;
+const amnesiaStart = opsEnd + 12;
+const amnesiaEnd = amnesiaStart + QA.length * QA_STEP;
+const namingStart = amnesiaEnd + 10;
+export const DIARIO_VS_FOTO_DURATION = namingStart + 110;
 
 export const DiarioVsFoto: React.FC<{ accent: string }> = ({ accent }) => {
   const frame = useCurrentFrame();
-  const t = frame - INTRO;
-  const beat = t < 0 ? -1 : Math.min(OPS.length - 1, Math.floor(t / BEAT));
-  const b = t < 0 ? 0 : t - beat * BEAT;
-  const applied = beat >= 0 && b >= 30;
-  const shownIdx = beat < 0 ? -1 : applied ? beat : beat - 1;
-  const foto = shownIdx >= 0 ? FOTO[shownIdx] : { Plan: "—", Estado: "—" };
-  const finished = t >= OPS.length * BEAT - 6;
+  const inOps = frame < amnesiaStart;
+  const inAmnesia = frame >= amnesiaStart && frame < namingStart;
+  const inNaming = frame >= namingStart;
 
-  const fotoRow = (field: "Plan" | "Estado") => {
-    const old = beat >= 0 ? FOTO_OLD[beat][field] : null;
-    const ghostActive = old !== null && b >= 6 && b <= 40;
-    const ghostY = interpolate(b, [8, 38], [0, -54], { easing: EASE, ...clamp });
-    const ghostOpacity = interpolate(b, [8, 18, 40], [0, 0.9, 0], clamp);
-    const newPop = applied && beat >= 0 ? interpolate(b, [30, 38], [0, 1], clamp) : 1;
-    const changedNow = beat >= 0 && b >= 28 && FOTO[beat][field] !== (shownIdx > 0 ? FOTO[shownIdx - 1][field] : null);
-    return (
-      <div
-        style={{
-          position: "relative",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "16px 0",
-          borderBottom: `1px solid ${theme.panelBorder}`,
-          fontFamily: theme.fontMono,
-          fontSize: 32,
-        }}
-      >
-        <span style={{ color: theme.textDim }}>{field}</span>
-        <span
-          style={{
-            color: changedNow ? theme.pain : theme.text,
-            fontWeight: 700,
-            scale: String(0.9 + newPop * 0.1),
-          }}
-        >
-          {foto[field]}
-        </span>
-        {ghostActive ? (
-          <span
-            style={{
-              position: "absolute",
-              right: 0,
-              opacity: ghostOpacity,
-              translate: `0px ${ghostY}px`,
-              color: theme.pain,
-              textDecoration: "line-through",
-              fontWeight: 700,
-            }}
-          >
-            {old}
-          </span>
-        ) : null}
-      </div>
-    );
-  };
+  // estado de la foto durante las ops
+  const opIdx = Math.min(OPS.length - 1, Math.max(0, Math.floor((frame - INTRO) / OP)));
+  const opB = frame - INTRO - opIdx * OP;
+  const fotoApplied = !inOps || opB >= 26;
+  const foto = inOps ? fotoAt(fotoApplied ? opIdx : opIdx - 1) : fotoAt(OPS.length - 1);
+
+  const reveal = interpolate(frame, [namingStart + 6, namingStart + 50], [0, 1], { easing: EASE, ...clamp });
 
   return (
-    <AbsoluteFill
-      style={{
-        flexDirection: "row",
-        alignItems: "flex-start",
-        justifyContent: "center",
-        gap: 120,
-        padding: "150px 150px 200px",
-      }}
-    >
-      {/* LA FOTO */}
-      <div style={{ width: 560, display: "flex", flexDirection: "column", gap: 18 }}>
-        <div style={{ textAlign: "center", fontFamily: theme.fontSans, fontSize: 28, fontWeight: 700, color: theme.pain }}>
-          📸 La foto — un UPDATE pisa el valor
+    <AbsoluteFill style={{ flexDirection: "column", alignItems: "center", justifyContent: "center", paddingTop: 150, paddingBottom: 160 }}>
+      {/* ── arriba: la foto vs el diario ── */}
+      <div style={{ display: "flex", gap: 90, alignItems: "flex-start", justifyContent: "center" }}>
+        {/* LA FOTO */}
+        <div style={{ width: 480, display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ textAlign: "center", fontFamily: theme.fontSans, fontSize: 26, fontWeight: 700, color: theme.pain }}>
+            📸 La foto — un UPDATE pisa el valor
+          </div>
+          <div style={{ background: theme.panel, border: `2px solid ${theme.pain}55`, borderRadius: 16, padding: "16px 28px" }}>
+            {(["Plan", "Estado"] as (keyof Foto)[]).map((f) => {
+              const isChanging = inOps && OPS[opIdx].oldField === f;
+              const ghostY = interpolate(opB, [6, 36], [0, -50], { easing: EASE, ...clamp });
+              const ghostOp = interpolate(opB, [6, 16, 38], [0, 0.9, 0], clamp);
+              return (
+                <div key={f} style={{ position: "relative", display: "flex", justifyContent: "space-between", padding: "14px 0", borderBottom: `1px solid ${theme.panelBorder}`, fontFamily: theme.fontMono, fontSize: 30 }}>
+                  <span style={{ color: theme.textDim }}>{f}</span>
+                  <span style={{ color: theme.text, fontWeight: 700 }}>{foto[f]}</span>
+                  {isChanging ? (
+                    <span style={{ position: "absolute", right: 0, opacity: ghostOp, translate: `0px ${ghostY}px`, color: theme.pain, textDecoration: "line-through", fontWeight: 700 }}>
+                      {OLD_VALUE[f]}
+                    </span>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+          {!inOps ? (
+            <div style={{ textAlign: "center", color: theme.pain, fontFamily: theme.fontSans, fontSize: 24, fontWeight: 600 }}>
+              el pasado se borró con cada UPDATE
+            </div>
+          ) : null}
         </div>
-        <div
-          style={{
-            background: theme.panel,
-            border: `2px solid ${theme.pain}55`,
-            borderRadius: 18,
-            padding: "20px 30px",
-          }}
-        >
-          {fotoRow("Plan")}
-          {fotoRow("Estado")}
-        </div>
-        <div style={{ textAlign: "center", color: theme.pain, fontFamily: theme.fontSans, fontSize: 28, fontWeight: 600, marginTop: 6, opacity: finished ? 1 : 0.5 }}>
-          ❓ ¿cómo llegó aquí? — ni idea
+
+        {/* EL DIARIO */}
+        <div style={{ width: 540, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ textAlign: "center", fontFamily: theme.fontSans, fontSize: 26, fontWeight: 700, color: accent }}>
+            📔 El diario — anexa, no borra
+          </div>
+          {OPS.map((op, i) => {
+            const at = INTRO + i * OP + 8;
+            const o = interpolate(frame, [at, at + 14], [0, 1], { easing: EASE, ...clamp });
+            const x = interpolate(frame, [at, at + 16], [40, 0], { easing: EASE, ...clamp });
+            if (frame < at) return <div key={i} style={{ height: 0 }} />;
+            return (
+              <div key={i} style={{ opacity: o, translate: `${x}px 0px`, display: "flex", gap: 14, alignItems: "baseline", background: theme.panel, border: `1px solid ${accent}44`, borderLeft: `5px solid ${accent}`, borderRadius: 10, padding: "12px 18px", fontFamily: theme.fontMono, fontSize: 24 }}>
+                <span style={{ color: accent }}>#{i + 1}</span>
+                <span style={{ color: theme.text }}>{op.card.name}<span style={{ color: theme.syntax.string }}> {op.card.detail}</span></span>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* EL DIARIO */}
-      <div style={{ width: 620, display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ textAlign: "center", fontFamily: theme.fontSans, fontSize: 28, fontWeight: 700, color: accent }}>
-          📔 El diario — anexa, no borra
-        </div>
-        {DIARIO.map((e, i) => {
-          const appearAt = INTRO + i * BEAT + 8;
-          const op = interpolate(frame, [appearAt, appearAt + 14], [0, 1], { easing: EASE, ...clamp });
-          const x = interpolate(frame, [appearAt, appearAt + 16], [40, 0], { easing: EASE, ...clamp });
-          if (frame < appearAt) return <div key={i} style={{ height: 0 }} />;
-          return (
-            <div key={i} style={{ opacity: op, translate: `${x}px 0px` }}>
-              <EventCard index={i + 1} name={e.name} detail={e.detail} accent={accent} state="pending" opacity={1} />
+      {/* ── abajo: amnesia (3 preguntas) o el nombre ── */}
+      <div style={{ marginTop: 40, width: 1160, minHeight: 240, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start" }}>
+        {inAmnesia
+          ? QA.map((qa, i) => {
+              const at = amnesiaStart + i * QA_STEP;
+              const o = interpolate(frame, [at, at + 16], [0, 1], { easing: EASE, ...clamp });
+              if (frame < at) return null;
+              return (
+                <div key={i} style={{ opacity: o, display: "flex", alignItems: "center", gap: 20, width: "100%", padding: "10px 0" }}>
+                  <span style={{ flex: 1, textAlign: "right", fontFamily: theme.fontSans, fontSize: 28, color: theme.text }}>{qa.q}</span>
+                  <span style={{ width: 200, textAlign: "center", fontFamily: theme.fontSans, fontSize: 26, fontWeight: 700, color: theme.pain }}>📸 ni idea ✗</span>
+                  <span style={{ flex: 1, fontFamily: theme.fontSans, fontSize: 26, fontWeight: 700, color: accent }}>📔 {qa.diario} ✓</span>
+                </div>
+              );
+            })
+          : null}
+
+        {inNaming ? (
+          <div style={{ opacity: reveal, translate: `0px ${(1 - reveal) * 18}px`, textAlign: "center", marginTop: 10 }}>
+            <div style={{ fontFamily: theme.fontSans, fontSize: 50, fontWeight: 800, color: accent }}>🎉 esto es Event Sourcing</div>
+            <div style={{ fontFamily: theme.fontSans, fontSize: 30, color: theme.textDim, marginTop: 10, maxWidth: 1100 }}>
+              la fuente de la verdad es el diario (la secuencia de hechos); cada renglón es un <b style={{ color: theme.text }}>evento</b>. La foto se reconstruye; el diario, una vez lo tiras, no vuelve.
             </div>
-          );
-        })}
-        {finished ? (
-          <div style={{ color: accent, fontFamily: theme.fontSans, fontSize: 26, fontWeight: 600, marginTop: 8 }}>
-            ✔ pasado intacto · el estado de hoy se reconstruye
           </div>
         ) : null}
       </div>
 
-      <Caption color={finished ? accent : theme.textDim}>
-        {finished
-          ? "la foto perdió el pasado; el diario lo conserva entero — eso es Event Sourcing"
-          : beat >= 0
-            ? `▶ ocurre: ${OPS[beat]}`
-            : "▶ a cada cosa que pasa…"}
+      <Caption color={inNaming ? accent : theme.textDim}>
+        {inNaming
+          ? "guardar el diario, no la foto: conservas el pasado y reconstruyes el presente"
+          : inAmnesia
+            ? "la foto tiene AMNESIA: guardó el presente y perdió el pasado — el diario responde todo"
+            : `▶ ocurre: ${OPS[opIdx].label}`}
       </Caption>
     </AbsoluteFill>
   );
