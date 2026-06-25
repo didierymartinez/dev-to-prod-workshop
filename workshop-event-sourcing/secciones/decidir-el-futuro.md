@@ -72,13 +72,20 @@ Console.WriteLine($"[después] plan {verificacion.Plan}");
 El camino feliz **siempre** emite. Pero en la vida real una orden puede repetirse (la red falló, el usuario hizo doble clic). Mira el dolor:
 
 ```csharp
-// 💥 la misma orden de suspender llega dos veces
-stream.Append(empresa.Suspender("falta de pago"));
-stream.Append(empresa.Suspender("falta de pago"));
-// El diario ahora dice que la empresa se suspendió DOS veces.
+// 💥 la misma orden de suspender llega dos veces (doble clic, red que reintenta),
+// sobre el MISMO `stream` del camino feliz de arriba. Cada orden CARGA, actúa y GUARDA
+// — el ciclo que formalizará el Command Handler.
+var orden1 = stream.Get();                          // carga la empresa (Suspendida = false)
+stream.Append(orden1.Suspender("falta de pago"));   // emite y guarda
+
+var orden2 = stream.Get();                          // RECARGA: el replay aplica la suspensión → Suspendida = true
+stream.Append(orden2.Suspender("falta de pago"));   // hoy emite OTRA VEZ → el diario se suspende dos veces
 // Y peor: si una regla dijera "no se puede cambiar el plan de una empresa suspendida",
 // nada lo impide, porque CambiarPlan emite sin mirar el estado.
 ```
+
+> [!NOTE]
+> 🔍 **Lo que descubres al correrlo: el agregado debe estar recargado.** Fíjate en los dos `Get()` de arriba. Si en cambio reusaras la **misma** instancia (`empresa.Suspender(...)` dos veces seguidas), `Suspendida` seguiría en `false` —`decide` **no muta** el objeto (míralo: el cuerpo de `Suspender` solo hace `return new …`, ninguna línea asigna a una propiedad de `this`); el cambio vive en el diario, no en la instancia que tienes en mano— y la guarda que estás por escribir **nunca dispararía**. La idempotencia funciona porque **cada orden recarga** el agregado: el `Get()` lo rehidrata con el hecho ya guardado, así que la segunda orden **sí** ve `Suspendida = true`. Ese ciclo *cargar → actuar → guardar* por comando es justo lo que formaliza el [Command Handler](el-command-handler.md).
 
 El agregado es el **guardián de las reglas**, así que la defensa nace **dentro** de la `Empresa`, mirando su estado **antes** de emitir.
 
@@ -120,7 +127,30 @@ public EmpresaSuspendida? Suspender(string motivo)
     return new EmpresaSuspendida(motivo);
 }
 ```
+
 </details>
+
+### 🔍 La trampa: la guarda no basta sin recargar
+
+Con la guarda puesta, vuelve a correr el demo de arriba: `orden2` venía **recargada** (`Suspendida = true`), así que `Suspender` devuelve `null` → queda **un solo** `EmpresaSuspendida`. ✓
+
+Pero la guarda **sola** no basta. Si reúsas la **misma** instancia sin recargar, no dispara:
+
+```csharp
+var e = stream.Get();              // Suspendida = false
+stream.Append(e.Suspender("x"));   // emite (ok)
+stream.Append(e.Suspender("x"));   // ⚠ ¡emite OTRA VEZ! e.Suspendida SIGUE en false:
+                                   //   decide no mutó e → el if (Suspendida) nunca se cumple
+```
+
+La idempotencia no la da el `if` solo: la da **recargar** entre órdenes (el `Get()` que rehidrata desde el diario) — justo lo que hará el [Command Handler](el-command-handler.md) en cada comando.
+
+Y como `Suspender` ahora puede devolver `null`, **comprueba antes de archivar** (no metas `null` en el diario):
+
+```csharp
+var hecho = orden2.Suspender("falta de pago");
+if (hecho is not null) stream.Append(hecho);
+```
 
 > [!IMPORTANT]
 > 🏷️ **Dos motivos distintos para NO emitir un hecho — no los confundas:**

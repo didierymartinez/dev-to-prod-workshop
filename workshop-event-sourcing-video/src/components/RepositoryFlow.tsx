@@ -1,84 +1,82 @@
 import React from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 import { theme } from "../theme";
-import { EASE, clamp, Arrow, Caption } from "./mechanics";
+import { EASE, clamp, CodePanel, Caption } from "./mechanics";
 
-// Mecanismo de «El flujo de vida»: el Repositorio (EventStream<T>).
-// Append(hecho) deja caer un hecho en la lista ESCONDIDA; Get() la recorre con
-// Load y SALE una Empresa rehidratada. El consumidor nunca toca la lista cruda.
+// Mecanismo de «El flujo de vida»: el Repositorio (EventStream<T>) con código sincronizado.
+// Append(hecho) (línea encendida) mete el hecho en la lista escondida; Get()→Load() (líneas
+// encendidas) la recorre y SALE una Empresa rehidratada. El consumidor nunca toca la lista.
 
+const CODE = [
+  "public void Append(object hecho)",
+  "    => _historia.Add(hecho);",
+  "",
+  "public T Get()",
+  "{",
+  "    var entidad = new T();",
+  "    entidad.Load(_historia);",
+  "    return entidad;",
+  "}",
+];
 const APPENDS = [
   { name: "EmpresaRegistrada", detail: '"Andes","Básico"' },
   { name: "PlanCambiado", detail: '"Premium"' },
 ];
 
-export const INTRO = 12;
-export const APPEND = 46;
-const GET_GAP = 26;
-const GET_DUR = 74;
-export const HOLD = 50;
+export const INTRO = 14;
+export const APPEND = 48;
+const GET_GAP = 28;
+const GET_DUR = 84;
+export const HOLD = 56;
 export const GET_START = INTRO + APPENDS.length * APPEND + GET_GAP;
 export const REPOSITORY_DURATION = GET_START + GET_DUR + HOLD;
 
 export const RepositoryFlow: React.FC<{ accent: string }> = ({ accent }) => {
   const frame = useCurrentFrame();
-  const inAppendPhase = frame < GET_START;
+  const appendActive = frame < GET_START;
   const getActive = frame >= GET_START;
-  const getPulse = getActive
-    ? interpolate(frame, [GET_START, GET_START + 16, GET_START + 52], [0, 1, 0.35], clamp)
-    : 0;
-  const emerge = interpolate(frame, [GET_START + 22, GET_START + 62], [0, 1], { easing: EASE, ...clamp });
+  const emerge = interpolate(frame, [GET_START + 24, GET_START + 66], [0, 1], { easing: EASE, ...clamp });
   const finished = frame >= GET_START + GET_DUR - 6;
 
+  const glow = (idx: number) => {
+    if (idx === 0 || idx === 1) {
+      return appendActive
+        ? interpolate(frame, [INTRO, INTRO + 10], [0, 0.7], clamp)
+        : interpolate(frame, [GET_START, GET_START + 16], [0.7, 0], clamp);
+    }
+    if (idx >= 3 && idx <= 8) {
+      const base = getActive ? interpolate(frame, [GET_START, GET_START + 18, GET_START + GET_DUR], [0, 0.6, 0.4], clamp) : 0;
+      return idx === 6 ? Math.min(1, base * 1.5) : base; // Load() más fuerte
+    }
+    return 0;
+  };
+
   return (
-    <AbsoluteFill
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 46,
-        padding: "150px 130px 200px",
-      }}
-    >
-      {/* CONSUMIDOR */}
-      <div style={{ width: 360, display: "flex", flexDirection: "column", gap: 18 }}>
-        <div style={{ textAlign: "center", fontFamily: theme.fontSans, fontSize: 28, fontWeight: 700, color: theme.textDim }}>
-          El consumidor
-        </div>
-        <Op label="Append(hecho)" accent={accent} active={inAppendPhase} />
-        <Op label=".Get()" accent={accent} active={getActive} />
-        <div style={{ color: theme.textDim, fontFamily: theme.fontSans, fontSize: 23, textAlign: "center", marginTop: 6 }}>
-          solo dos puertas — nunca toca la lista
-        </div>
-      </div>
+    <AbsoluteFill style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 44, paddingTop: 150, paddingBottom: 160, paddingLeft: 90, paddingRight: 90 }}>
+      {/* CÓDIGO: la clase EventStream<T>, con la línea activa */}
+      <CodePanel lines={CODE} glow={glow} accent={accent} width={760} title="EventStream<T> — el Repositorio" />
 
-      <Arrow color={accent} active={inAppendPhase} />
-
-      {/* EVENTSTREAM<T> — el repositorio con la lista escondida */}
-      <div style={{ width: 560, display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ textAlign: "center", fontFamily: theme.fontSans, fontSize: 28, fontWeight: 700, color: accent }}>
-          EventStream&lt;T&gt; — Repositorio
+      {/* VISUAL: la lista escondida + la Empresa que sale por Get */}
+      <div style={{ width: 620, display: "flex", flexDirection: "column", gap: 18 }}>
+        <div style={{ textAlign: "center", fontFamily: theme.fontSans, fontSize: 24, color: theme.textDim }}>
+          {appendActive ? "Append → cae en la lista escondida" : "Get() → Load() recorre y rehidrata"}
         </div>
         <div
           style={{
-            position: "relative",
             background: theme.panel,
             border: `3px solid ${accent}`,
-            borderRadius: 18,
-            padding: "22px 24px",
-            minHeight: 300,
-            scale: String(1 + getPulse * 0.03),
-            boxShadow: `0 0 ${20 + getPulse * 50}px ${accent}${getPulse > 0.1 ? "55" : "22"}`,
+            borderRadius: 16,
+            padding: "18px 22px",
           }}
         >
-          <div style={{ color: theme.textDim, fontFamily: theme.fontSans, fontSize: 22, marginBottom: 14 }}>
-            🔒 lista escondida (private _historia)
+          <div style={{ color: theme.textDim, fontFamily: theme.fontSans, fontSize: 20, marginBottom: 12 }}>
+            🔒 private _historia (escondida)
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {APPENDS.map((e, i) => {
               const landAt = INTRO + i * APPEND;
               const op = interpolate(frame, [landAt + 4, landAt + 26], [0, 1], { easing: EASE, ...clamp });
-              const x = interpolate(frame, [landAt + 4, landAt + 26], [-260, 0], { easing: EASE, ...clamp });
+              const x = interpolate(frame, [landAt + 4, landAt + 26], [-200, 0], { easing: EASE, ...clamp });
               if (frame < landAt + 2) return <div key={i} style={{ height: 0 }} />;
               return (
                 <div
@@ -90,9 +88,9 @@ export const RepositoryFlow: React.FC<{ accent: string }> = ({ accent }) => {
                     border: `1px solid ${accent}55`,
                     borderLeft: `5px solid ${accent}`,
                     borderRadius: 10,
-                    padding: "12px 16px",
+                    padding: "11px 15px",
                     fontFamily: theme.fontMono,
-                    fontSize: 24,
+                    fontSize: 22,
                     color: theme.text,
                   }}
                 >
@@ -102,34 +100,14 @@ export const RepositoryFlow: React.FC<{ accent: string }> = ({ accent }) => {
               );
             })}
           </div>
-          {getActive ? (
-            <div style={{ marginTop: 16, color: accent, fontFamily: theme.fontMono, fontSize: 22, opacity: getPulse > 0.05 ? 1 : 0.5 }}>
-              Get() → Load() recorre la lista…
-            </div>
-          ) : null}
         </div>
-      </div>
 
-      <Arrow color={accent} active={emerge > 0.1} />
-
-      {/* EMPRESA REHIDRATADA (sale por Get) */}
-      <div style={{ width: 420, display: "flex", flexDirection: "column", gap: 16, opacity: emerge }}>
-        <div style={{ textAlign: "center", fontFamily: theme.fontSans, fontSize: 28, fontWeight: 700, color: accent }}>
-          Empresa rehidratada
-        </div>
-        <div
-          style={{
-            translate: `${(1 - emerge) * -40}px 0px`,
-            background: theme.panel,
-            border: `3px solid ${accent}`,
-            borderRadius: 18,
-            padding: "22px 26px",
-            fontFamily: theme.fontMono,
-          }}
-        >
-          <Row k="Nombre" v="Andes" dim={theme.textDim} />
-          <Row k="Plan" v="Premium" dim={theme.textDim} />
-          <Row k="Suspendida" v="false" dim={theme.textDim} />
+        {/* Empresa rehidratada que sale */}
+        <div style={{ opacity: emerge, translate: `${(1 - emerge) * 30}px 0px`, display: "flex", alignItems: "center", gap: 16 }}>
+          <span style={{ fontSize: 40, color: accent }}>↓</span>
+          <div style={{ background: theme.panel, border: `2px solid ${accent}`, borderRadius: 14, padding: "14px 20px", fontFamily: theme.fontMono, fontSize: 24, color: theme.text }}>
+            new Empresa → <span style={{ color: accent }}>Plan: Premium</span>
+          </div>
         </div>
       </div>
 
@@ -137,42 +115,9 @@ export const RepositoryFlow: React.FC<{ accent: string }> = ({ accent }) => {
         {finished
           ? "Append para anotar, Get para rehidratar — la lista cruda nunca sale: eso es el Repositorio"
           : getActive
-            ? "▶ .Get() — instancia y reproduce la historia escondida"
-            : "▶ Append(hecho) — el hecho cae en la lista, sin que el consumidor la vea"}
+            ? "▶ .Get() → new T() + Load() reproduce la historia escondida"
+            : "▶ Append(hecho) → _historia.Add(hecho), sin que el consumidor la vea"}
       </Caption>
     </AbsoluteFill>
   );
 };
-
-const Op: React.FC<{ label: string; accent: string; active: boolean }> = ({ label, accent, active }) => (
-  <div
-    style={{
-      background: active ? `${accent}22` : theme.panel,
-      border: `2px solid ${active ? accent : theme.panelBorder}`,
-      borderRadius: 12,
-      padding: "16px 20px",
-      textAlign: "center",
-      fontFamily: theme.fontMono,
-      fontSize: 28,
-      color: active ? accent : theme.textDim,
-      fontWeight: 700,
-      scale: String(active ? 1.03 : 1),
-    }}
-  >
-    {label}
-  </div>
-);
-
-const Row: React.FC<{ k: string; v: string; dim: string }> = ({ k, v, dim }) => (
-  <div
-    style={{
-      display: "flex",
-      justifyContent: "space-between",
-      padding: "12px 0",
-      borderBottom: `1px solid ${theme.panelBorder}`,
-    }}
-  >
-    <span style={{ color: dim, fontSize: 26 }}>{k}</span>
-    <span style={{ color: theme.text, fontSize: 28, fontWeight: 700 }}>{v}</span>
-  </div>
-);

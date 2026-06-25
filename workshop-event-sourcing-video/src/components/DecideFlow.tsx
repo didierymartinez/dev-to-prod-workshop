@@ -1,184 +1,229 @@
 import React from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 import { theme } from "../theme";
-import { EASE, clamp, Arrow, Caption } from "./mechanics";
+import { EASE, clamp, CodePanel, Caption } from "./mechanics";
 
-// Mecanismo de «Decidir el futuro»: el agregado DECIDE mirando su estado.
-// Tres caminos animados: emite el hecho (✔), lo rechaza (validación), o no-op (idempotencia).
-// Clave: decide ≠ apply — decide PRODUCE el hecho; evolve lo aplica después.
+// Mecanismo de «Decidir el futuro»: el CICLO cargar → actuar → guardar, y la lección sutil
+// que el alumno descubre corriendo el código: `decide` NO muta la instancia en memoria.
+// Suspender() dos veces sobre el MISMO objeto emite las dos (Suspendida sigue false).
+// El no-op (idempotencia) solo aparece tras Append → Get (replay) sobre la entidad RECARGADA.
+// "El cambio vive en el diario, no en el objeto."
 
 const EMIT = "#6BCB77";
 const REJECT = "#FF5C5C";
 
-type Outcome = { kind: "emit" | "reject" | "noop"; label: string; tag: string; color: string };
-const BEATS: {
-  intent: string;
-  state: { Plan: string; Suspendida: string };
-  outcome: Outcome;
-}[] = [
-  {
-    intent: 'CambiarPlan("Enterprise")',
-    state: { Plan: "Premium", Suspendida: "false" },
-    outcome: { kind: "emit", label: 'PlanCambiado("Enterprise")', tag: "✔ emite el hecho", color: EMIT },
-  },
-  {
-    intent: 'CambiarPlan("Enterprise")',
-    state: { Plan: "Premium", Suspendida: "true" },
-    outcome: { kind: "reject", label: "throw ReglaDeNegocioException", tag: "✖ rechazado — validación", color: REJECT },
-  },
-  {
-    intent: 'Suspender("otro motivo")',
-    state: { Plan: "Premium", Suspendida: "true" },
-    outcome: { kind: "noop", label: "return null", tag: "∅ no-op — idempotencia", color: theme.textDim },
-  },
+const CODE = [
+  "public EmpresaSuspendida? Suspender(string motivo)",
+  "{",
+  "    if (Suspendida) return null;            // idempotencia",
+  "    return new EmpresaSuspendida(motivo);   // emite",
+  "}",
 ];
 
-export const INTRO = 10;
+type Beat = {
+  tag: string;
+  call: string;
+  susp: boolean;
+  line: number; // línea del método que decide (-1 = no aplica: es Get/Append)
+  badge: "reload" | "stale" | "read" | "save" | "none";
+  diary: { name: string; dup?: boolean }[];
+  note: string;
+  color: string;
+};
+
+export const INTRO = 12;
 export const BEAT = 80;
-export const HOLD = 56;
-export const DECIDE_DURATION = INTRO + BEATS.length * BEAT + HOLD;
+export const HOLD = 70;
+
+export const DECIDE_DURATION = INTRO + 6 * BEAT + HOLD;
 
 export const DecideFlow: React.FC<{ accent: string }> = ({ accent }) => {
   const frame = useCurrentFrame();
+
+  const BEATS: Beat[] = [
+    {
+      tag: "1 · CARGAR",
+      call: "var empresa = stream.Get();",
+      susp: false,
+      line: -1,
+      badge: "reload",
+      diary: [{ name: "EmpresaRegistrada" }],
+      note: "Get() rehidrata: el replay reconstruye → Suspendida = false",
+      color: accent,
+    },
+    {
+      tag: "2 · ACTUAR (decide)",
+      call: 'empresa.Suspender("falta de pago")',
+      susp: false,
+      line: 3,
+      badge: "read",
+      diary: [{ name: "EmpresaRegistrada" }],
+      note: "Suspendida=false → cae al return: EMITE el hecho. Ojo: la empresa en memoria NO muta.",
+      color: EMIT,
+    },
+    {
+      tag: "3 · GUARDAR",
+      call: "stream.Append(hecho);",
+      susp: false,
+      line: -1,
+      badge: "save",
+      diary: [{ name: "EmpresaRegistrada" }, { name: "EmpresaSuspendida" }],
+      note: "el hecho va al diario. Pero la empresa en memoria SIGUE Suspendida=false.",
+      color: accent,
+    },
+    {
+      tag: "⚠ LA TRAMPA — misma instancia, sin recargar",
+      call: "empresa.Suspender(...)   // otra vez",
+      susp: false,
+      line: 3,
+      badge: "stale",
+      diary: [{ name: "EmpresaRegistrada" }, { name: "EmpresaSuspendida" }, { name: "EmpresaSuspendida", dup: true }],
+      note: "el objeto está OBSOLETO → Suspendida sigue false → EMITE OTRA VEZ. El diario se suspende dos veces.",
+      color: REJECT,
+    },
+    {
+      tag: "5 · LA CURA — recargar primero",
+      call: "empresa = stream.Get();",
+      susp: true,
+      line: -1,
+      badge: "reload",
+      diary: [{ name: "EmpresaRegistrada" }, { name: "EmpresaSuspendida" }],
+      note: "Get() → el replay aplica el hecho guardado → AHORA Suspendida = true",
+      color: accent,
+    },
+    {
+      tag: "6 · NO-OP (idempotencia)",
+      call: "empresa.Suspender(...)",
+      susp: true,
+      line: 2,
+      badge: "read",
+      diary: [{ name: "EmpresaRegistrada" }, { name: "EmpresaSuspendida" }],
+      note: "if (Suspendida) return null → NO emite ✓. Funciona porque recargaste: el estado vino del diario.",
+      color: theme.textDim,
+    },
+  ];
+
   const t = frame - INTRO;
   const beat = t < 0 ? 0 : Math.min(BEATS.length - 1, Math.floor(t / BEAT));
   const b = t < 0 ? 0 : t - beat * BEAT;
-  const scenario = BEATS[beat];
+  const s = BEATS[beat];
   const finished = t >= BEATS.length * BEAT - 6;
 
-  const intentOpacity = interpolate(b, [4, 22], [0, 1], { easing: EASE, ...clamp });
-  const intentX = interpolate(b, [4, 22], [-40, 0], { easing: EASE, ...clamp });
-  const evalPulse = interpolate(b, [26, 36, 50], [0, 1, 0.3], clamp);
-  const decisiveFlash = interpolate(b, [26, 34, 52], [0, 1, 0.2], clamp);
-  const outcomeOpacity = interpolate(b, [42, 60], [0, 1], { easing: EASE, ...clamp });
-  const outcomeX = interpolate(b, [42, 60], [-30, 0], { easing: EASE, ...clamp });
+  const callIn = interpolate(b, [4, 18], [0, 1], { easing: EASE, ...clamp });
+  const lineGlow = (idx: number) =>
+    idx === s.line ? interpolate(b, [22, 32, BEAT], [0, 1, 0.7], clamp) : 0;
+  const suspFlash = s.badge === "reload" ? interpolate(b, [24, 34, 56], [0, 1, 0], clamp) : 0;
+
+  const suspColor = s.susp ? accent : theme.textDim;
+  const badgeText =
+    s.badge === "reload"
+      ? "⟳ recargada por Get() — estado del diario"
+      : s.badge === "stale"
+        ? "⚠ obsoleta — no recargada desde el diario"
+        : s.badge === "save"
+          ? "sin cambios (decide no mutó)"
+          : s.badge === "read"
+            ? "decide LEE este estado (no lo cambia)"
+            : "";
+  const badgeColor = s.badge === "stale" ? REJECT : s.badge === "reload" ? accent : theme.textDim;
 
   return (
-    <AbsoluteFill
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 40,
-        padding: "150px 120px 200px",
-      }}
-    >
-      {/* INTENCIÓN (comando) */}
-      <div style={{ width: 420, display: "flex", flexDirection: "column", gap: 18 }}>
-        <div style={{ textAlign: "center", fontFamily: theme.fontSans, fontSize: 28, fontWeight: 700, color: theme.textDim }}>
-          La intención (comando)
-        </div>
-        <div
-          style={{
-            opacity: intentOpacity,
-            translate: `${intentX}px 0px`,
-            background: theme.panel,
-            border: `2px solid ${accent}`,
-            borderRadius: 14,
-            padding: "22px 24px",
-            textAlign: "center",
-            fontFamily: theme.fontMono,
-            fontSize: 30,
-            color: theme.text,
-          }}
-        >
-          {scenario.intent}
-        </div>
+    <AbsoluteFill style={{ flexDirection: "column", alignItems: "center", justifyContent: "center", paddingTop: 150, paddingBottom: 150 }}>
+      {/* lo que se ejecuta ahora */}
+      <div
+        style={{
+          opacity: callIn,
+          background: theme.panel,
+          border: `2px solid ${s.color}`,
+          borderRadius: 12,
+          padding: "12px 24px",
+          fontFamily: theme.fontMono,
+          fontSize: 26,
+          color: theme.text,
+          marginBottom: 24,
+        }}
+      >
+        <span style={{ color: theme.textDim, fontWeight: 700 }}>{s.tag}: </span>
+        {s.call}
       </div>
 
-      <Arrow color={accent} active={b >= 20 && b < 44} />
+      <div style={{ display: "flex", gap: 36, alignItems: "stretch", justifyContent: "center" }}>
+        {/* método Suspender, con la línea que decide encendida */}
+        <CodePanel lines={CODE} glow={lineGlow} accent={accent} width={760} title="Suspender() — decide mirando su estado" maxFont={23} />
 
-      {/* EMPRESA DECIDE */}
-      <div style={{ width: 460, display: "flex", flexDirection: "column", gap: 14 }}>
-        <div style={{ textAlign: "center", fontFamily: theme.fontSans, fontSize: 28, fontWeight: 700, color: accent }}>
-          Empresa decide — mira su estado
-        </div>
-        <div
-          style={{
-            background: theme.panel,
-            border: `3px solid ${accent}`,
-            borderRadius: 18,
-            padding: "22px 26px",
-            scale: String(1 + evalPulse * 0.03),
-            boxShadow: `0 0 ${18 + evalPulse * 40}px ${accent}${evalPulse > 0.1 ? "55" : "22"}`,
-            fontFamily: theme.fontMono,
-          }}
-        >
-          <StateRow k="Plan" v={scenario.state.Plan} flash={0} />
-          <StateRow k="Suspendida" v={scenario.state.Suspendida} flash={decisiveFlash} accent={accent} />
-        </div>
-        <div style={{ textAlign: "center", color: theme.textDim, fontFamily: theme.fontSans, fontSize: 23, marginTop: 4 }}>
-          decide: <b style={{ color: accent }}>produce</b> el hecho · no muta el estado
-        </div>
-      </div>
-
-      <Arrow color={scenario.outcome.color} active={b >= 40} />
-
-      {/* RESULTADO */}
-      <div style={{ width: 460, display: "flex", flexDirection: "column", gap: 18 }}>
-        <div style={{ textAlign: "center", fontFamily: theme.fontSans, fontSize: 28, fontWeight: 700, color: theme.textDim }}>
-          El resultado
-        </div>
-        <div
-          style={{
-            opacity: outcomeOpacity,
-            translate: `${outcomeX}px 0px`,
-            background: `${scenario.outcome.color}1A`,
-            border: `2px solid ${scenario.outcome.color}`,
-            borderRadius: 14,
-            padding: "22px 24px",
-            textAlign: "center",
-          }}
-        >
-          <div style={{ fontFamily: theme.fontMono, fontSize: 26, color: theme.text, marginBottom: 12 }}>
-            {scenario.outcome.label}
+        {/* empresa en memoria: la protagonista (su Suspendida) */}
+        <div style={{ width: 360, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ color: accent, fontFamily: theme.fontSans, fontSize: 24, fontWeight: 700, textAlign: "center" }}>
+            empresa (en memoria)
           </div>
-          <div style={{ fontFamily: theme.fontSans, fontSize: 28, fontWeight: 700, color: scenario.outcome.color }}>
-            {scenario.outcome.tag}
+          <div
+            style={{
+              flex: 1,
+              border: `3px solid ${s.badge === "stale" ? REJECT : accent}`,
+              borderRadius: 16,
+              padding: "20px 22px",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              gap: 10,
+              background: suspFlash > 0.02 ? `${accent}22` : theme.panel,
+            }}
+          >
+            <div style={{ fontFamily: theme.fontMono, fontSize: 24, color: theme.textDim }}>Suspendida</div>
+            <div style={{ fontFamily: theme.fontMono, fontSize: 56, fontWeight: 800, color: suspColor, scale: String(1 + suspFlash * 0.12) }}>
+              {String(s.susp)}
+            </div>
+            {badgeText ? (
+              <div style={{ marginTop: 8, fontFamily: theme.fontSans, fontSize: 19, fontWeight: 600, color: badgeColor }}>
+                {badgeText}
+              </div>
+            ) : null}
           </div>
         </div>
+
+        {/* el diario (EventStream) */}
+        <div style={{ width: 440, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ color: accent, fontFamily: theme.fontSans, fontSize: 24, fontWeight: 700, textAlign: "center" }}>
+            el diario (stream)
+          </div>
+          <div style={{ flex: 1, background: theme.panel, border: `1px solid ${theme.panelBorder}`, borderRadius: 16, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
+            {s.diary.map((e, i) => {
+              const isLast = i === s.diary.length - 1;
+              const op = isLast ? interpolate(b, [26, 44], [0, 1], clamp) : 1;
+              const col = e.dup ? REJECT : accent;
+              return (
+                <div
+                  key={i}
+                  style={{
+                    opacity: op,
+                    background: theme.codeBg,
+                    border: `1px solid ${col}55`,
+                    borderLeft: `5px solid ${col}`,
+                    borderRadius: 9,
+                    padding: "10px 14px",
+                    fontFamily: theme.fontMono,
+                    fontSize: 21,
+                    color: e.dup ? REJECT : theme.text,
+                  }}
+                >
+                  #{i + 1} {e.name}
+                  {e.dup ? "  ⚠ duplicado" : ""}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
-      <Caption color={finished ? accent : theme.textDim}>
+      <Caption color={finished ? accent : s.color}>
         {finished
-          ? "decidir ≠ aplicar: decide produce (o no) el hecho; evolve lo aplica después"
-          : scenario.outcome.kind === "emit"
-            ? "▶ activa → CambiarPlan emite el hecho"
-            : scenario.outcome.kind === "reject"
-              ? "▶ suspendida → CambiarPlan es inválido: se rechaza (grita)"
-              : "▶ ya suspendida → Suspender es redundante: no-op (calla)"}
+          ? "el cambio vive en el diario, no en el objeto · cada comando: cargar → actuar → guardar (recargar entre comandos)"
+          : s.note}
       </Caption>
+
+      <div style={{ marginTop: 10, color: theme.textDim, fontFamily: theme.fontSans, fontSize: 20, textAlign: "center" }}>
+        su gemela es la <b style={{ color: accent }}>validación</b>: CambiarPlan <i>lanza</i> si está suspendida — una grita, la otra calla
+      </div>
     </AbsoluteFill>
   );
 };
-
-const StateRow: React.FC<{ k: string; v: string; flash: number; accent?: string }> = ({
-  k,
-  v,
-  flash,
-  accent,
-}) => (
-  <div
-    style={{
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "14px 12px",
-      borderRadius: 10,
-      background: accent ? `${accent}${flash > 0.02 ? "33" : "00"}` : "transparent",
-      borderBottom: `1px solid ${theme.panelBorder}`,
-    }}
-  >
-    <span style={{ color: theme.textDim, fontSize: 28 }}>{k}</span>
-    <span
-      style={{
-        color: accent && flash > 0.05 ? accent : theme.text,
-        fontSize: 30,
-        fontWeight: 700,
-        scale: String(1 + flash * 0.16),
-      }}
-    >
-      {v}
-    </span>
-  </div>
-);

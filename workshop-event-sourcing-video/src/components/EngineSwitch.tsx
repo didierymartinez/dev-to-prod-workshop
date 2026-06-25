@@ -1,198 +1,175 @@
 import React from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 import { theme } from "../theme";
-import { EASE, clamp, Slot, Arrow, EventCard, AggregateBox, Caption } from "./mechanics";
+import { EASE, clamp, CodePanel, Caption } from "./mechanics";
 
-// Mecanismo de «Refactorizando el motor»: el switch que enruta por TIPO.
-// Cada hecho enciende su `case` y dispara la mutación que le toca en el agregado.
-// El motor (Load) vive UNA vez en la base AggregateRoot; Empresa/Factura lo heredan.
+// Mecanismo de «Refactorizando el motor»: el HILO de 3 refactors encadenados.
+// El código evoluciona paso a paso (izquierda) mientras la SALIDA no cambia (derecha):
+// refactorizar cambia la forma, no el comportamiento. En el refactor 2 nace el Aggregate Root.
 
-const EVENTS = [
-  { name: "EmpresaRegistrada", detail: '"Andes","Básico"' },
-  { name: "PlanCambiado", detail: '"Premium"' },
-  { name: "EmpresaSuspendida", detail: '"falta de pago"' },
-  { name: "EmpresaReactivada", detail: "" },
-];
-const CASES = [
-  { match: "case EmpresaRegistrada", mut: "Nombre, Plan" },
-  { match: "case PlanCambiado", mut: "Plan" },
-  { match: "case EmpresaSuspendida", mut: "Suspendida" },
-  { match: "case EmpresaReactivada", mut: "Suspendida, Reactivaciones" },
-];
-type Estado = { Nombre: string; Plan: string; Suspendida: string; Reactivaciones: number };
-const INITIAL: Estado = { Nombre: "—", Plan: "—", Suspendida: "—", Reactivaciones: 0 };
-const STATES: Estado[] = [
-  { Nombre: "Andes", Plan: "Básico", Suspendida: "false", Reactivaciones: 0 },
-  { Nombre: "Andes", Plan: "Premium", Suspendida: "false", Reactivaciones: 0 },
-  { Nombre: "Andes", Plan: "Premium", Suspendida: "true", Reactivaciones: 0 },
-  { Nombre: "Andes", Plan: "Premium", Suspendida: "false", Reactivaciones: 1 },
-];
-const CHANGED: (keyof Estado)[][] = [
-  ["Nombre", "Plan"],
-  ["Plan"],
-  ["Suspendida"],
-  ["Suspendida", "Reactivaciones"],
-];
-const FIELDS: (keyof Estado)[] = ["Nombre", "Plan", "Suspendida", "Reactivaciones"];
+type Beat = { tag: string; code: string[]; glow: number[]; note: string; reuse: boolean; color: string };
 
-export const INTRO = 16;
-export const BEAT = 52;
-export const HOLD = 60;
-export const ENGINE_SWITCH_DURATION = INTRO + EVENTS.length * BEAT + HOLD;
+export const INTRO = 12;
+export const BEAT = 92;
+export const HOLD = 76;
+const N = 4;
+export const ENGINE_SWITCH_DURATION = INTRO + N * BEAT + HOLD;
 
 export const EngineSwitch: React.FC<{ accent: string }> = ({ accent }) => {
   const frame = useCurrentFrame();
-  const t = frame - INTRO;
-  const beat = t < 0 ? -1 : Math.min(EVENTS.length - 1, Math.floor(t / BEAT));
-  const b = t < 0 ? 0 : t - beat * BEAT;
-  const applied = beat >= 0 && b >= 30;
-  const shownIdx = beat < 0 ? -1 : applied ? beat : beat - 1;
-  const shown = shownIdx >= 0 ? STATES[shownIdx] : INITIAL;
-  const finished = t >= EVENTS.length * BEAT - 6;
 
-  const caseGlow = (i: number) =>
-    i === beat ? interpolate(b, [4, 16, 44], [0, 1, 0.55], clamp) : 0;
-  const fieldFlash = (f: keyof Estado) =>
-    beat >= 0 && CHANGED[beat].includes(f)
-      ? interpolate(b, [30, 37, 50], [0, 1, 0], clamp)
-      : 0;
+  const BEATS: Beat[] = [
+    {
+      tag: "punto de partida — el if que crece",
+      code: [
+        "public Empresa(IEnumerable<object> historia)",
+        "{",
+        "    foreach (var hecho in historia)",
+        "    {",
+        "        if (hecho is EmpresaRegistrada r) { Nombre=r.Nombre; Plan=r.Plan; }",
+        "        if (hecho is PlanCambiado p)      { Plan=p.NuevoPlan; }",
+        "        if (hecho is EmpresaSuspendida)   { Suspendida=true; }",
+        "        if (hecho is EmpresaReactivada)   { Suspendida=false; Reactivaciones++; }",
+        "    }",
+        "}",
+      ],
+      glow: [4, 5, 6, 7],
+      note: "el constructor recorre Y aplica; cada hecho nuevo es otro if, y con una Factura copiarías todo el bucle.",
+      reuse: false,
+      color: theme.pain,
+    },
+    {
+      tag: "refactor 1 · separar «recorrer» de «aplicar»",
+      code: [
+        "public Empresa(IEnumerable<object> historia)",
+        "{",
+        "    foreach (var hecho in historia)",
+        "        Aplicar(hecho);              // recorrer",
+        "}",
+        "",
+        "private void Aplicar(object hecho)   // aplicar (aparte)",
+        "{",
+        "    if (hecho is EmpresaRegistrada r) { Nombre=r.Nombre; Plan=r.Plan; }",
+        "    if (hecho is PlanCambiado p)      { Plan=p.NuevoPlan; }",
+        "    // …",
+        "}",
+      ],
+      glow: [3, 6],
+      note: "responsabilidad única: el foreach solo recorre; Aplicar tiene la lógica de cada hecho.",
+      reuse: false,
+      color: accent,
+    },
+    {
+      tag: "refactor 2 · el motor sube a la base 🎉 nace el Aggregate Root",
+      code: [
+        "public abstract class AggregateRoot",
+        "{",
+        "    public void Load(IEnumerable<object> historia)   // el motor, UNA vez",
+        "    {",
+        "        foreach (var hecho in historia) Aplicar(hecho);",
+        "    }",
+        "    protected abstract void Aplicar(object hecho);",
+        "}",
+        "",
+        "public class Empresa : AggregateRoot",
+        "{",
+        "    public Empresa(IEnumerable<object> h) => Load(h);",
+        "    protected override void Aplicar(object hecho) { /* los ifs */ }",
+        "}",
+      ],
+      glow: [0, 1, 2, 3, 4, 5, 6, 7],
+      note: "el motor Load se escribe UNA vez en la base; Empresa —y mañana Factura— lo heredan y solo aportan su Aplicar.",
+      reuse: true,
+      color: accent,
+    },
+    {
+      tag: "refactor 3 · del if encadenado al switch por tipo",
+      code: [
+        "protected override void Aplicar(object hecho)",
+        "{",
+        "    switch (hecho)",
+        "    {",
+        "        case EmpresaRegistrada r: Nombre=r.Nombre; Plan=r.Plan; break;",
+        "        case PlanCambiado p:      Plan=p.NuevoPlan; break;",
+        "        case EmpresaSuspendida:   Suspendida=true; break;",
+        "        case EmpresaReactivada:   Suspendida=false; Reactivaciones++; break;",
+        "    }",
+        "}",
+      ],
+      glow: [2, 3, 4, 5, 6, 7, 8],
+      note: "los if → un switch por tipo (pattern matching): un case por hecho, tipado y fácil de crecer.",
+      reuse: true,
+      color: accent,
+    },
+  ];
+
+  const t = frame - INTRO;
+  const beat = t < 0 ? 0 : Math.min(N - 1, Math.floor(t / BEAT));
+  const b = t < 0 ? 0 : t - beat * BEAT;
+  const s = BEATS[beat];
+  const finished = t >= N * BEAT - 6;
+
+  const tagIn = interpolate(b, [4, 18], [0, 1], { easing: EASE, ...clamp });
+  const codeIn = interpolate(b, [8, 24], [0, 1], { easing: EASE, ...clamp });
+  const glowAmt = interpolate(b, [22, 34, BEAT], [0, 1, 0.55], clamp);
+  const reuseIn = s.reuse ? interpolate(b, [30, 48], [0, 1], { easing: EASE, ...clamp }) : 0;
 
   return (
-    <AbsoluteFill
-      style={{
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        paddingBottom: 60,
-      }}
-    >
-      {/* nota de reutilización (secundaria, arriba) */}
+    <AbsoluteFill style={{ flexDirection: "column", alignItems: "center", justifyContent: "center", paddingTop: 150, paddingBottom: 150 }}>
+      {/* qué refactor estamos haciendo */}
       <div
         style={{
+          opacity: tagIn,
+          background: theme.panel,
+          border: `2px solid ${s.color}`,
+          borderRadius: 12,
+          padding: "12px 26px",
           fontFamily: theme.fontSans,
-          fontSize: 26,
-          color: theme.textDim,
-          marginBottom: 28,
+          fontSize: 28,
+          fontWeight: 700,
+          color: theme.text,
+          marginBottom: 24,
         }}
       >
-        el motor <span style={{ color: accent, fontWeight: 700 }}>Load()</span> vive una vez en la base{" "}
-        <span style={{ color: accent, fontWeight: 700 }}>AggregateRoot</span> — Empresa, Factura… lo heredan
+        <span style={{ color: s.color }}>{beat + 1}/{N}</span> · {s.tag}
       </div>
 
-      <div
-        style={{
-          flexDirection: "row",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 48,
-        }}
-      >
-        {/* STREAM */}
-        <Slot title="El Stream" color={theme.textDim} width={440}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {EVENTS.map((e, i) => (
-              <EventCard
-                key={i}
-                index={i + 1}
-                name={e.name}
-                detail={e.detail}
-                accent={accent}
-                state={i === beat ? "active" : i < beat || (i === beat && applied) ? "consumed" : "pending"}
-                opacity={interpolate(frame, [i * 4, i * 4 + 12], [0, 1], clamp)}
-              />
-            ))}
+      <div style={{ display: "flex", gap: 36, alignItems: "stretch", justifyContent: "center", opacity: codeIn }}>
+        {/* el código que EVOLUCIONA */}
+        <CodePanel
+          lines={s.code}
+          glow={(i) => (s.glow.includes(i) ? glowAmt : 0)}
+          accent={s.color === theme.pain ? theme.pain : accent}
+          width={1020}
+          title="el motor (evoluciona paso a paso)"
+        />
+
+        {/* la salida que NO cambia */}
+        <div style={{ width: 480, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ color: accent, fontFamily: theme.fontSans, fontSize: 24, fontWeight: 700, textAlign: "center" }}>
+            la salida — no cambia
           </div>
-        </Slot>
-
-        <Arrow color={accent} active={beat >= 0 && b < 30} />
-
-        {/* SWITCH (Aplicar por tipo) */}
-        <Slot title="switch (hecho) — enruta por tipo" color={accent} width={520}>
-          <div
-            style={{
-              background: theme.codeBg,
-              border: `2px solid ${accent}`,
-              borderRadius: 16,
-              padding: "20px 22px",
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
-            }}
-          >
-            {CASES.map((c, i) => {
-              const g = caseGlow(i);
-              return (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "12px 16px",
-                    borderRadius: 10,
-                    background: `${accent}${g > 0.02 ? "33" : "00"}`,
-                    border: `1px solid ${g > 0.4 ? accent : "transparent"}`,
-                    fontFamily: theme.fontMono,
-                    fontSize: 23,
-                  }}
-                >
-                  <span style={{ color: g > 0.3 ? accent : theme.text }}>{c.match}</span>
-                  <span style={{ color: theme.textDim }}>→ {c.mut}</span>
-                </div>
-              );
-            })}
+          <div style={{ background: theme.panel, border: `2px solid ${accent}`, borderRadius: 16, padding: "20px 22px", display: "flex", flexDirection: "column", justifyContent: "center", flex: 1, gap: 14 }}>
+            <div style={{ fontFamily: theme.fontMono, fontSize: 23, color: theme.text, lineHeight: 1.5 }}>
+              Constructora Andes:
+              <br />
+              plan <span style={{ color: accent }}>Premium</span>, suspendida,
+              <br />
+              reactivada <span style={{ color: accent }}>1</span> vez
+            </div>
+            <div style={{ fontFamily: theme.fontSans, fontSize: 20, color: theme.textDim }}>
+              ✓ refactorizar cambia la forma, no el comportamiento
+            </div>
+            {/* reutilización: aparece al nacer el Aggregate Root */}
+            <div style={{ opacity: reuseIn, marginTop: 6, background: `${accent}1A`, border: `1px solid ${accent}66`, borderRadius: 10, padding: "12px 14px", fontFamily: theme.fontSans, fontSize: 21, color: accent, fontWeight: 600 }}>
+              ♻ Empresa · Factura · Pedido → heredan AggregateRoot
+            </div>
           </div>
-        </Slot>
-
-        <Arrow color={accent} active={applied} />
-
-        {/* AGGREGATE */}
-        <AggregateBox
-          accent={accent}
-          title="Empresa — Aggregate Root"
-          width={460}
-          note="🔒 frontera: se muta solo aquí"
-        >
-          {FIELDS.map((f) => {
-            const flash = fieldFlash(f);
-            return (
-              <div
-                key={f}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "12px 12px",
-                  borderRadius: 10,
-                  background: `${accent}${flash > 0.01 ? "33" : "00"}`,
-                  borderBottom: `1px solid ${theme.panelBorder}`,
-                  fontFamily: theme.fontMono,
-                }}
-              >
-                <span style={{ color: theme.textDim, fontSize: 26 }}>{f}</span>
-                <span
-                  style={{
-                    color: flash > 0.05 ? accent : theme.text,
-                    fontSize: 28,
-                    fontWeight: 700,
-                    scale: String(1 + flash * 0.16),
-                  }}
-                >
-                  {String(shown[f])}
-                </span>
-              </div>
-            );
-          })}
-        </AggregateBox>
+        </div>
       </div>
 
       <Caption color={finished ? accent : theme.textDim}>
-        {finished
-          ? "un case por tipo, tipado y seguro — el if que crecía feo, domado"
-          : beat >= 0
-            ? `▶ hecho ${beat + 1}/${EVENTS.length}: ${EVENTS[beat].name} → enciende su case`
-            : "▶ cada hecho entra al switch…"}
+        {finished ? "tres refactors, mismo resultado: un motor de replay reutilizable y tipado" : s.note}
       </Caption>
     </AbsoluteFill>
   );

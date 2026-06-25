@@ -1,6 +1,8 @@
 import React from "react";
 import { Easing } from "remotion";
+import { fitText } from "@remotion/layout-utils";
 import { theme } from "../theme";
+import { tokenize } from "../highlight";
 
 // Primitivas compartidas por las animaciones de mecanismo (la "evolución/flujo").
 // Buenas prácticas del skill: interpolate() + Easing.bezier (sin spring),
@@ -8,6 +10,86 @@ import { theme } from "../theme";
 
 export const EASE = Easing.bezier(0.16, 1, 0.3, 1);
 export const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
+
+/** Alfa hex de 2 dígitos a partir de 0..1. */
+export const hexA = (n: number) =>
+  Math.round(Math.max(0, Math.min(1, n)) * 255)
+    .toString(16)
+    .padStart(2, "0");
+
+/** Renderiza una línea de código C# con resaltado de sintaxis. */
+const renderCode = (line: string) =>
+  tokenize(line).length === 0
+    ? " "
+    : tokenize(line).map((tk, j) => (
+        <span key={j} style={{ color: tk.kind === "ws" ? undefined : theme.syntax[tk.kind] }}>
+          {tk.text}
+        </span>
+      ));
+
+/** Panel de código real con la(s) línea(s) activa(s) resaltada(s), tamaño medido con fitText.
+ *  `glow(idx)` devuelve 0..1 para encender cada línea en sincronía con la animación. */
+export const CodePanel: React.FC<{
+  lines: string[];
+  glow: (idx: number) => number;
+  accent: string;
+  width?: number;
+  title?: string;
+  maxFont?: number;
+}> = ({ lines, glow, accent, width = 1080, title, maxFont = 25 }) => {
+  const PAD = 28;
+  const longest = lines.reduce((a, l) => (l.length > a.length ? l : a), "");
+  const font = Math.min(
+    maxFont,
+    Math.floor(
+      fitText({
+        text: longest || " ",
+        withinWidth: width - PAD * 2,
+        fontFamily: theme.fontMonoFamily,
+        fontWeight: "normal",
+      }).fontSize,
+    ),
+  );
+  return (
+    <div style={{ width, display: "flex", flexDirection: "column", gap: 12 }}>
+      {title ? (
+        <div style={{ color: accent, fontFamily: theme.fontSans, fontSize: 26, fontWeight: 700, textAlign: "center" }}>
+          {title}
+        </div>
+      ) : null}
+      <div
+        style={{
+          background: theme.codeBg,
+          border: `1px solid ${theme.panelBorder}`,
+          borderRadius: 16,
+          padding: `${PAD - 6}px ${PAD}px`,
+          fontFamily: theme.fontMono,
+          fontSize: font,
+          lineHeight: 1.6,
+          whiteSpace: "pre",
+        }}
+      >
+        {lines.map((line, idx) => {
+          const g = glow(idx);
+          return (
+            <div
+              key={idx}
+              style={{
+                background: `${accent}${g > 0.02 ? hexA(g * 0.32) : "00"}`,
+                borderLeft: `4px solid ${g > 0.3 ? accent : "transparent"}`,
+                borderRadius: 6,
+                paddingLeft: 10,
+                marginLeft: -10,
+              }}
+            >
+              {renderCode(line)}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 /** Columna con título centrado y un slot de contenido (layout en flex, no absoluto). */
 export const Slot: React.FC<{
