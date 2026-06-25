@@ -12,6 +12,7 @@ import { RepositoryFlow } from "./components/RepositoryFlow";
 import { DecideFlow } from "./components/DecideFlow";
 import { LooseToClass } from "./components/LooseToClass";
 import { CodeLeap } from "./components/CodeLeap";
+import { BeatSequence } from "./components/BeatSequence";
 
 type SceneProps = { section: Section; durationInFrames: number };
 
@@ -110,7 +111,7 @@ export const PainScene: React.FC<SceneProps> = ({ section, durationInFrames }) =
             lineHeight: 1.1,
           }}
         >
-          {section.pain.title}
+          {section.pain?.title}
         </h2>
       </FadeUp>
       <FadeUp delay={16}>
@@ -124,7 +125,7 @@ export const PainScene: React.FC<SceneProps> = ({ section, durationInFrames }) =
             margin: 0,
           }}
         >
-          {section.pain.text}
+          {section.pain?.text}
         </p>
       </FadeUp>
     </AbsoluteFill>
@@ -237,7 +238,8 @@ const LABELS: Record<NonNullable<Section["mechanism"]>, string> = {
   "replay-evolve": "⚙️ El mecanismo — el Replay (evolve)",
   "engine-switch": "⚙️ El mecanismo — el switch que enruta por tipo",
   "repository": "📦 El mecanismo — Append / Get (el Repositorio)",
-  "decide": "🧭 El mecanismo — decidir (emite · rechaza · no-op)",
+  "decide": "🧭 El mecanismo — decidir · cargar→actuar→guardar",
+  "beats": "⚙️ El mecanismo — paso a paso",
 };
 
 const renderMechanism = (section: Section) => {
@@ -252,6 +254,8 @@ const renderMechanism = (section: Section) => {
       return <RepositoryFlow accent={section.accent} />;
     case "decide":
       return <DecideFlow accent={section.accent} />;
+    case "beats":
+      return <BeatSequence accent={section.accent} beats={section.beats ?? []} />;
     default:
       return null;
   }

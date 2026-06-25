@@ -8,6 +8,8 @@ Dejar de ensamblar el sistema con `new` por todos lados, y que algo lo arme por 
 
 ## El problema: el infierno de los `new`
 
+Ese `new SuspenderHandler(...)` no es nuevo: lo vienes escribiendo **a mano** desde [El despachador](el-despachador.md) (donde registrabas `Registrar(new SuspenderHandler(stream))`) y en cada handler del almacén y de async. Es el dolor que se venía sembrando — hoy le ponemos nombre y se lo quitamos.
+
 ```csharp
 var almacen = new InMemoryEventStore();
 var handler = new SuspenderHandler(almacen);
@@ -51,6 +53,7 @@ var services = new ServiceCollection();
 
 services.AddSingleton<InMemoryEventStore>();   // UNO solo para toda la app
 services.AddTransient<SuspenderHandler>();     // uno NUEVO cada vez que lo pidan
+services.AddTransient<CambiarPlanHandler>();   // y el otro handler que ya tienes (con 50, esto crece)
 
 var proveedor = services.BuildServiceProvider();
 
@@ -68,9 +71,12 @@ Sin un solo `new` nuestro: el contenedor armó el grafo.
 > [!NOTE]
 > **Los tiempos de vida** importan: `AddSingleton` (una instancia para toda la app), `AddScoped` (una por petición/mensaje), `AddTransient` (una nueva cada vez). Trampa clásica (*captive dependency*): meter un `Scoped` dentro de un `Singleton` lo "congela" con la primera instancia — un bug silencioso. Lo retomaremos cuando importe.
 
+> [!NOTE]
+> 🌱 **Semilla — hoy `Singleton`, mañana `Scoped`.** Registramos el almacén como `AddSingleton` porque el `InMemoryEventStore` no tiene estado por petición. Pero **no automatices "almacén = Singleton"**: cuando llegue **Marten** ([El gran reveal — Marten](revelar-marten.md)), el almacén será una **sesión por petición/mensaje** → se registrará **`Scoped`**.
+
 ## 🧬 Desarmemos la "magia": un mini-contenedor en ~20 líneas
 
-Dijimos "el recepcionista lo fabrica por arte de magia". No hay magia: un contenedor es **un diccionario + reflexión del constructor + recursión**. Construyamos uno de juguete para probarlo:
+Dijimos "el recepcionista lo fabrica por arte de magia". No hay magia: un contenedor es **un diccionario + reflexión del constructor + recursión**. Construyamos uno de juguete para probarlo — es el mismo patrón didáctico del **`Despachador`** de [El despachador](el-despachador.md): un juguete para *entender* (allá, el ruteo por tipo; aquí, el ensamblado de dependencias) antes de usar la herramienta de verdad:
 
 ```csharp
 public class MiniContenedor

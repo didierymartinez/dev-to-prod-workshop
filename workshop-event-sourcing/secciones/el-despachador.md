@@ -148,6 +148,8 @@ Ninguna de las dos apareció "porque sí" en [El Command Handler](el-command-han
 
 > [!NOTE]
 > 💡 **El `Despachador` es un andamio para *entender*, no para arrastrar.** Lo construiste para **sentir** por qué hacían falta el tipo-comando y el contrato. Pero es un juguete didáctico: en la próxima sección el handler cambiará (recibirá el almacén), y luego se volverá async — y este `Despachador` sencillo dejará de encajar. **Constrúyelo, pruébalo… y déjalo de lado** — no lo lleves a las siguientes secciones. El despachador *de verdad* lo pone Wolverine.
+>
+> Dos cosas para anotar de su **cableado** (`Registrar(new SuspenderHandler(stream))`): (1) ata cada handler a **un** stream fijo — solo sirve con **una** empresa; cuando llegue el almacén-por-id ([El almacén en memoria](el-almacen-en-memoria.md)), el handler abrirá el stream **por id dentro de `Handle`**, no lo recibirá ya fijado. (2) Ese `new …` a mano —el del `Registrar` y el de cada handler— es el **germen del "infierno de los `new`"** que despacharás con **inyección de dependencias** unas secciones más adelante.
 
 ---
 

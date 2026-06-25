@@ -1,5 +1,7 @@
 # El almacén en memoria (Event Store)
 
+Acabas de construir el **`Despachador`** y, tal como te dije, lo dejaste de lado: era un andamio para *entender* el ruteo por tipo. Retomamos el hilo donde de verdad sigue — el ciclo **cargar → decidir → guardar** de [El Command Handler](el-command-handler.md), con su sobre `EventoAlmacenado` y su `Version`.
+
 Tu `EventStream` ya **lee** (`Get`), **escribe** (`Append`) y **numera** (el sobre `EventoAlmacenado`) la historia de **una** empresa, y un Command Handler orquesta el ciclo. Pero todo eso vive sobre **un** stream suelto. Con **mil** empresas tendrías mil streams sueltos flotando en el programa. Falta un **almacén central** que custodie la historia de **todas** y te dé la correcta por su **id** — y que, ahora que habrá varios escritores, **detecte los choques**.
 
 ## 🎯 El Objetivo
