@@ -1,8 +1,8 @@
 # El almacén en memoria (Event Store)
 
-Acabas de construir el **`Despachador`** y, tal como te dije, lo dejaste de lado: era un andamio para *entender* el ruteo por tipo. Retomamos el hilo donde de verdad sigue — el ciclo **cargar → decidir → guardar** de [El Command Handler](el-command-handler.md), con su sobre `EventoAlmacenado` y su `Version`.
+Acabas de construir el **`Despachador`** y, tal como te dije, lo dejaste de lado: era un andamio para *entender* el ruteo por tipo. Retomamos el hilo donde de verdad sigue — el ciclo **cargar → decidir → guardar** de [El Command Handler](el-command-handler.md).
 
-Tu `EventStream` ya **lee** (`Get`), **escribe** (`Append`) y **numera** (el sobre `EventoAlmacenado`) la historia de **una** empresa, y un Command Handler orquesta el ciclo. Pero todo eso vive sobre **un** stream suelto. Con **mil** empresas tendrías mil streams sueltos flotando en el programa. Falta un **almacén central** que custodie la historia de **todas** y te dé la correcta por su **id** — y que, ahora que habrá varios escritores, **detecte los choques**.
+Tu `EventStream` ya **lee** (`Get`) y **escribe** (`Append`) la historia de **una** empresa, y un Command Handler orquesta el ciclo. Pero todo eso vive sobre **un** stream suelto. Con **mil** empresas tendrías mil streams sueltos flotando en el programa. Falta un **almacén central** que custodie la historia de **todas** y te dé la correcta por su **id** — y que, ahora que habrá varios escritores, **detecte los choques**.
 
 ## 🎯 El Objetivo
 
@@ -22,9 +22,23 @@ public abstract class AggregateRoot
 }
 ```
 
+## 🔢 El sobre: numerar cada hecho
+
+Antes de guardar muchas historias juntas, conviene **numerar** cada hecho. Una vez archivado, cada hecho ocupa una **posición fija** en la historia de su empresa: el 1.º, el 2.º, el 3.º… Esa posición es su **versión**. La grabamos (con la fecha) junto al hecho, en un **sobre**:
+
+```csharp
+// el sobre: envuelve el hecho con su POSICIÓN en el stream y cuándo se anotó
+public record EventoAlmacenado(int Version, DateTime Timestamp, object EventData);
+```
+
+> 💡 El sobre **no** lleva quién es la empresa: el cajón **ya es** de una empresa (su id es el rótulo). Solo añade lo que el hecho por sí mismo no sabe: su **posición** y su fecha. Al **leer**, se desenvuelve — al agregado le interesa el hecho, no el sobre.
+
+> [!NOTE]
+> 🌱 **Semilla — ¿para qué numerar?** Hoy el número parece decorativo. Pero es la **llave** para detectar conflictos: cuando haya **varios escritores** sobre el mismo stream, comparar *"¿la versión que esperabas sigue libre?"* es lo que evita que dos escrituras se pisen. Eso es la **concurrencia optimista**, y la construyes **en esta misma sección, más abajo**.
+
 ## El almacén: un cajón por empresa
 
-El almacén guarda los hechos de **cada empresa en su propio cajón**, rotulado con su id. En C#, eso es un **`Dictionary`**: la llave es el id; el valor, la lista ordenada de **sobres** (`EventoAlmacenado`, que ya conoces de [El Command Handler](el-command-handler.md)) de esa empresa.
+El almacén guarda los hechos de **cada empresa en su propio cajón**, rotulado con su id. En C#, eso es un **`Dictionary`**: la llave es el id; el valor, la lista ordenada de **sobres** (`EventoAlmacenado`, que **acabas de crear** arriba) de esa empresa.
 
 > 🛠️ **Inténtalo tú.** Crea la clase `InMemoryEventStore` (vive en RAM) con un `Dictionary<string, List<EventoAlmacenado>>` (la llave = el id). Dale dos métodos donde **el id es un parámetro**: `GetEvents(string aggregateId)` que devuelve la lista de ese cajón (o vacía si no existe), y `AppendEvent(string aggregateId, EventoAlmacenado evento)` que mete el sobre en ese cajón.
 
@@ -71,7 +85,7 @@ public EventStream<T> AbrirStream<T>(string aggregateId) where T : AggregateRoot
 ```
 
 ```csharp
-// 🔁 Reemplaza el EventStream<T> de «El Command Handler»: ya no guarda la lista; habla con el almacén
+// 🔁 Reemplaza el EventStream<T> de «El flujo de vida»: ya no guarda la lista; habla con el almacén y numera con el sobre
 public class EventStream<T> where T : AggregateRoot, new()
 {
     private readonly InMemoryEventStore _store;
@@ -170,7 +184,7 @@ a.Append(new EmpresaSuspendida("falta de pago"));   // A la suspende
 b.Append(new PlanCambiado("Enterprise"));            // B le cambia el plan
 ```
 
-Ambas escrituras entran tan tranquilas. Pero **B decidió "Enterprise" mirando una empresa que A acababa de suspender** — trabajó sobre un estado que ya no era cierto, y nadie se dio cuenta. Aquí cobra sentido la **versión** que ya pones en cada sobre ([El Command Handler](el-command-handler.md)): cada hecho declara **en qué posición** entra; si esa posición ya está ocupada, es que alguien escribió primero. El almacén lo **rechaza**:
+Ambas escrituras entran tan tranquilas. Pero **B decidió "Enterprise" mirando una empresa que A acababa de suspender** — trabajó sobre un estado que ya no era cierto, y nadie se dio cuenta. Aquí cobra sentido la **versión** que pusiste en cada sobre (el `EventoAlmacenado` de «🔢 El sobre», arriba): cada hecho declara **en qué posición** entra; si esa posición ya está ocupada, es que alguien escribió primero. El almacén lo **rechaza**:
 
 ```csharp
 public class ConcurrencyException(string mensaje) : Exception(mensaje);

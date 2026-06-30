@@ -95,11 +95,50 @@ public class SuspenderHandler(EventStream<Empresa> stream) : ICommandHandler<Sus
 > [!NOTE]
 > **¿Y por qué una interfaz, no una clase abstracta como `AggregateRoot`?** En [Refactorizando el motor](refactorizando-el-motor.md) elegiste una **clase abstracta** porque había **código y estado compartidos** que heredar (el bucle `Load`, el `Id`). Aquí es al revés: los handlers **no comparten implementación** —el `Handle` de uno no tiene nada que ver con el del otro—, así que no hay nada que heredar. Solo necesitas un **contrato**: *"sé manejar `TCommand`"*. Eso es una **interfaz** (y un handler puede cumplir varias; una clase base le gastaría su única herencia).
 
-## 🔧 La tabla: el despachador
+## 🔧 La tabla, a mano primero
 
-Con las dos piezas en mano, el despachador es una **tabla** que mapea **el tipo del comando** a **su handler**: registras cada uno una vez, y despachar es **buscar por el tipo** del comando que llega.
+Con las dos piezas en mano, el despachador es una **tabla** que mapea **el tipo del comando** a una función que lo maneja: registras cada handler una vez, y despachar es **buscar por el tipo** del comando que llega. Antes de envolverla en una clase, **constrúyela a mano** — para *ver* qué guarda.
 
-> 🛠️ **Inténtalo tú.** Construye un `Despachador` con un `Dictionary<Type, Action<object>>`. (1) `Registrar<T>(ICommandHandler<T> handler)` guarda, bajo `typeof(T)`, cómo llamar a ese handler. (2) `Enviar(object comando)` busca por `comando.GetType()` y lo ejecuta. **Pista:** al **registrar** conoces `T` (puedes castear); al **enviar** solo tienes un `object` — captura el cast en una lambda al registrar.
+> 🛠️ **Inténtalo tú.** Crea un `Dictionary<Type, Action<object>>`. Por cada handler **agrega una entrada**: la llave es `typeof(SuComando)` y el valor una lambda que recibe el comando como `object`, lo **castea** a su tipo concreto y llama `Handle`. Luego despacha buscando por `comando.GetType()`.
+
+<details>
+<summary>👉 Muéstrame una forma de hacerlo</summary>
+
+```csharp
+var cambiarPlan = new CambiarPlanHandler(stream);
+var suspender   = new SuspenderHandler(stream);
+
+var handlers = new Dictionary<Type, Action<object>>();
+
+handlers.Add(typeof(CambiarPlanDeEmpresa),
+    (object comando) => cambiarPlan.Handle((CambiarPlanDeEmpresa)comando));   // castea y llama
+
+handlers.Add(typeof(SuspenderEmpresa),
+    (object comando) => suspender.Handle((SuspenderEmpresa)comando));
+
+object comando = new SuspenderEmpresa("falta de pago");   // llega como object
+handlers[comando.GetType()](comando);                     // → SuspenderHandler.Handle
+```
+</details>
+
+Lee cada entrada: la lambda recibe `comando` como `object` (la tabla guarda funciones **uniformes** `Action<object>`), lo **castea** al comando concreto y se lo pasa al handler que ya instanciaste. Despachar es `handlers[comando.GetType()](comando)`: busca la función por el tipo y la ejecuta. Funciona — y poblarla a mano una vez es el mejor modo de *ver* qué guardará el despachador.
+
+### 💥 El dolor: repites el tipo, y puedes desalinearlo
+
+Mira el patrón de cada `Add`: `typeof(X)` … `(X)comando`. El mismo tipo `X`, repetido por entrada. Y **nada obliga a que coincidan** la llave, el cast y el handler — esto **compila** y revienta al despachar:
+
+```csharp
+// 💥 la llave dice un tipo, el cast dice otro
+handlers.Add(typeof(SuspenderEmpresa),
+    (object comando) => cambiarPlan.Handle((CambiarPlanDeEmpresa)comando));
+// al llegar un SuspenderEmpresa intentaría (CambiarPlanDeEmpresa)comando → InvalidCastException EN EJECUCIÓN
+```
+
+## 🔧 Extrae el patrón: nace `Registrar<T>` (y el `Despachador`)
+
+Esas dos líneas por handler son **el mismo patrón** con `X` cambiando → pide un **método genérico** que reciba `X` como parámetro de tipo `T` y arme la entrada por ti. Y de paso **cura el dolor**: si la llave es `typeof(T)`, el cast es `(T)` y el handler es `ICommandHandler<T>`, los tres son **el mismo `T`**, y el compilador te impide desalinearlos.
+
+> 🛠️ **Inténtalo tú.** Envuelve el diccionario en una clase `Despachador`. (1) `Registrar<T>(ICommandHandler<T> handler)` guarda, bajo `typeof(T)`, la lambda `comando => handler.Handle((T)comando)`. (2) `Enviar(object comando)` busca por `comando.GetType()` y lo ejecuta. *(Es exactamente lo que hacías a mano — con `T` en vez de repetir el tipo.)*
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -120,8 +159,20 @@ public class Despachador
 ```
 </details>
 
+Compara, línea a línea, lo que escribías a mano con lo que `Registrar<T>` hace por dentro — **son lo mismo**, con un solo `T` en lugar del tipo repetido:
+
+```csharp
+// a mano: TÚ repetías el tipo (y podías desalinear llave / cast / handler)
+handlers.Add(typeof(SuspenderEmpresa),
+    comando => suspender.Handle((SuspenderEmpresa)comando));
+
+// Registrar<SuspenderEmpresa>(suspender) arma esa MISMA entrada, con un único T:
+_handlers[typeof(T)] = comando => handler.Handle((T)comando);
+// la llave typeof(T), el cast (T) y el handler ICommandHandler<T>: los tres, el mismo T
+```
+
 > [!NOTE]
-> 💡 **El truco de la lambda.** El genérico `T` solo existe al **registrar** (ahí sabes que es `CambiarPlanDeEmpresa`). La lambda `comando => handler.Handle((T)comando)` **captura** ese `T` y queda como un `Action<object>` uniforme — así la tabla es homogénea aunque cada handler reciba un comando distinto. Sin `dynamic`, sin reflexión: solo un diccionario y un delegado.
+> 💡 **El truco de la lambda — y por qué `Registrar` es más seguro, no solo más corto.** El genérico `T` solo existe al **registrar** (ahí C# sabe que es `SuspenderEmpresa`). La lambda `comando => handler.Handle((T)comando)` **captura** ese `T` y queda como un `Action<object>` uniforme, así la tabla es homogénea aunque cada handler reciba un comando distinto. Y como la llave, el cast y el handler son **el mismo `T`**, ya **no puedes** desalinearlos como en el `Add` a mano: el compilador lo garantiza. Sin `dynamic`, sin reflexión — solo un diccionario y un delegado.
 
 Úsalo: registras cada handler una vez, y despachas comandos que llegan **como `object`**, sin saber qué clase los maneja:
 
@@ -133,6 +184,9 @@ despachador.Registrar(new SuspenderHandler(stream));
 object comando = new SuspenderEmpresa("falta de pago");   // llega como object
 despachador.Enviar(comando);                              // encuentra SuspenderHandler por el tipo y lo llama
 ```
+
+> [!NOTE]
+> 💡 **Inferencia: el `<T>` que no escribes.** En `Registrar(new SuspenderHandler(stream))` no pusiste `Registrar<SuspenderEmpresa>`: C# **deduce** el `T` del tipo del handler (`SuspenderHandler : ICommandHandler<SuspenderEmpresa>`). El genérico está ahí trabajando aunque no lo veas — y si algún día la inferencia no alcanza, lo pones explícito (`Registrar<SuspenderEmpresa>(...)`).
 
 ## 🏷️ Por qué hacían falta las dos piezas
 

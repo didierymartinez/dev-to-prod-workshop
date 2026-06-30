@@ -4,7 +4,7 @@ En la sección anterior, el ciclo **cargar → actuar → guardar** quedó suelt
 
 ## 🎯 El Objetivo
 
-Encapsular ese "cargar → actuar → guardar" en una pieza con un solo trabajo, para que el resto del programa solo diga *"ejecuta esta intención"* y no sepa de streams; y que cada hecho archivado quede **numerado** (su versión).
+Encapsular ese "cargar → actuar → guardar" en una pieza con un solo trabajo, para que el resto del programa solo diga *"ejecuta esta intención"* y no sepa de streams.
 
 ## La empresa decide; alguien más hace la logística
 
@@ -99,47 +99,6 @@ Funciona. Pero fíjate: **tú** decides, para cada comando, **qué clase instanc
 > [!NOTE]
 > 🌱 **Semilla — este handler es plomería que se repite.** Mira los dos `Handle`: ambos hacen *Get → decidir → Append*, cambiando solo el comando y el método. Primero, en [El despachador](el-despachador.md), construirás **a mano** lo que rutea cada comando a su handler; más adelante verás que **Wolverine descubre y genera todo eso por ti** —tú escribirás solo la decisión, el framework pondrá el cargar/guardar y encontrará el handler por su tipo, ese `switch` que no tuviste que escribir—. Lo construyes a mano ahora para que, cuando lo veas automatizado, sepas exactamente qué hace.
 
-## 🔧 La versión del evento: el stream numera lo que archiva
-
-Hoy tu stream guarda los hechos en una lista pelada. Pero cada hecho, una vez archivado, ocupa una **posición fija** en la historia: el 1.º, el 2.º, el 3.º… Esa posición es su **versión**. Conviene grabarla (y la fecha) junto al hecho, en un **sobre**:
-
-```csharp
-// el sobre: envuelve el hecho con su POSICIÓN en el stream y cuándo se anotó
-public record EventoAlmacenado(int Version, DateTime Timestamp, object EventData);
-```
-
-> 🛠️ **Inténtalo tú.** **🔁 Modifica** tu `EventStream<T>`: que guarde `EventoAlmacenado` (no `object` pelado), lleve un `_version` que **sube con cada `Append`**, y al leer **desenvuelva** el sobre (al agregado le interesa el hecho, no el sobre).
-
-<details>
-<summary>👉 Muéstrame una forma de hacerlo</summary>
-
-```csharp
-public class EventStream<T> where T : AggregateRoot, new()
-{
-    private readonly List<EventoAlmacenado> _historia = new();
-    private int _version;
-
-    public void Append(object hecho)                       // ESCRIBIR: el hecho toma la siguiente posición
-        => _historia.Add(new EventoAlmacenado(++_version, DateTime.UtcNow, hecho));
-
-    public T Get()                                         // LEER: desenvuelve los sobres y rehidrata
-    {
-        var entidad = new T();
-        entidad.Load(_historia.Select(s => s.EventData));   // solo el hecho, no el sobre
-        return entidad;
-    }
-}
-```
-</details>
-
-> 💡 El sobre **no** lleva quién es la empresa: el stream **ya es** de una empresa. Solo añade lo que el hecho por sí mismo no sabe: su **posición** y su fecha.
-
-> [!NOTE]
-> Por ahora `_version` **arranca en 0** en cada instancia del stream —siempre haces `Append` desde cero, así que numera bien (1, 2, 3…)—. Cuando el almacén te entregue historias **ya existentes** (próxima sección), el `Get()` aprenderá a **leer la última posición** del cajón para seguir contando desde ahí. Aún no hace falta.
-
-> [!NOTE]
-> 🌱 **Semilla — ¿para qué numerar?** Hoy el número parece decorativo. Pero será la **llave** para detectar conflictos: cuando aparezcan **varias** empresas y **varios escritores** sobre el mismo stream ([El almacén en memoria](el-almacen-en-memoria.md)), comparar *"¿la versión que esperabas sigue libre?"* es lo que evita que dos escrituras simultáneas se pisen. Eso es la **concurrencia optimista**, y la verás allí.
-
 > [!NOTE]
 > 🌱 **Semilla — los errores no se manejan con `try/catch` por todos lados.** Cuando un `Handle` falle (una regla no se cumple, la red cae), el instinto es llenar el método de `try/catch`. Eso ensucia y oculta la lógica. Más adelante verás dos caminos mejores: tratar el resultado como *"éxito o fallo"* que fluye por el sistema (**railway**), y apoyarte en las **políticas de reintento/error del framework**. Por ahora: que tu handler **exprese la regla**, no que se ahogue en manejo de errores.
 
@@ -147,7 +106,7 @@ public class EventStream<T> where T : AggregateRoot, new()
 
 ### El Descubrimiento
 
-Quedó repartido con claridad: el **Aggregate Root** (`Empresa`) tiene la **lógica pura** (decide/evolve, sin I/O, protege reglas), y el **Command Handler** hace el **trabajo de logística** (rehidratar desde el stream, pedir la decisión, guardar el hecho). Y cada hecho archivado queda **numerado** en su sobre.
+Quedó repartido con claridad: el **Aggregate Root** (`Empresa`) tiene la **lógica pura** (decide/evolve, sin I/O, protege reglas), y el **Command Handler** hace el **trabajo de logística** (rehidratar desde el stream, pedir la decisión, guardar el hecho).
 
 > [!NOTE]
 > 🌱 **Semilla — esta repartición es un regalo para los tests.** Como el agregado es puro y el handler es una capa delgada, puedes probar **toda tu lógica de negocio sin mocks ni base de datos**: das hechos pasados (*Given*), ejecutas un comando (*When*) y verificas el hecho emitido (*Then*). Es justo el estilo que la plantilla del equipo trae listo para usar.
@@ -160,8 +119,6 @@ Pero fíjate **cómo** ejecutas un comando: eliges la **clase del handler a mano
 
 - [ ] Moviste el ciclo "cargar → actuar → guardar" del `Program.cs` a una clase handler **por comando** (`CambiarPlanHandler`, `SuspenderHandler`), cada una con su `Handle` recibiendo los **parámetros sueltos**.
 - [ ] El handler de suspender respeta la idempotencia: si `Suspender` devuelve `null`, **no** hace `Append`.
-- [ ] Tu `EventStream` guarda `EventoAlmacenado` (con `Version` y fecha) y **desenvuelve** el sobre al leer.
-- [ ] Explicas por qué el sobre **no** lleva el id de la empresa (el stream ya es de una empresa) y para qué servirá el número de versión (detectar choques).
 
 ---
 
@@ -169,7 +126,7 @@ Pero fíjate **cómo** ejecutas un comando: eliges la **clase del handler a mano
 
 Piensa la respuesta a esto (es tu reflexión de la sección):
 
-> 💭 ¿Por qué el handler obedece el `null` de `Suspender` en vez de decidir él la idempotencia? ¿Para qué numeras cada hecho en el sobre?
+> 💭 ¿Por qué el handler obedece el `null` de `Suspender` en vez de decidir él la idempotencia? ¿Qué gana el sistema con un handler **por comando** (responsabilidad única) frente a un solo súper-secretario?
 
 Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
 
@@ -183,7 +140,7 @@ git push
 
 ## 🧠 En una frase
 
-El **Command Handler** es una capa delgada (una clase **por comando**) que orquesta **cargar → actuar → guardar**, dejando la lógica en el agregado; y al archivar, el `EventStream` envuelve cada hecho en un **sobre `EventoAlmacenado`** con su **posición** (su versión) — el número que pronto servirá para detectar escrituras que chocan.
+El **Command Handler** es una capa delgada (una clase **por comando**) que orquesta **cargar → actuar → guardar**, dejando la **lógica de negocio** en el agregado y la **logística** (rehidratar, pedir la decisión, guardar el hecho) en el handler.
 
 ---
 

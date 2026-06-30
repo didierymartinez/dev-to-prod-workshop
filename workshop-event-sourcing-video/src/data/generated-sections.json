@@ -6,13 +6,12 @@
     "subtitle": "El secretario que hace logística",
     "emoji": "📋",
     "bridge": "El ciclo cargar→actuar→guardar quedó suelto en Program.cs; lo encapsulamos en una pieza.",
-    "objetivo": "Encapsular cargar→actuar→guardar y numerar cada hecho archivado.",
-    "oneLiner": "Una capa delgada por comando orquesta cargar→actuar→guardar; el agregado decide, y el stream envuelve cada hecho en un sobre con su versión.",
+    "objetivo": "Encapsular cargar→actuar→guardar en una pieza con un solo trabajo.",
+    "oneLiner": "El Command Handler es una capa delgada (una clase por comando) que orquesta cargar→actuar→guardar: la lógica vive en el agregado; la logística (rehidratar, pedir, guardar) en el handler.",
     "concepts": [
       "Command Handler",
       "Responsabilidad única",
-      "Sobre EventoAlmacenado",
-      "Versión del evento",
+      "una clase por comando",
       "Idempotencia obedecida"
     ],
     "beats": [
@@ -106,57 +105,6 @@
           "kind": "text",
           "title": "Reparto de roles",
           "text": "El Aggregate Root tiene la lógica pura (decide, protege reglas). El Command Handler hace la logística (rehidratar, pedir, guardar). El handler obedece el null que decidió el agregado."
-        }
-      },
-      {
-        "tag": "Numerar: el sobre",
-        "code": [
-          "public record EventoAlmacenado(",
-          "    int Version, DateTime Timestamp, object EventData);",
-          "",
-          "public void Append(object hecho)",
-          "    => _historia.Add(",
-          "        new EventoAlmacenado(++_version, DateTime.UtcNow, hecho));",
-          "",
-          "public T Get()",
-          "{",
-          "    var entidad = new T();",
-          "    entidad.Load(_historia.Select(s => s.EventData));",
-          "    return entidad;",
-          "}"
-        ],
-        "glow": [
-          5
-        ],
-        "note": "++_version graba la posición fija del hecho en su sobre.",
-        "badge": "🎉 Cada hecho queda numerado",
-        "side": {
-          "kind": "state",
-          "title": "El sobre EventoAlmacenado",
-          "flashKey": "Version",
-          "rows": [
-            {
-              "k": "Version",
-              "v": "++_version → 1, 2, 3…"
-            },
-            {
-              "k": "Timestamp",
-              "v": "DateTime.UtcNow"
-            },
-            {
-              "k": "EventData",
-              "v": "el hecho (Append guarda, Get desenvuelve)"
-            }
-          ]
-        }
-      },
-      {
-        "tag": "¿Para qué el número?",
-        "note": "El sobre no lleva el id: el stream ya es de una empresa. El número será la llave de conflictos.",
-        "side": {
-          "kind": "text",
-          "title": "Semilla: concurrencia",
-          "text": "Hoy el número parece decorativo. Cuando haya varios escritores sobre el mismo stream, comparar \"¿la versión que esperabas sigue libre?\" evita que dos escrituras se pisen. Eso es concurrencia optimista, en El almacén en memoria."
         }
       }
     ]
@@ -328,8 +276,9 @@
     "oneLiner": "Un almacén guarda un cajón de sobres por id; el stream te lo entrega para leer y escribir, y al guardar verifica la versión.",
     "concepts": [
       "Event Store",
+      "sobre (EventoAlmacenado)",
+      "versión del evento",
       "Dictionary id→eventos",
-      "id único de tres caras",
       "concurrencia optimista",
       "ConcurrencyException"
     ],
@@ -351,6 +300,48 @@
           "kind": "text",
           "title": "¿Por qué ahora?",
           "text": "Una empresa en un stream único no necesitaba id. Con miles, es imprescindible."
+        }
+      },
+      {
+        "tag": "El sobre: numerar cada hecho",
+        "code": [
+          "public record EventoAlmacenado(",
+          "    int Version, DateTime Timestamp, object EventData);",
+          "",
+          "public void Append(object hecho)",
+          "    => _historia.Add(",
+          "        new EventoAlmacenado(++_version, DateTime.UtcNow, hecho));",
+          "",
+          "public T Get()",
+          "{",
+          "    var entidad = new T();",
+          "    entidad.Load(_historia.Select(s => s.EventData));",
+          "    return entidad;",
+          "}"
+        ],
+        "glow": [
+          5
+        ],
+        "note": "++_version graba la posición fija del hecho en su sobre.",
+        "badge": "🎉 Cada hecho queda numerado",
+        "side": {
+          "kind": "state",
+          "title": "El sobre EventoAlmacenado",
+          "flashKey": "Version",
+          "rows": [
+            {
+              "k": "Version",
+              "v": "++_version → 1, 2, 3…"
+            },
+            {
+              "k": "Timestamp",
+              "v": "DateTime.UtcNow"
+            },
+            {
+              "k": "EventData",
+              "v": "el hecho (Append guarda, Get desenvuelve)"
+            }
+          ]
         }
       },
       {
