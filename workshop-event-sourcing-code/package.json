@@ -1,0 +1,25 @@
+{
+  "name": "workshop-event-sourcing-code",
+  "version": "0.1.0",
+  "description": "Video Remotion: la evolución del código del taller de Event Sourcing (solo código, transformándose)",
+  "private": true,
+  "scripts": {
+    "dev": "remotion studio",
+    "studio": "remotion studio",
+    "render": "remotion render",
+    "render:evo": "remotion render evolucion-del-codigo out/evolucion.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.482",
+    "@remotion/google-fonts": "4.0.482",
+    "@remotion/layout-utils": "4.0.482",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "4.0.482"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "typescript": "^5.4.0"
+  }
+}

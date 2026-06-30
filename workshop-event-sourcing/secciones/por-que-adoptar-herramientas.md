@@ -17,8 +17,9 @@ Vale la pena verlo junto. Esto es un motor de Event Sourcing real:
 | [Los primeros hechos](los-primeros-hechos.md)–[Refactorizando el motor](refactorizando-el-motor.md) | eventos (`record`) + `evolve` + `AggregateRoot` | reconstruir el estado leyendo los hechos |
 | [El flujo de vida](el-flujo-de-vida.md) | `EventStream` | leer/escribir la historia de **una** empresa |
 | [Decidir el futuro](decidir-el-futuro.md) | `decide` | emitir hechos validando reglas |
-| [El Command Handler](el-command-handler.md) | `CommandHandler` + el sobre `EventoAlmacenado` (con `Version`) | orquestar **cargar → decidir → guardar**; numerar cada hecho |
-| [El almacén en memoria](el-almacen-en-memoria.md) | `InMemoryEventStore` | almacén por id + concurrencia optimista |
+| [El Command Handler](el-command-handler.md) | `CommandHandler` | orquestar **cargar → decidir → guardar** |
+| [El despachador](el-despachador.md) | `record`-comando + `ICommandHandler<T>` + `Despachador` | rutear cada comando a su handler por tipo (un **mediador** a mano) |
+| [El almacén en memoria](el-almacen-en-memoria.md) | `InMemoryEventStore` + el sobre `EventoAlmacenado` (con `Version`) | numerar cada hecho; almacén por id + concurrencia optimista |
 | [El tiempo de espera](el-tiempo-de-espera.md) | `async/await` | no agotar hilos al esperar I/O |
 | [Inyección de Dependencias](inyeccion-de-dependencias.md) | contenedor de DI | ensamblar sin `new` regado |
 | [Docker y PostgreSQL](docker-postgres.md) | Docker + Postgres/`JSONB` | persistir de verdad |
@@ -56,7 +57,7 @@ Ninguna de estas es "imposible" — las podrías construir. Pero son **meses** d
 Hay dos librerías hermanas (mismo autor, la familia se llama **Critter Stack**) que hacen exactamente lo que tú ya entiendes:
 
 - **Marten** — convierte **PostgreSQL** en un **event store** (y base documental) de primera. Guarda streams de eventos, los rehidrata reproduciéndolos, lleva la versión, serializa y **deserializa al tipo correcto** por ti, y trae proyecciones, multi-tenancy y time-travel horneados. Es tu `InMemoryEventStore` + todo el plumbing de Postgres de [Docker y PostgreSQL](docker-postgres.md), hecho por expertos.
-- **Wolverine** — un **mediador** —algo que recibe un comando y lo entrega a quien sabe manejarlo, sin que el emisor conozca al handler— **+ mensajería**. Encuentra tus handlers, despacha comandos, **comitea (guarda) por ti** al final de cada uno, y publica eventos a un **broker** (un servicio de mensajería intermedio —tipo cola— que aún no construyes) con **outbox/inbox** durable. Es tu `CommandHandler` y tu orquestación, industrializados.
+- **Wolverine** — un **mediador** —algo que recibe un comando y lo entrega a quien sabe manejarlo, sin que el emisor conozca al handler: justo lo que hace tu `Despachador` de [El despachador](el-despachador.md)— **+ mensajería**. Encuentra tus handlers, despacha comandos, **comitea (guarda) por ti** al final de cada uno, y publica eventos a un **broker** (un servicio de mensajería intermedio —tipo cola— que aún no construyes) con **outbox/inbox** durable. Es tu `CommandHandler` y tu orquestación, industrializados.
 
 > [!NOTE]
 > 💡 Wolverine **no** reemplaza tu contenedor de DI ([Inyección de Dependencias](inyeccion-de-dependencias.md)): se **apoya** en él. Lo que reemplaza es el **despacho** de comandos y el "guardar al final" que escribías a mano.

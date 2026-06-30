@@ -54,10 +54,8 @@ Este mapa, para cada sección, te dice:
 - **Tu calificación:** [ ] _____
 
 ## El Command Handler
-- **🛠️ Construyes (2 retos):**
-  1. Un handler **por comando** (`CambiarPlanHandler`, `SuspenderHandler`) que orquesta **cargar → decidir → guardar** sobre el stream, recibiendo los **parámetros sueltos** (respetando el `null` de idempotencia). Clases concretas — **sin record ni interfaz todavía**.
-  2. **La versión del evento** — el `EventStream` envuelve cada hecho en un **sobre `EventoAlmacenado(Version, …)`** y lleva su posición.
-- **💡 Qué aprendes:** sacar el ciclo del `Program.cs` a una pieza con un solo trabajo, **una por comando** (responsabilidad única); y que cada hecho archivado tiene una **versión** (su posición), que luego servirá para detectar choques.
+- **🛠️ Construyes (reto):** un handler **por comando** (`CambiarPlanHandler`, `SuspenderHandler`) que orquesta **cargar → decidir → guardar** sobre el stream, recibiendo los **parámetros sueltos** (respetando el `null` de idempotencia). Clases concretas — **sin record ni interfaz todavía**.
+- **💡 Qué aprendes:** sacar el ciclo del `Program.cs` a una pieza con un solo trabajo, **una por comando** (responsabilidad única).
 - **👁️ Se te muestra:** el **constructor primario** de clase (idioma de C#). *(El `record`-comando y el contrato `ICommandHandler<T>` se difieren a [El despachador](secciones/el-despachador.md), donde por fin hacen falta — no antes.)*
 - **Tu calificación:** [ ] _____
 
@@ -69,7 +67,7 @@ Este mapa, para cada sección, te dice:
 - **Tu calificación:** [ ] _____
 
 ## El almacén en memoria (Event Store)
-- **🛠️ Construyes (reto):** el `InMemoryEventStore` — un `Dictionary` con un cajón de **sobres** por empresa (por id), `GetEvents(id)`/`AppendEvent(id, sobre)`. El `EventStream` deja de guardar su lista y **delega** en el almacén; el comando recupera su `EmpresaId` y el handler **busca por id**.
+- **🛠️ Construyes (reto):** primero el **sobre `EventoAlmacenado(Version, …)`** (numerar cada hecho con su posición en el stream); luego el `InMemoryEventStore` — un `Dictionary` con un cajón de **sobres** por empresa (por id), `GetEvents(id)`/`AppendEvent(id, sobre)`. El `EventStream` deja de guardar su lista y **delega** en el almacén; el comando recupera su `EmpresaId` y el handler **busca por id**.
 - **💡 Qué aprendes:** el patrón **Event Store** (almacén central por id) — surge porque con **muchas** empresas no caben mil listas sueltas; que **el id es la llave**; y la **concurrencia optimista** (rechazar una escritura si la versión esperada ya está ocupada, usando el número del sobre).
 - **👁️ Se te muestra:** cómo el almacén te **entrega** el `EventStream` (`AbrirStream`, con el `this`) y el chequeo de concurrencia, con un bloque **📦 "clase completa"**. *(Por qué: la factory con back-reference y la concurrencia son sutiles.)*
 - **Tu calificación:** [ ] _____

@@ -1,0 +1,1943 @@
+[
+  {
+    "title": "§2 · Los hechos como records",
+    "code": [
+      "public record EmpresaRegistrada(string Nombre, string Plan);",
+      "public record PlanCambiado(string NuevoPlan);",
+      "public record EmpresaSuspendida(string Motivo);",
+      "public record EmpresaReactivada();"
+    ],
+    "concepts": [
+      "record (inmutable)",
+      "evento/hecho",
+      "versionado/upcasting",
+      "evento público (IEvent)"
+    ]
+  },
+  {
+    "title": "§2 · El Stream ordenado",
+    "code": [
+      "var historia = new List<object>",
+      "{",
+      "    new EmpresaRegistrada(\"Constructora Andes\", \"Básico\"),",
+      "    new PlanCambiado(\"Premium\"),",
+      "    new EmpresaSuspendida(\"falta de pago\"),",
+      "    new EmpresaReactivada(),",
+      "    new EmpresaSuspendida(\"incumplimiento de contrato\"),",
+      "};"
+    ],
+    "concepts": [
+      "Stream",
+      "fuente de la verdad"
+    ]
+  },
+  {
+    "title": "§2 · Replay en variables sueltas",
+    "code": [
+      "string nombre = \"\";  string plan = \"\";",
+      "bool   suspendida;   int reactivaciones;",
+      "",
+      "foreach (var hecho in historia)",
+      "{",
+      "    if (hecho is EmpresaRegistrada r) { nombre = r.Nombre; plan = r.Plan; }",
+      "    if (hecho is PlanCambiado p)      { plan = p.NuevoPlan; }",
+      "    if (hecho is EmpresaSuspendida)   { suspendida = true; }",
+      "    if (hecho is EmpresaReactivada)   { suspendida = false; reactivaciones++; }",
+      "}",
+      "",
+      "Console.WriteLine($\"{nombre}: plan {plan}, ...\");"
+    ],
+    "concepts": [
+      "Replay",
+      "evolve",
+      "función pura"
+    ]
+  },
+  {
+    "title": "§2 · Encerrar en la clase → Aggregate Root",
+    "code": [
+      "var empresa = new Empresa(historia);",
+      "Console.WriteLine($\"{empresa.Nombre}: plan {empresa.Plan}…\");",
+      "",
+      "public class Empresa",
+      "{",
+      "    public string Nombre { get; private set; } = \"\";",
+      "    public string Plan   { get; private set; } = \"\";",
+      "    public bool   Suspendida    { get; private set; }",
+      "    public int    Reactivaciones { get; private set; }",
+      "",
+      "    public Empresa(IEnumerable<object> historia)",
+      "    {",
+      "        foreach (var hecho in historia)",
+      "        {",
+      "            // … if (hecho is EmpresaRegistrada r) … etc. …",
+      "        }",
+      "    }",
+      "}"
+    ],
+    "concepts": [
+      "Aggregate Root",
+      "{ get; private set; }",
+      "dueña de su coherencia"
+    ]
+  },
+  {
+    "title": "§3 · Separar recorrer de aplicar",
+    "code": [
+      "public class Empresa",
+      "{",
+      "    // … propiedades: Nombre, Plan, Suspendida, Reactivaciones …",
+      "",
+      "    public Empresa(IEnumerable<object> historia)",
+      "    {",
+      "        foreach (var hecho in historia)",
+      "            Aplicar(hecho);",
+      "    }",
+      "",
+      "    private void Aplicar(object hecho)",
+      "    {",
+      "        if (hecho is EmpresaRegistrada r) { Nombre = r.Nombre; Plan = r.Plan; }",
+      "        if (hecho is PlanCambiado p)      { Plan = p.NuevoPlan; }",
+      "        if (hecho is EmpresaSuspendida)   { Suspendida = true; }",
+      "        if (hecho is EmpresaReactivada)   { Suspendida = false; Reactivaciones++; }",
+      "    }",
+      "}"
+    ],
+    "concepts": [
+      "separación de responsabilidades",
+      "Aplicar (handler de evento)"
+    ]
+  },
+  {
+    "title": "§3 · Subir el motor a base",
+    "code": [
+      "public abstract class AggregateRoot",
+      "{",
+      "    public void Load(IEnumerable<object> historia)",
+      "    {",
+      "        foreach (var hecho in historia)",
+      "            Aplicar(hecho);",
+      "    }",
+      "",
+      "    protected abstract void Aplicar(object hecho);",
+      "}",
+      "",
+      "public class Empresa : AggregateRoot",
+      "{",
+      "    // … propiedades …",
+      "    public Empresa(IEnumerable<object> historia) => Load(historia);",
+      "    // protected override void Aplicar(object hecho) { … los if … }",
+      "}"
+    ],
+    "concepts": [
+      "Aggregate Root",
+      "clase abstracta",
+      "Load (replay)",
+      "herencia"
+    ]
+  },
+  {
+    "title": "§3 · Del if al switch",
+    "code": [
+      "protected override void Aplicar(object hecho)",
+      "{",
+      "    switch (hecho)",
+      "    {",
+      "        case EmpresaRegistrada r: Nombre = r.Nombre; Plan = r.Plan; break;",
+      "        case PlanCambiado p:      Plan = p.NuevoPlan;                break;",
+      "        case EmpresaSuspendida:   Suspendida = true;                break;",
+      "        case EmpresaReactivada:   Suspendida = false; Reactivaciones++; break;",
+      "    }",
+      "}"
+    ],
+    "concepts": [
+      "pattern matching de tipo",
+      "motor de replay reutilizable"
+    ]
+  },
+  {
+    "title": "§4 · Envoltorio dueño de la historia",
+    "code": [
+      "public class EventStreamDeEmpresa",
+      "{",
+      "    private readonly List<object> _historia = new();",
+      "",
+      "    public void Append(object hecho) => _historia.Add(hecho);",
+      "",
+      "    public Empresa Get()",
+      "    {",
+      "        var empresa = new Empresa();",
+      "        empresa.Load(_historia);",
+      "        return empresa;",
+      "    }",
+      "}",
+      "",
+      "// Empresa: constructor sin parámetros",
+      "public Empresa() { }"
+    ],
+    "concepts": [
+      "Event Stream",
+      "EventStream<T>",
+      "Append",
+      "Get",
+      "constructor sin parámetros"
+    ]
+  },
+  {
+    "title": "§4 · Genérico EventStream<T>",
+    "code": [
+      "public class EventStream<T> where T : AggregateRoot, new()",
+      "{",
+      "    private readonly List<object> _historia = new();",
+      "",
+      "    public void Append(object hecho) => _historia.Add(hecho);",
+      "",
+      "    public T Get()",
+      "    {",
+      "        var entidad = new T();",
+      "        entidad.Load(_historia);",
+      "        return entidad;",
+      "    }",
+      "}"
+    ],
+    "concepts": [
+      "genéricos con restricción",
+      "Repositorio"
+    ]
+  },
+  {
+    "title": "§4 · Consumidor: Append y Get",
+    "code": [
+      "var stream = new EventStream<Empresa>();",
+      "stream.Append(new EmpresaRegistrada(\"Constructora Andes\",",
+      "    \"Básico\"));",
+      "stream.Append(new PlanCambiado(\"Premium\"));",
+      "",
+      "var empresa = stream.Get();",
+      "Console.WriteLine($\"{empresa.Nombre}: plan {empresa.Plan}\");"
+    ],
+    "concepts": []
+  },
+  {
+    "title": "§5 · El agregado emite hechos",
+    "code": [
+      "public class Empresa : AggregateRoot",
+      "{",
+      "    // … propiedades + Aplicar (switch), sin cambios …",
+      "",
+      "    public PlanCambiado CambiarPlan(string nuevoPlan)",
+      "        => new(nuevoPlan);",
+      "    public EmpresaSuspendida Suspender(string motivo)",
+      "        => new(motivo);",
+      "    public EmpresaReactivada Reactivar()",
+      "        => new();",
+      "}"
+    ],
+    "concepts": [
+      "decide",
+      "decidir ≠ aplicar"
+    ]
+  },
+  {
+    "title": "§5 · Cargar, actuar, guardar",
+    "code": [
+      "var stream = new EventStream<Empresa>();",
+      "stream.Append(",
+      "    new EmpresaRegistrada(\"Constructora Andes\", \"Básico\"));",
+      "",
+      "var empresa = stream.Get();                 // 1. CARGAR",
+      "var hecho = empresa.CambiarPlan(\"Enterprise\"); // 2. ACTUAR",
+      "stream.Append(hecho);                       // 3. GUARDAR",
+      "",
+      "var verificacion = stream.Get();            // recargamos",
+      "Console.WriteLine($\"plan {verificacion.Plan}\");",
+      "// plan Enterprise"
+    ],
+    "concepts": [
+      "cargar → actuar → guardar",
+      "patrón Decider",
+      "Comando",
+      "Query"
+    ]
+  },
+  {
+    "title": "§5 · Validación vs idempotencia",
+    "code": [
+      "public class ReglaDeNegocioException(string mensaje)",
+      "    : Exception(mensaje);",
+      "",
+      "public PlanCambiado CambiarPlan(string nuevoPlan)",
+      "{",
+      "    if (Suspendida)",
+      "        throw new ReglaDeNegocioException(",
+      "            \"No se puede cambiar el plan suspendida.\");",
+      "    return new PlanCambiado(nuevoPlan);",
+      "}",
+      "",
+      "public EmpresaSuspendida? Suspender(string motivo)",
+      "{",
+      "    if (Suspendida) return null;   // no-op redundante",
+      "    return new EmpresaSuspendida(motivo);",
+      "}"
+    ],
+    "concepts": [
+      "Validación",
+      "Idempotencia",
+      "tipo anulable T?",
+      "constructor primario",
+      "Command Handler"
+    ]
+  },
+  {
+    "title": "§6 · El secretario (un handler)",
+    "code": [
+      "// el ciclo cargar→actuar→guardar sale de Program.cs",
+      "public class EmpresaCommandHandlers(EventStream<Empresa> stream)",
+      "{",
+      "    public void CambiarPlan(string nuevoPlan)",
+      "    {",
+      "        var empresa = stream.Get();          // 1. cargar",
+      "        stream.Append(empresa.CambiarPlan(nuevoPlan));",
+      "    }",
+      "",
+      "    public void Suspender(string motivo)",
+      "    {",
+      "        var hecho = stream.Get().Suspender(motivo);",
+      "        if (hecho is not null) stream.Append(hecho); // null = no",
+      "    }",
+      "}"
+    ],
+    "concepts": [
+      "Command Handler",
+      "constructor primario"
+    ]
+  },
+  {
+    "title": "§6 · Una clase por comando",
+    "code": [
+      "// se borra el super-secretario: un especialista por comando",
+      "public class CambiarPlanHandler(EventStream<Empresa> stream)",
+      "{",
+      "    public void Handle(string nuevoPlan) =>",
+      "        stream.Append(stream.Get().CambiarPlan(nuevoPlan));",
+      "}",
+      "",
+      "public class SuspenderHandler(EventStream<Empresa> stream)",
+      "{",
+      "    public void Handle(string motivo)",
+      "    {",
+      "        var hecho = stream.Get().Suspender(motivo);",
+      "        if (hecho is not null) stream.Append(hecho);",
+      "    }",
+      "}"
+    ],
+    "concepts": [
+      "responsabilidad única",
+      "una clase por comando"
+    ]
+  },
+  {
+    "title": "§7 · Un record por comando",
+    "code": [
+      "public record CambiarPlanDeEmpresa(string NuevoPlan);",
+      "public record SuspenderEmpresa(string Motivo);",
+      "",
+      "public class CambiarPlanHandler(EventStream<Empresa> stream)",
+      "{",
+      "    public void Handle(CambiarPlanDeEmpresa cmd) =>",
+      "        stream.Append(stream.Get().CambiarPlan(cmd.NuevoPlan));",
+      "}",
+      "",
+      "public class SuspenderHandler(EventStream<Empresa> stream)",
+      "{",
+      "    public void Handle(SuspenderEmpresa cmd)",
+      "    {",
+      "        var hecho = stream.Get().Suspender(cmd.Motivo);",
+      "        if (hecho is not null) stream.Append(hecho);",
+      "    }",
+      "}"
+    ],
+    "concepts": [
+      "Comando",
+      "record (inmutable)"
+    ]
+  },
+  {
+    "title": "§7 · Contrato ICommandHandler<T>",
+    "code": [
+      "public interface ICommandHandler<TCommand>",
+      "{",
+      "    void Handle(TCommand comando);",
+      "}",
+      "",
+      "public class CambiarPlanHandler(EventStream<Empresa> stream)",
+      "    : ICommandHandler<CambiarPlanDeEmpresa>",
+      "{",
+      "    public void Handle(CambiarPlanDeEmpresa cmd) =>",
+      "        stream.Append(stream.Get().CambiarPlan(cmd.NuevoPlan));",
+      "}",
+      "",
+      "public class SuspenderHandler(EventStream<Empresa> stream)",
+      "    : ICommandHandler<SuspenderEmpresa>",
+      "{ /* Handle(SuspenderEmpresa) … igual cuerpo … */ }"
+    ],
+    "concepts": [
+      "ICommandHandler<T>",
+      "interfaz como contrato"
+    ]
+  },
+  {
+    "title": "§7 · La tabla: Despachador",
+    "code": [
+      "public class Despachador",
+      "{",
+      "    private readonly Dictionary<Type, Action<object>>",
+      "        _handlers = new();",
+      "",
+      "    public void Registrar<T>(ICommandHandler<T> handler)",
+      "        => _handlers[typeof(T)] =",
+      "           (object comando) => handler.Handle((T)comando);",
+      "",
+      "    public void Enviar(object comando)",
+      "        => _handlers[comando.GetType()](comando);",
+      "}",
+      "",
+      "// despachador.Registrar(new SuspenderHandler(stream));",
+      "// despachador.Enviar(new SuspenderEmpresa(\"falta de pago\"));"
+    ],
+    "concepts": [
+      "Despachador",
+      "mediador/dispatcher"
+    ]
+  },
+  {
+    "title": "§8 · El sobre con versión",
+    "code": [
+      "// el sobre: hecho + POSICIÓN en el stream + fecha",
+      "public record EventoAlmacenado(",
+      "    int Version, DateTime Timestamp, object EventData);",
+      "",
+      "public class EventStream<T> where T : AggregateRoot, new()",
+      "{",
+      "    private readonly List<EventoAlmacenado> _historia = new();",
+      "    private int _version;",
+      "",
+      "    public void Append(object hecho)        // toma la sig. posición",
+      "        => _historia.Add(",
+      "            new EventoAlmacenado(++_version, DateTime.UtcNow, hecho));",
+      "",
+      "    public T Get()                          // desenvuelve el sobre",
+      "    {",
+      "        var entidad = new T();",
+      "        entidad.Load(_historia.Select(s => s.EventData));",
+      "        return entidad;",
+      "    }",
+      "}"
+    ],
+    "concepts": [
+      "sobre (EventoAlmacenado)",
+      "versión del evento"
+    ]
+  },
+  {
+    "title": "§8 · Un cajón por id",
+    "code": [
+      "// AggregateRoot ahora lleva un Id",
+      "public abstract class AggregateRoot",
+      "{",
+      "    public string Id { get; set; } = \"\";",
+      "    // … Load(historia) + Aplicar(switch) …",
+      "}",
+      "",
+      "public class InMemoryEventStore",
+      "{",
+      "    private readonly",
+      "        Dictionary<string, List<EventoAlmacenado>> _cajones = new();",
+      "",
+      "    public IEnumerable<EventoAlmacenado> GetEvents(string aggregateId) =>",
+      "        _cajones.GetValueOrDefault(aggregateId)",
+      "        ?? Enumerable.Empty<EventoAlmacenado>();",
+      "}"
+    ],
+    "concepts": [
+      "Event Store",
+      "InMemoryEventStore",
+      "id del agregado"
+    ]
+  },
+  {
+    "title": "§8 · El almacén entrega el stream",
+    "code": [
+      "// dentro de InMemoryEventStore",
+      "public EventStream<T> AbrirStream<T>(string aggregateId)",
+      "    where T : AggregateRoot, new()",
+      "    => new(this, aggregateId);   // se incluye a sí mismo",
+      "",
+      "// EventStream ya no guarda la lista; habla con el almacén",
+      "public class EventStream<T> where T : AggregateRoot, new()",
+      "{",
+      "    private readonly InMemoryEventStore _store;",
+      "    private readonly string _aggregateId;",
+      "    private int _version;",
+      "",
+      "    public T Get() { /* GetEvents → Load → recuerda _version */ }",
+      "",
+      "    public void Append(object hecho) =>",
+      "        _store.AppendEvent(_aggregateId,",
+      "            new(++_version, DateTime.UtcNow, hecho));",
+      "}"
+    ],
+    "concepts": [
+      "el almacén entrega el stream"
+    ]
+  },
+  {
+    "title": "§8 · Concurrencia optimista",
+    "code": [
+      "public class ConcurrencyException(string mensaje) : Exception(mensaje);",
+      "",
+      "// AppendEvent valida la versión antes de aceptar",
+      "public void AppendEvent(string aggregateId, EventoAlmacenado evento)",
+      "{",
+      "    var cajon = _cajones.GetValueOrDefault(aggregateId) ?? new();",
+      "    var versionActual =",
+      "        cajon.Count == 0 ? 0 : cajon[^1].Version;",
+      "",
+      "    if (evento.Version != versionActual + 1)",
+      "        throw new ConcurrencyException(",
+      "            $\"Esperaba {versionActual + 1}, llegó {evento.Version}\");",
+      "",
+      "    _cajones[aggregateId] = cajon;",
+      "    cajon.Add(evento);",
+      "}"
+    ],
+    "concepts": [
+      "concurrencia optimista",
+      "ConcurrencyException"
+    ]
+  },
+  {
+    "title": "§9 · El almacén, async",
+    "code": [
+      "public class InMemoryEventStore",
+      "{",
+      "    // … _cajones, AbrirStream<T> sin cambios …",
+      "    public Task<IEnumerable<EventoAlmacenado>> GetEventsAsync(",
+      "        string aggregateId, CancellationToken ct = default) =>",
+      "        Task.FromResult<IEnumerable<EventoAlmacenado>>(",
+      "            _cajones.GetValueOrDefault(aggregateId)",
+      "            ?? Enumerable.Empty<EventoAlmacenado>());",
+      "",
+      "    public Task AppendEventAsync(string aggregateId,",
+      "        EventoAlmacenado evento, CancellationToken ct = default)",
+      "    {",
+      "        // … validar versión / ConcurrencyException, cajon.Add …",
+      "        return Task.CompletedTask;",
+      "    }",
+      "}"
+    ],
+    "concepts": [
+      "async/await",
+      "Task",
+      "CancellationToken",
+      "Task.FromResult/Task.CompletedTask"
+    ]
+  },
+  {
+    "title": "§9 · EventStream y contrato async",
+    "code": [
+      "// EventStream: Get → GetAsync, Append → AppendAsync",
+      "public async Task<T> GetAsync()",
+      "{",
+      "    var entidad = new T { Id = _aggregateId };",
+      "    var sobres =",
+      "        (await _store.GetEventsAsync(_aggregateId)).ToList();",
+      "    entidad.Load(sobres.Select(s => s.EventData));",
+      "    _version = sobres.Count == 0 ? 0 : sobres[^1].Version;",
+      "    return entidad;",
+      "}",
+      "public async Task AppendAsync(object hecho)",
+      "{",
+      "    _version++;",
+      "    await _store.AppendEventAsync(_aggregateId,",
+      "        new(_version, DateTime.UtcNow, hecho));",
+      "}"
+    ],
+    "concepts": [
+      "async hasta arriba"
+    ]
+  },
+  {
+    "title": "§9 · Handlers HandleAsync",
+    "code": [
+      "public interface ICommandHandler<TCommand>",
+      "{",
+      "    Task HandleAsync(TCommand comando,",
+      "        CancellationToken ct = default);",
+      "}",
+      "",
+      "public class SuspenderHandler(InMemoryEventStore store)",
+      "    : ICommandHandler<SuspenderEmpresa>",
+      "{",
+      "    public async Task HandleAsync(",
+      "        SuspenderEmpresa cmd, CancellationToken ct = default)",
+      "    {",
+      "        var stream  = store.AbrirStream<Empresa>(cmd.EmpresaId);",
+      "        var empresa = await stream.GetAsync();",
+      "        var hecho   = empresa.Suspender(cmd.Motivo);",
+      "        if (hecho is not null) await stream.AppendAsync(hecho);",
+      "    }",
+      "}"
+    ],
+    "concepts": [
+      "ICommandHandler async"
+    ]
+  },
+  {
+    "title": "§10 · Adiós a los new manuales",
+    "code": [
+      "// ANTES: cableado a mano en Program.cs",
+      "var almacen = new InMemoryEventStore();",
+      "var handler = new SuspenderHandler(almacen);"
+    ],
+    "concepts": [
+      "infierno de los new",
+      "cableado a mano"
+    ]
+  },
+  {
+    "title": "§10 · ServiceCollection arma el grafo",
+    "code": [
+      "dotnet add package Microsoft.Extensions.DependencyInjection",
+      "",
+      "using Microsoft.Extensions.DependencyInjection;",
+      "",
+      "var services = new ServiceCollection();",
+      "services.AddSingleton<InMemoryEventStore>();",
+      "services.AddTransient<SuspenderHandler>();",
+      "services.AddTransient<CambiarPlanHandler>();",
+      "var proveedor = services.BuildServiceProvider();",
+      "",
+      "var almacen = proveedor.GetRequiredService<InMemoryEventStore>();",
+      "await almacen.AbrirStream<Empresa>(\"emp-7\")",
+      "    .AppendAsync(new EmpresaRegistrada(\"Constructora Andes\", \"Básico\"));",
+      "",
+      "var handler = proveedor.GetRequiredService<SuspenderHandler>();",
+      "await handler.HandleAsync(new SuspenderEmpresa(\"emp-7\", \"falta de pago\"));"
+    ],
+    "concepts": [
+      "Inyección de Dependencias",
+      "Inversión de Control (IoC)",
+      "contenedor DI",
+      "ServiceCollection",
+      "IServiceProvider",
+      "tiempos de vida (Singleton/Scoped/Transient)"
+    ]
+  },
+  {
+    "title": "§10 · MiniContenedor: sin magia",
+    "code": [
+      "public class MiniContenedor",
+      "{",
+      "    private readonly Dictionary<Type, Type> _registro = new();",
+      "",
+      "    public void Registrar<TServicio, TImpl>() =>",
+      "        _registro[typeof(TServicio)] = typeof(TImpl);",
+      "",
+      "    public object Resolver(Type tipo)",
+      "    {",
+      "        var concreto = _registro.TryGetValue(tipo, out var impl)",
+      "            ? impl : tipo;",
+      "        var ctor = concreto.GetConstructors().First();",
+      "        var args = ctor.GetParameters()",
+      "            .Select(p => Resolver(p.ParameterType)).ToArray();",
+      "        return Activator.CreateInstance(concreto, args)!;",
+      "    }",
+      "}"
+    ],
+    "concepts": [
+      "reflexión",
+      "DIP",
+      "pure DI"
+    ]
+  },
+  {
+    "title": "§11 · Postgres en docker-compose",
+    "code": [
+      "services:",
+      "  postgres:",
+      "    image: postgres:17-alpine",
+      "    container_name: gestion_eventstore",
+      "    environment:",
+      "      POSTGRES_USER: gestion",
+      "      POSTGRES_PASSWORD: dev_local_pwd",
+      "      POSTGRES_DB: gestion_eventstore",
+      "    ports:",
+      "      - \"5432:5432\"",
+      "    volumes:",
+      "      - eventstore_data:/var/lib/postgresql/data",
+      "",
+      "volumes:",
+      "  eventstore_data:"
+    ],
+    "concepts": [
+      "Persistencia",
+      "PostgreSQL + JSONB",
+      "documento JSON",
+      "ACID",
+      "Docker",
+      "contenedor",
+      "docker-compose",
+      "volumen nombrado"
+    ]
+  },
+  {
+    "title": "§11 · Encender y conectar",
+    "code": [
+      "docker compose up -d",
+      "docker ps",
+      "# gestion_eventstore ... Up",
+      "",
+      "# Host=localhost;Port=5432;Database=gestion_eventstore;",
+      "# Username=gestion;Password=dev_local_pwd"
+    ],
+    "concepts": [
+      "docker compose up -d",
+      "connection string"
+    ]
+  },
+  {
+    "title": "§13 · El agregado acumula (Raise)",
+    "code": [
+      "public abstract class AggregateRoot",
+      "{",
+      "    private readonly List<object> _uncommittedEvents = new();",
+      "    public string Id { get; set; } = \"\";",
+      "",
+      "    public IReadOnlyList<object> UncommittedEvents",
+      "        => _uncommittedEvents.AsReadOnly();",
+      "    public void ClearUncommittedEvents()",
+      "        => _uncommittedEvents.Clear();",
+      "    protected void Raise(object hecho)",
+      "        => _uncommittedEvents.Add(hecho);",
+      "",
+      "    public void Load(IEnumerable<object> historia)",
+      "    { foreach (var h in historia) Aplicar(h); }",
+      "    protected abstract void Aplicar(object hecho);",
+      "}"
+    ],
+    "concepts": [
+      "Raise",
+      "uncommitted events",
+      "ClearUncommittedEvents"
+    ]
+  },
+  {
+    "title": "§13 · Decisiones void con Raise",
+    "code": [
+      "public void CambiarPlan(string nuevoPlan)",
+      "{",
+      "    if (Suspendida)",
+      "        throw new ReglaDeNegocioException(\"...\");",
+      "    Raise(new PlanCambiado(nuevoPlan));",
+      "}",
+      "",
+      "public void Suspender(string motivo)",
+      "{",
+      "    if (Suspendida) return;   // idempotencia: no encola",
+      "    Raise(new EmpresaSuspendida(motivo));",
+      "}",
+      "",
+      "public void Reactivar() => Raise(new EmpresaReactivada());"
+    ],
+    "concepts": []
+  },
+  {
+    "title": "§13 · El handler solo drena",
+    "code": [
+      "public class SuspenderHandler(InMemoryEventStore store)",
+      "    : ICommandHandler<SuspenderEmpresa>",
+      "{",
+      "    public async Task HandleAsync(",
+      "        SuspenderEmpresa cmd, CancellationToken ct = default)",
+      "    {",
+      "        var stream  = store.AbrirStream<Empresa>(cmd.EmpresaId);",
+      "        var empresa = await stream.GetAsync();",
+      "",
+      "        empresa.Suspender(cmd.Motivo);   // decide → encola",
+      "",
+      "        foreach (var hecho in empresa.UncommittedEvents)",
+      "            await stream.AppendAsync(hecho);",
+      "        empresa.ClearUncommittedEvents();",
+      "    }",
+      "}"
+    ],
+    "concepts": [
+      "drenar (decide-drena-limpia)"
+    ]
+  },
+  {
+    "title": "§14 · Raise encola y aplica",
+    "code": [
+      "// base AggregateRoot",
+      "protected void Raise(object hecho)",
+      "{",
+      "    _uncommittedEvents.Add(hecho);  // lo recuerda",
+      "    Aplicar(hecho);                 // …y lo aplica",
+      "}",
+      "// Load sigue aplicando SIN encolar (rehidratar no levanta hechos)"
+    ],
+    "concepts": [
+      "Apply en Raise",
+      "rehidratar"
+    ]
+  },
+  {
+    "title": "§14 · Un Apply por tipo",
+    "code": [
+      "// el switch ya solo ENRUTA (sigue siendo el override de la base)",
+      "protected override void Aplicar(object hecho)",
+      "{",
+      "    switch (hecho)",
+      "    {",
+      "        case EmpresaRegistrada e: Apply(e); break;",
+      "        case PlanCambiado e:      Apply(e); break;",
+      "        case EmpresaSuspendida e: Apply(e); break;",
+      "        case EmpresaReactivada e: Apply(e); break;",
+      "    }",
+      "}",
+      "// un Apply por tipo, PÚBLICO (la herramienta los llama por convención)",
+      "public void Apply(EmpresaRegistrada e) { Nombre = e.Nombre; Plan = e.Plan; }",
+      "public void Apply(PlanCambiado e)      => Plan = e.NuevoPlan;",
+      "public void Apply(EmpresaSuspendida e) => Suspendida = true;",
+      "public void Apply(EmpresaReactivada e) { Suspendida = false; Reactivaciones++; }"
+    ],
+    "concepts": [
+      "Apply por tipo",
+      "dispatcher/enrutador",
+      "rehidratación por convención"
+    ]
+  },
+  {
+    "title": "§15 · Version vive en AggregateRoot",
+    "code": [
+      "// AggregateRoot (base)",
+      "public int Version { get; protected set; }",
+      "",
+      "public void Load(IEnumerable<object> historia)",
+      "{",
+      "    foreach (var hecho in historia)",
+      "    {",
+      "        Aplicar(hecho);",
+      "        Version++;   // cada hecho persistido sube la versión",
+      "    }",
+      "}",
+      "",
+      "protected void Raise(object hecho)   // NO toca Version",
+      "{",
+      "    _uncommittedEvents.Add(hecho);",
+      "    Aplicar(hecho);",
+      "}"
+    ],
+    "concepts": [
+      "versión del agregado",
+      "AggregateRoot.Version",
+      "versión persistida"
+    ]
+  },
+  {
+    "title": "§15 · GetAsync lee del agregado",
+    "code": [
+      "public async Task<T> GetAsync()",
+      "{",
+      "    var entidad = new T { Id = _aggregateId };",
+      "    var sobres =",
+      "        (await _store.GetEventsAsync(_aggregateId)).ToList();",
+      "    entidad.Load(sobres.Select(s => s.EventData));",
+      "    _version = entidad.Version;   // antes: sobres[^1].Version",
+      "    return entidad;",
+      "}"
+    ],
+    "concepts": []
+  },
+  {
+    "title": "§16 · La Unit of Work: dos listas",
+    "code": [
+      "public class InMemoryEventStore",
+      "{",
+      "    private readonly Dictionary<string,",
+      "        List<EventoAlmacenado>> _cajones = new();",
+      "    private readonly List<AggregateRoot> _iniciados   = new();",
+      "    private readonly List<AggregateRoot> _modificados = new();",
+      "",
+      "    public void StartStream(AggregateRoot ar) =>",
+      "        _iniciados.Add(ar);",
+      "",
+      "    public Task<T?> GetAggregateRootAsync<T>(string id, ...)",
+      "        where T : AggregateRoot, new()",
+      "    { /* rehidrata */ _modificados.Add(ar); return ar; }",
+      "",
+      "    // SaveChangesAsync: drena _iniciados + _modificados,",
+      "    // chequea concurrencia (actual != ar.Version), limpia.",
+      "}"
+    ],
+    "concepts": [
+      "Unit of Work",
+      "almacén directo",
+      "StartStream",
+      "GetAggregateRootAsync",
+      "SaveChangesAsync"
+    ]
+  },
+  {
+    "title": "§16 · Handlers sin plomería",
+    "code": [
+      "public class CambiarPlanHandler(InMemoryEventStore store)",
+      "    : ICommandHandler<CambiarPlanDeEmpresa>",
+      "{",
+      "    public async Task HandleAsync(",
+      "        CambiarPlanDeEmpresa cmd, CancellationToken ct = default)",
+      "    {",
+      "        var empresa = await store",
+      "            .GetAggregateRootAsync<Empresa>(cmd.EmpresaId, ct)",
+      "            ?? throw new InvalidOperationException(\"No existe.\");",
+      "        empresa.CambiarPlan(cmd.NuevoPlan);",
+      "        await store.SaveChangesAsync(ct);",
+      "        // borrado: foreach UncommittedEvents + Clear",
+      "    }",
+      "}"
+    ],
+    "concepts": [
+      "cargar-decidir-guardar"
+    ]
+  },
+  {
+    "title": "§17 · Extraer IEventStore",
+    "code": [
+      "public interface IEventStore",
+      "{",
+      "    void StartStream(AggregateRoot agregado);",
+      "    Task<T?> GetAggregateRootAsync<T>(string id,",
+      "        CancellationToken ct = default)",
+      "        where T : AggregateRoot, new();",
+      "    Task SaveChangesAsync(CancellationToken ct = default);",
+      "    Task<bool> ExistsAsync<T>(string id,",
+      "        CancellationToken ct = default) where T : AggregateRoot;",
+      "}",
+      "",
+      "// InMemoryEventStore : IEventStore (su código no cambia)",
+      "// handlers: RegistrarEmpresaHandler(IEventStore store), …"
+    ],
+    "concepts": [
+      "IEventStore",
+      "extraer interfaz",
+      "depender del contrato"
+    ]
+  },
+  {
+    "title": "§17 · MartenEventStore mapea 1:1",
+    "code": [
+      "using Marten;",
+      "",
+      "public class MartenEventStore(",
+      "    IDocumentSession session, IQuerySession querySession)",
+      "    : MartenUnitOfWork, IEventStore",
+      "{",
+      "    public void StartStream(AggregateRoot ar) =>",
+      "        session.Events.StartStream(ar.Id, ar.UncommittedEvents);",
+      "",
+      "    public async Task<T?> GetAggregateRootAsync<T>(string id, …)",
+      "        => await querySession.Events",
+      "               .AggregateStreamAsync<T>(id, token: ct);",
+      "",
+      "    // ExistsAsync → FetchStreamStateAsync",
+      "    // SaveChangesAsync → Append + session.SaveChangesAsync(ct)",
+      "}"
+    ],
+    "concepts": [
+      "Marten",
+      "MartenEventStore",
+      "mapeo 1:1",
+      "AggregateStreamAsync",
+      "StartStream",
+      "Events.Append",
+      "FetchStreamStateAsync",
+      "IDocumentSession",
+      "IQuerySession"
+    ]
+  },
+  {
+    "title": "§17 · El swap de una línea",
+    "code": [
+      "services.AddMarten(options =>",
+      "{",
+      "    options.Connection(\"Host=localhost;Port=5432;…\");",
+      "    options.UseSystemTextJsonForSerialization();",
+      "    options.Events.StreamIdentity = StreamIdentity.AsString;",
+      "    options.Events.EventNamingStyle =",
+      "        EventNamingStyle.SmarterTypeName;",
+      "}).UseLightweightSessions();",
+      "",
+      "// EL SWAP: una línea (antes: InMemoryEventStore)",
+      "services.AddScoped<IEventStore, MartenEventStore>();"
+    ],
+    "concepts": [
+      "AddMarten",
+      "swap de una línea",
+      "AddScoped (DI)",
+      "StreamIdentity.AsString",
+      "EventNamingStyle.SmarterTypeName",
+      "mt_events",
+      "JSONB",
+      "FetchForWriting"
+    ]
+  },
+  {
+    "title": "§18 · Handlers sin SaveChangesAsync",
+    "code": [
+      "public class RegistrarEmpresaHandler(IEventStore store)",
+      "    : ICommandHandler<RegistrarEmpresa>",
+      "{",
+      "    public Task HandleAsync(RegistrarEmpresa cmd,",
+      "        CancellationToken ct = default)",
+      "    {",
+      "        var empresa = Empresa.Registrar(",
+      "            cmd.EmpresaId, cmd.Nombre, cmd.Plan);",
+      "        store.StartStream(empresa);   // sin SaveChangesAsync",
+      "        return Task.CompletedTask;",
+      "    }",
+      "}",
+      "// CambiarPlanHandler: Get + empresa.CambiarPlan(...)",
+      "//   tambien SIN await store.SaveChangesAsync(ct)"
+    ],
+    "concepts": [
+      "Wolverine",
+      "descubrimiento por convención",
+      "ICommandHandler opcional"
+    ]
+  },
+  {
+    "title": "§18 · El middleware del UnitOfWork",
+    "code": [
+      "// MartenUnitOfWork: union de lo tocado",
+      "public IEnumerable<AggregateRoot> AggregateRoots",
+      "    => _iniciados.Union(_modificados);",
+      "// MartenEventStore: appendear una tanda",
+      "public void AppendEvents(string id, IEnumerable<object> hechos)",
+      "    => session.Events.Append(id, hechos);",
+      "",
+      "public class UnitOfWorkMiddleware(IEventStore eventStore)",
+      "{",
+      "    public void After()   // appendea pendientes (NO comitea)",
+      "    {",
+      "        if (eventStore is not MartenEventStore m) return;",
+      "        foreach (var ar in m.ModificadosConCambios)",
+      "            m.AppendEvents(ar.Id, ar.UncommittedEvents);",
+      "    }",
+      "    public void Finally() { /* limpia + ClearChangeTracker */ }",
+      "}"
+    ],
+    "concepts": [
+      "middleware",
+      "Before/After/Finally",
+      "AutoApplyTransactions"
+    ]
+  },
+  {
+    "title": "§18 · Cablear Wolverine",
+    "code": [
+      "// dotnet add package WolverineFx.Marten",
+      "// dotnet add package WolverineFx.RuntimeCompilation",
+      "builder.UseWolverine(options =>",
+      "{",
+      "    options.Discovery.IncludeAssembly(",
+      "        typeof(CambiarPlanHandler).Assembly);",
+      "    options.UseRuntimeCompilation();",
+      "    options.Services.AddMarten(/* … */)",
+      "        .IntegrateWithWolverine();",
+      "    options.Policies.AddMiddleware<UnitOfWorkMiddleware>();",
+      "    options.Policies.AutoApplyTransactions();  // commit auto",
+      "});",
+      "builder.Services.AddScoped<IEventStore, MartenEventStore>();",
+      "// envio: await bus.InvokeAsync(comando)"
+    ],
+    "concepts": [
+      "WolverineFx.RuntimeCompilation",
+      "codegen",
+      "Discovery.IncludeAssembly",
+      "IntegrateWithWolverine",
+      "Outbox/Inbox",
+      "IMessageBus",
+      "InvokeAsync"
+    ]
+  },
+  {
+    "title": "§19 · Enchufar JasperFx al Program",
+    "code": [
+      "using JasperFx;   // arriba del Program",
+      "",
+      "var app = builder.Build();",
+      "// si llegan args (p. ej. \"codegen\"), corre JasperFx;",
+      "// si no, levanta la app",
+      "return await app.RunJasperFxCommands(args);"
+    ],
+    "concepts": [
+      "JasperFx",
+      "RunJasperFxCommands"
+    ]
+  },
+  {
+    "title": "§19 · Volcar el codegen",
+    "code": [
+      "dotnet run -- codegen preview   # imprime el código",
+      "dotnet run -- codegen write     # lo escribe a disco",
+      "# queda en Internal/Generated/"
+    ],
+    "concepts": [
+      "codegen",
+      "Internal/Generated"
+    ]
+  },
+  {
+    "title": "§19 · Ver el SQL de Marten",
+    "code": [
+      "options.Logger(new Marten.Services.ConsoleMartenLogger());",
+      "// imprime cada INSERT/SELECT contra mt_events"
+    ],
+    "concepts": [
+      "ConsoleMartenLogger",
+      "mt_events"
+    ]
+  },
+  {
+    "title": "§20 · FetchForWriting nativo",
+    "code": [
+      "// camino NATIVO (doc de Marten/Wolverine, no el del equipo)",
+      "public async Task Handle(",
+      "    CambiarPlanDeEmpresa cmd,",
+      "    IDocumentSession session, CancellationToken ct)",
+      "{",
+      "    // carga + listo para anexar (concurrencia incluida)",
+      "    var stream = await session.Events",
+      "        .FetchForWriting<Empresa>(cmd.EmpresaId, ct);",
+      "    if (stream.Aggregate.Suspendida)",
+      "        throw new ReglaDeNegocioException(",
+      "            \"No se puede cambiar el plan...\");",
+      "    stream.AppendOne(new PlanCambiado(cmd.NuevoPlan));",
+      "    await session.SaveChangesAsync(ct);  // concurrencia: gratis",
+      "}"
+    ],
+    "concepts": [
+      "FetchForWriting",
+      "vertiente nativa"
+    ]
+  },
+  {
+    "title": "§20 · El atributo [Aggregate]",
+    "code": [
+      "// nativo con [Aggregate]: Wolverine carga y persiste por ti",
+      "[Aggregate]                  // carga/guarda Empresa por su id",
+      "public static PlanCambiado Handle(",
+      "    CambiarPlanDeEmpresa cmd, Empresa empresa)",
+      "{",
+      "    if (empresa.Suspendida)  // estado ya cargado",
+      "        throw new ReglaDeNegocioException(",
+      "            \"No se puede cambiar el plan...\");",
+      "    // lo devuelto se anexa al stream",
+      "    return new PlanCambiado(cmd.NuevoPlan);",
+      "}"
+    ],
+    "concepts": [
+      "[Aggregate]",
+      "Aggregate Handler Workflow",
+      "handler estático"
+    ]
+  },
+  {
+    "title": "§21 · Interfaces marcadoras vacías",
+    "code": [
+      "public interface IEvent;          // marcador raíz",
+      "public interface IPublicEvent  : IEvent;  // cruza frontera",
+      "public interface IPrivateEvent : IEvent;  // interno",
+      "",
+      "// los que salen implementan IPublicEvent:",
+      "public record EmpresaSuspendida(string Motivo) : IPublicEvent;",
+      "public record EmpresaReactivada()              : IPublicEvent;",
+      "// EmpresaRegistrada y PlanCambiado NO marcan nada"
+    ],
+    "concepts": [
+      "interfaz marcadora",
+      "IEvent",
+      "IPublicEvent",
+      "IPrivateEvent",
+      "evento público vs privado",
+      "Event-Driven (EDA)"
+    ]
+  },
+  {
+    "title": "§21 · Separar con OfType<T>()",
+    "code": [
+      "// AggregateRoot (acumulador List<object>)",
+      "// ... propiedades + Aplicar (switch) ...",
+      "",
+      "public IPublicEvent[] GetPublicEvents() =>",
+      "    _uncommittedEvents.OfType<IPublicEvent>().ToArray();",
+      "",
+      "public IPrivateEvent[] GetPrivateEvents() =>",
+      "    _uncommittedEvents.OfType<IPrivateEvent>().ToArray();"
+    ],
+    "concepts": [
+      "OfType<T>()",
+      "GetPublicEvents/GetPrivateEvents"
+    ]
+  },
+  {
+    "title": "§22 · Dos enviadores",
+    "code": [
+      "public interface IPublicEventSender {",
+      "    Task PublishAsync(params IPublicEvent[] eventos);",
+      "    Task PublishAsync(string groupId,",
+      "                      params IPublicEvent[] eventos);",
+      "}",
+      "public interface IPrivateEventSender {",
+      "    Task PublishAsync(params IPrivateEvent[] eventos);",
+      "    Task PublishAsync(string groupId,",
+      "                      params IPrivateEvent[] eventos);",
+      "}"
+    ],
+    "concepts": [
+      "senders (enviadores)",
+      "IPublicEventSender / IPrivateEventSender",
+      "broker externo vs bus interno",
+      "groupId / orden FIFO"
+    ]
+  },
+  {
+    "title": "§22 · Sender de test",
+    "code": [
+      "public class TestPublicEventSender : IPublicEventSender",
+      "{",
+      "    private readonly List<IPublicEvent> _enviados = new();",
+      "    public IReadOnlyList<IPublicEvent> Enviados =>",
+      "        _enviados.AsReadOnly();",
+      "    public Task PublishAsync(params IPublicEvent[] ev) {",
+      "        _enviados.AddRange(ev); return Task.CompletedTask;",
+      "    }",
+      "    public Task PublishAsync(string groupId,",
+      "                             params IPublicEvent[] ev) {",
+      "        _enviados.AddRange(ev); return Task.CompletedTask;",
+      "    }",
+      "}"
+    ],
+    "concepts": [
+      "TestPublicEventSender",
+      "doble de test"
+    ]
+  },
+  {
+    "title": "§22 · El sobre",
+    "code": [
+      "public record Sobre(",
+      "    object Payload,",
+      "    string TenantId,",
+      "    string? UserId = null,",
+      "    string? GroupId = null);"
+    ],
+    "concepts": [
+      "sobre (envelope)",
+      "metadatos de contexto",
+      "DeliveryOptions de Wolverine"
+    ]
+  },
+  {
+    "title": "§23 · Outbox e inbox ingenuos",
+    "code": [
+      "public class AlmacenConOutbox",
+      "{",
+      "    private readonly List<object> _eventos = new();",
+      "    private readonly List<(string Id, object Msg)> _outbox = new();",
+      "    public int Pendientes => _outbox.Count;",
+      "    public void GuardarConOutbox(object hecho)",
+      "    {",
+      "        _eventos.Add(hecho);",
+      "        _outbox.Add((Guid.NewGuid().ToString(), hecho));",
+      "    }",
+      "    public void DrenarOutbox(BusEnMemoria bus, Inbox inbox)",
+      "    {",
+      "        foreach (var (id, msg) in _outbox.ToList())",
+      "        {",
+      "            if (!inbox.YaProcesado(id)) bus.Publicar(id, msg);",
+      "            _outbox.RemoveAll(p => p.Id == id);",
+      "        }",
+      "    }",
+      "}"
+    ],
+    "concepts": [
+      "doble escritura (dual write)",
+      "atomicidad",
+      "outbox transaccional",
+      "relay",
+      "at-least-once"
+    ]
+  },
+  {
+    "title": "§23 · Inbox y bus de juguete",
+    "code": [
+      "public class Inbox    // idempotencia del consumidor",
+      "{",
+      "    private readonly HashSet<string> _procesados = new();",
+      "    public bool YaProcesado(string id) => !_procesados.Add(id);",
+      "}",
+      "",
+      "public class BusEnMemoria",
+      "{",
+      "    public int Publicados { get; private set; }",
+      "    public void Publicar(string id, object msg) => Publicados++;",
+      "}"
+    ],
+    "concepts": [
+      "inbox",
+      "idempotencia",
+      "exactly-once de procesamiento",
+      "broker",
+      "RabbitMQ/ASB"
+    ]
+  },
+  {
+    "title": "§23 · Wolverine lo trae",
+    "code": [
+      "// IntegrateWithWolverine() ya activa outbox/inbox",
+      "// transaccional sobre Marten; se enciende por política:",
+      "options.Policies.UseDurableOutboxOnAllSendingEndpoints();",
+      "options.Policies.UseDurableInboxOnAllListeners();"
+    ],
+    "concepts": [
+      "IntegrateWithWolverine",
+      "UseDurableOutbox/UseDurableInbox",
+      "durable vs inline",
+      "SendInline",
+      "serverless"
+    ]
+  },
+  {
+    "title": "§24 · RabbitMQ en compose",
+    "code": [
+      "# docker-compose.yml — junto a postgres:",
+      "  rabbitmq:",
+      "    image: rabbitmq:4-management",
+      "    container_name: gestion_rabbitmq",
+      "    ports:",
+      "      - \"5672:5672\"      # AMQP",
+      "      - \"15672:15672\"    # panel web guest/guest",
+      "",
+      "# appsettings.json",
+      "{ \"ConnectionStrings\": {",
+      "    \"rabbitmq\":",
+      "      \"amqp://guest:guest@localhost:5672\" } }",
+      "",
+      "# dotnet add package WolverineFx.RabbitMQ",
+      "# docker compose up -d"
+    ],
+    "concepts": [
+      "RabbitMQ",
+      "broker",
+      "AMQP",
+      "conexión nombrada",
+      "WolverineFx.RabbitMQ"
+    ]
+  },
+  {
+    "title": "§24 · Rutear a exchange",
+    "code": [
+      "using Wolverine.RabbitMQ;",
+      "// dentro del builder.UseWolverine(options => { … })",
+      "",
+      "options.UseRabbitMqUsingNamedConnection(\"rabbitmq\")",
+      "       .AutoProvision();",
+      "",
+      "options.Policies.UseDurableOutboxOnAllSendingEndpoints();",
+      "var contratos = typeof(EmpresaSuspendida).Assembly;",
+      "foreach (var tipo in contratos.GetTypes()",
+      "    .Where(t => t.IsAssignableTo(typeof(IPublicEvent))))",
+      "    options.PublishMessage(tipo)",
+      "        .ToRabbitExchange(\"gestion-empresas\")",
+      "        .UseDurableOutbox();",
+      "",
+      "options.ListenToRabbitQueue(\"gestion-empresas.cola\",",
+      "    c => c.BindExchange(\"facturacion\")).UseDurableInbox();"
+    ],
+    "concepts": [
+      "AutoProvision",
+      "exchange",
+      "outbox durable",
+      "ToRabbitExchange",
+      "ruteo por tipo",
+      "ListenToRabbitQueue",
+      "BindExchange",
+      "inbox durable",
+      "EDA in-memory (bug silencioso)"
+    ]
+  },
+  {
+    "title": "§24 · Mismo patrón en ASB",
+    "code": [
+      "using Wolverine.AzureServiceBus;",
+      "// dotnet add package WolverineFx.AzureServiceBus",
+      "",
+      "// toma el connection string LITERAL (no nombrado)",
+      "options.UseAzureServiceBus(",
+      "    builder.Configuration",
+      "        .GetConnectionString(\"AsbConnection\")!);",
+      "",
+      "options.PublishMessage<EmpresaSuspendida>()",
+      "       .ToAzureServiceBusTopic(\"empresas\")",
+      "       .UseDurableOutbox();"
+    ],
+    "concepts": [
+      "Azure Service Bus",
+      "topic",
+      "ToAzureServiceBusTopic",
+      "connection string literal",
+      "WolverineFx.AzureServiceBus"
+    ]
+  },
+  {
+    "title": "§26 · Host serverless: ManualOnly + Solo",
+    "code": [
+      "// gemelo serverless de UsarWolverineParaComandos",
+      "builder.Services.AddWolverineRuntimeCompilation();",
+      "",
+      "builder.Services.AddWolverine(",
+      "    ExtensionDiscovery.ManualOnly, options =>   // ← no auto",
+      "{",
+      "    options.Discovery.IncludeAssembly(",
+      "        typeof(SuspenderEmpresa).Assembly);",
+      "    options.Services",
+      "        .AgregarConfiguracionMartenComandos(cs, schema, _ => { }, isDev)",
+      "        .IntegrateWithWolverine();",
+      "    options.Policies.AddMiddleware<UnitOfWorkMiddleware>();",
+      "    options.Policies.AutoApplyTransactions();",
+      "    options.Durability.Mode = DurabilityMode.Solo;   // ← no Balanced",
+      "});"
+    ],
+    "concepts": [
+      "Serverless / Azure Functions",
+      "dotnet-isolated",
+      "AddWolverine(ManualOnly)",
+      "DurabilityMode.Solo"
+    ]
+  },
+  {
+    "title": "§26 · El envío: SendInline (sin outbox)",
+    "code": [
+      "// dockerizado (host largo):",
+      "options.HabilitarAzureServiceBus(cs);",
+      "options.PublicarEvento<EmpresaSuspendida>(\"empresas\");",
+      "",
+      "// serverless (Azure Functions):",
+      "options.HabilitarAzureServiceBusParaServerLess(cs);",
+      "    // SystemQueuesAreEnabled(false)",
+      "options.PublicarEventoServerless<EmpresaSuspendida>(\"empresas\");",
+      "    // SendInline() — envía en el acto, sin outbox durable"
+    ],
+    "concepts": [
+      "SendInline",
+      "SystemQueuesAreEnabled(false)"
+    ]
+  },
+  {
+    "title": "§27 · Modelo de lectura + proyección",
+    "code": [
+      "using Marten.Events.Aggregation;",
+      "",
+      "public class EmpresaResumen",
+      "{",
+      "    public string Id { get; set; } = \"\";",
+      "    public string Nombre { get; set; } = \"\";",
+      "    public string Plan { get; set; } = \"\";",
+      "    public bool   Suspendida { get; set; }",
+      "}",
+      "",
+      "public partial class EmpresaResumenProjection",
+      "    : SingleStreamProjection<EmpresaResumen, string>",
+      "{",
+      "    public void Apply(EmpresaRegistrada e, EmpresaResumen r)",
+      "    { r.Nombre = e.Nombre; r.Plan = e.Plan; }",
+      "    // … PlanCambiado / Suspendida / Reactivada …",
+      "}"
+    ],
+    "concepts": [
+      "CQRS",
+      "proyección",
+      "modelo de lectura",
+      "SingleStreamProjection",
+      "partial (codegen)"
+    ]
+  },
+  {
+    "title": "§27 · Registrar y consultar",
+    "code": [
+      "using JasperFx.Events.Projections;",
+      "",
+      "options.Projections.Add<EmpresaResumenProjection>(",
+      "    ProjectionLifecycle.Inline);   // o .Async, o .Live",
+      "",
+      "await using var querySession = store.QuerySession();",
+      "",
+      "var suspendidas = await querySession.Query<EmpresaResumen>()",
+      "    .Where(e => e.Suspendida)",
+      "    .ToListAsync(CancellationToken.None);"
+    ],
+    "concepts": [
+      "ProjectionLifecycle",
+      "Live/Inline/Async",
+      "consistencia eventual",
+      "QuerySession",
+      "Query<T> LINQ",
+      "async daemon"
+    ]
+  },
+  {
+    "title": "§28 · Cambio aditivo tolerante",
+    "code": [
+      "// hace un año guardaste miles de estos:",
+      "public record PlanCambiado(string NuevoPlan);",
+      "",
+      "// hoy: agregas campo OPCIONAL con default",
+      "//   → los viejos siguen deserializando",
+      "public record PlanCambiado(",
+      "    string NuevoPlan,",
+      "    string CambiadoPor = \"desconocido\");",
+      "// {\"NuevoPlan\":\"Premium\"} → CambiadoPor = \"desconocido\""
+    ],
+    "concepts": [
+      "Versionado de eventos",
+      "Cambio aditivo",
+      "Lector tolerante"
+    ]
+  },
+  {
+    "title": "§28 · Upcasting v1 → v2",
+    "code": [
+      "// v1 (lo persistido) y v2 (lo que usas hoy)",
+      "public record PlanCambiadoV1(string Plan);",
+      "public record PlanCambiado(",
+      "    string NuevoPlan, string CambiadoPor);",
+      "",
+      "// el upcaster: traduce v1 → v2 al LEER",
+      "static PlanCambiado Upcast(PlanCambiadoV1 viejo) =>",
+      "    new(viejo.Plan, CambiadoPor: \"desconocido\");",
+      "",
+      "// se registra en Marten (su mecanismo);",
+      "// tu código solo conoce PlanCambiado."
+    ],
+    "concepts": [
+      "Upcasting",
+      "Upcaster"
+    ]
+  },
+  {
+    "title": "§29 · La llave es (tenant, id)",
+    "code": [
+      "public class AlmacenMultiTenant",
+      "{",
+      "    private readonly",
+      "        Dictionary<(string Tenant, string Id), string>",
+      "        _streams = new();",
+      "",
+      "    public int Total => _streams.Count;",
+      "",
+      "    public void Guardar(string tenant, string id, string nombre)",
+      "        => _streams[(tenant, id)] = nombre;",
+      "",
+      "    public string? Cargar(string tenant, string id)",
+      "        => _streams.GetValueOrDefault((tenant, id));",
+      "}"
+    ],
+    "concepts": [
+      "multi-tenancy",
+      "tenant",
+      "llave (tenant, id)",
+      "aislamiento ortogonal"
+    ]
+  },
+  {
+    "title": "§29 · Conjoined en Marten",
+    "code": [
+      "using JasperFx.MultiTenancy;   // TenancyStyle vive AQUÍ",
+      "",
+      "// dentro del AddMarten(options => { … })",
+      "options.Events.TenancyStyle = TenancyStyle.Conjoined;",
+      "options.Policies.AllDocumentsAreMultiTenanted();",
+      "",
+      "// el tenant se fija al ABRIR la sesión, no por parámetro:",
+      "store.LightweightSession(\"sinco\");"
+    ],
+    "concepts": [
+      "TenancyStyle.Conjoined",
+      "columna tenant_id",
+      "tenant por sesión"
+    ]
+  },
+  {
+    "title": "§30 · ITenantResolver del contexto",
+    "code": [
+      "public interface ITenantResolver",
+      "{",
+      "    string TenantId { get; }",
+      "    string UserId { get; }",
+      "}",
+      "",
+      "// lee headers HTTP que un gateway de confianza estampó",
+      "public class TrustedHeadersTenantResolver(",
+      "    IHttpContextAccessor accessor) : ITenantResolver",
+      "{",
+      "    public string TenantId => Leer(\"X-Tenant-Id\");",
+      "    public string UserId   => Leer(\"X-User-Id\");",
+      "}"
+    ],
+    "concepts": [
+      "tenant resolver",
+      "ITenantResolver",
+      "TrustedHeadersTenantResolver",
+      "header HTTP confiable",
+      "gateway"
+    ]
+  },
+  {
+    "title": "§30 · Leer header o lanzar",
+    "code": [
+      "private string Leer(string header)",
+      "{",
+      "    var valor = accessor.HttpContext?",
+      "        .Request.Headers[header].FirstOrDefault();",
+      "    if (string.IsNullOrWhiteSpace(valor))",
+      "        throw new InvalidOperationException(",
+      "            $\"Falta el header de contexto '{header}'.\");",
+      "    return valor;",
+      "}"
+    ],
+    "concepts": [
+      "IHttpContextAccessor",
+      "lanzar si falta"
+    ]
+  },
+  {
+    "title": "§30 · Registrar el resolver",
+    "code": [
+      "services.AddHttpContextAccessor();",
+      "services.AddScoped<ITenantResolver,",
+      "    TrustedHeadersTenantResolver>();"
+    ],
+    "concepts": [
+      "AddHttpContextAccessor",
+      "registro scoped (DI)"
+    ]
+  },
+  {
+    "title": "§31 · Resolver desde el sobre",
+    "code": [
+      "// lee del sobre del mensaje (lo propaga Wolverine)",
+      "public class WolverineMessageContextTenantResolver(",
+      "    IMessageContext messageContext) : ITenantResolver",
+      "{",
+      "    public string TenantId => messageContext.TenantId",
+      "        ?? throw new InvalidOperationException(",
+      "            \"El mensaje no se publicó con DeliveryOptions.TenantId.\");",
+      "    public string UserId =>",
+      "        messageContext.Envelope?.Headers",
+      "            .GetValueOrDefault(\"user_id\")",
+      "        ?? throw new InvalidOperationException(",
+      "            \"El mensaje no trae el header user_id.\");",
+      "}"
+    ],
+    "concepts": [
+      "IMessageContext",
+      "WolverineMessageContextTenantResolver",
+      "DeliveryOptions.TenantId"
+    ]
+  },
+  {
+    "title": "§31 · Proxy elige por HttpContext",
+    "code": [
+      "// una sola ITenantResolver, dos fuentes",
+      "public class ProxyTenantResolver(",
+      "    IMessageContext messageContext,",
+      "    IHttpContextAccessor accessor) : ITenantResolver",
+      "{",
+      "    private readonly ITenantResolver _real =",
+      "        accessor.HttpContext is not null",
+      "        ? new TrustedHeadersTenantResolver(accessor)",
+      "        : new WolverineMessageContextTenantResolver(messageContext);",
+      "    public string TenantId => _real.TenantId;",
+      "    public string UserId   => _real.UserId;",
+      "}"
+    ],
+    "concepts": [
+      "patrón Proxy",
+      "IHttpContextAccessor"
+    ]
+  },
+  {
+    "title": "§31 · Registrar el híbrido",
+    "code": [
+      "services.AddHttpContextAccessor();",
+      "services.AddScoped<ITenantResolver, ProxyTenantResolver>();"
+    ],
+    "concepts": [
+      "AddHttpContextAccessor"
+    ]
+  },
+  {
+    "title": "§32 · Rehidratar con un switch",
+    "code": [
+      "// rehidrata \"a pie\": un switch rutea cada hecho a su Apply",
+      "private static void ApplyEvent(Empresa ar, object evento)",
+      "{",
+      "    switch (evento)",
+      "    {",
+      "        case EmpresaRegistrada e: ar.Apply(e); break;",
+      "        case EmpresaSuspendida e: ar.Apply(e); break;",
+      "        case EmpresaReactivada e: ar.Apply(e); break;",
+      "        // … una rama MÁS por cada hecho nuevo",
+      "    }",
+      "}"
+    ],
+    "concepts": [
+      "Rehidratar",
+      "switch por tipo"
+    ]
+  },
+  {
+    "title": "§32 · TestStore por reflexión",
+    "code": [
+      "public class TestStore : IEventStore",
+      "{",
+      "    private readonly Dictionary<string, List<object>> _previos = new();",
+      "    private readonly Dictionary<string, List<object>> _nuevos  = new();",
+      "    private static readonly",
+      "        ConcurrentDictionary<(Type, Type), MethodInfo?> _cache = new();",
+      "",
+      "    public void AppendPreviousEvents(string id, params object[] ev) =>",
+      "        (_previos[id] = _previos.GetValueOrDefault(id) ?? new())",
+      "            .AddRange(ev);",
+      "    public IEnumerable<object> GetNewEvents(string id) =>",
+      "        _nuevos.GetValueOrDefault(id) ?? [];",
+      "    // … StartStream / GetAggregateRootAsync / SaveChanges …",
+      "}"
+    ],
+    "concepts": [
+      "TestStore",
+      "almacén en memoria",
+      "Given/Then"
+    ]
+  },
+  {
+    "title": "§32 · ApplyEvent reflexivo",
+    "code": [
+      "// halla el Apply(TipoConcreto) y lo invoca (cacheado)",
+      "private static void ApplyEvent<T>(T ar, object evento)",
+      "{",
+      "    var metodo = _cache.GetOrAdd(",
+      "        (typeof(T), evento.GetType()),",
+      "        llave => llave.Item1.GetMethod(",
+      "            \"Apply\", new[] { llave.Item2 }));",
+      "    metodo?.Invoke(ar, new[] { evento });",
+      "}"
+    ],
+    "concepts": [
+      "Reflexión",
+      "MethodInfo",
+      "cache de método"
+    ]
+  },
+  {
+    "title": "§33 · Base Given/When/Then",
+    "code": [
+      "using AwesomeAssertions;",
+      "",
+      "public abstract class CommandHandlerTestBase",
+      "{",
+      "    protected string AggregateId = \"emp-7\";",
+      "    protected readonly TestStore EventStore = new();",
+      "",
+      "    protected void Given(params object[] eventos) =>",
+      "        EventStore.AppendPreviousEvents(AggregateId, eventos);",
+      "",
+      "    protected void Then(params object[] esperados) =>",
+      "        EventStore.GetNewEvents(AggregateId)",
+      "            .Should().BeEquivalentTo(esperados);",
+      "",
+      "    protected void And<T, TR>(Func<T, TR> proyeccion, TR esperado)",
+      "        where T : AggregateRoot, new() =>",
+      "        proyeccion(EventStore.GetAggregateRoot<T>(AggregateId))",
+      "            .Should().Be(esperado);",
+      "}"
+    ],
+    "concepts": [
+      "Given-When-Then",
+      "CommandHandlerTestBase",
+      "And (estado)",
+      "AwesomeAssertions",
+      "BeEquivalentTo"
+    ]
+  },
+  {
+    "title": "§33 · WhenAsync + test [Fact]",
+    "code": [
+      "public abstract class CommandHandlerAsyncTest<TCommand>",
+      "    : CommandHandlerTestBase",
+      "{",
+      "    protected abstract ICommandHandler<TCommand> Handler { get; }",
+      "    protected async Task WhenAsync(TCommand cmd)",
+      "    { await Handler.HandleAsync(cmd); EventStore.SaveChanges(); }",
+      "}",
+      "",
+      "public class CambiarPlanTests",
+      "    : CommandHandlerAsyncTest<CambiarPlanDeEmpresa>",
+      "{",
+      "    protected override ICommandHandler<CambiarPlanDeEmpresa>",
+      "        Handler => new CambiarPlanHandler(EventStore);",
+      "",
+      "    [Fact]",
+      "    public async Task Cambiar_plan_emite_PlanCambiado()",
+      "    {",
+      "        Given(new EmpresaRegistrada(\"Constructora Andes\",",
+      "            \"Básico\"));",
+      "        await WhenAsync(new CambiarPlanDeEmpresa(AggregateId,",
+      "            \"Premium\"));",
+      "        Then(new PlanCambiado(\"Premium\"));",
+      "        And<Empresa, string>(e => e.Plan, \"Premium\");",
+      "    }",
+      "}"
+    ],
+    "concepts": [
+      "CommandHandlerAsyncTest<T>",
+      "WhenAsync",
+      "[Fact]",
+      "xUnit",
+      "probar sin BD ni mocks"
+    ]
+  },
+  {
+    "title": "§34 · Método de extensión clásico",
+    "code": [
+      "public static class QueryableExtensions",
+      "{",
+      "    public static Task<List<T>> ToListAsync<T>(",
+      "        this IQueryable<T> fuente, CancellationToken ct)",
+      "        where T : notnull => …;",
+      "",
+      "    public static Task<bool> AnyAsync<T>(",
+      "        this IQueryable<T> fuente, CancellationToken ct)",
+      "        where T : notnull => …;",
+      "    // ↑ this IQueryable<T> … where T : notnull — repetido",
+      "}"
+    ],
+    "concepts": [
+      "método de extensión clásico",
+      "genéricos con restricción"
+    ]
+  },
+  {
+    "title": "§34 · El bloque extension(...)",
+    "code": [
+      "public static class QueryableExtensions",
+      "{",
+      "    // receptor + restricciones, UNA vez para el bloque",
+      "    extension<T>(IQueryable<T> fuente) where T : notnull",
+      "    {",
+      "        public Task<IReadOnlyList<T>> ToListAsync(",
+      "            CancellationToken ct)",
+      "            => Marten.QueryableExtensions",
+      "                .ToListAsync(fuente, ct);",
+      "",
+      "        public Task<bool> AnyAsync(CancellationToken ct)",
+      "            => Marten.QueryableExtensions.AnyAsync(",
+      "                (IMartenQueryable<T>)fuente, ct);",
+      "    }",
+      "}"
+    ],
+    "concepts": [
+      "extension members",
+      "bloque extension(...)",
+      "C# 14"
+    ]
+  },
+  {
+    "title": "§35 · Directory.Build.props compartido",
+    "code": [
+      "<!-- Directory.Build.props (raíz): versionado -->",
+      "<Project>",
+      "  <PropertyGroup>",
+      "    <AssemblyVersion>0.0.0.0</AssemblyVersion>",
+      "    <FileVersion Condition=\"'$(Version)' != ''\">$([System.Text",
+      ".RegularExpressions.Regex]::Replace($(Version),",
+      "'[-+].*$',''))</FileVersion>",
+      "  </PropertyGroup>",
+      "</Project>"
+    ],
+    "concepts": [
+      "NuGet",
+      "Directory.Build.props",
+      "desacoplar AssemblyVersion/PackageVersion"
+    ]
+  },
+  {
+    "title": "§35 · PrivateAssets no filtra",
+    "code": [
+      "<PackageReference Include=\"Marten\" Version=\"...\"",
+      "  PrivateAssets=\"all\" />",
+      "<!-- USA Marten, pero NO se lo impone al consumidor -->",
+      "<!-- corta la dependencia transitiva -->"
+    ],
+    "concepts": [
+      "PrivateAssets=\"all\"",
+      "dependencia transitiva"
+    ]
+  },
+  {
+    "title": "§35 · release-nuget.yml LOCKSTEP",
+    "code": [
+      "# release-nuget.yml — disparo manual",
+      "on:",
+      "  workflow_dispatch:",
+      "    inputs:",
+      "      bump_type: { type: choice,",
+      "        options: [patch, minor, major], default: minor }",
+      "      version:   { description: \"X.Y.Z\" }",
+      "jobs:",
+      "  release:",
+      "    uses: Cosmos-SincoERP/.github/.github/workflows/",
+      "      _reusable-nuget-publish-batch.yml@v1",
+      "    secrets: inherit"
+    ],
+    "concepts": [
+      "versionado LOCKSTEP",
+      "workflow_dispatch",
+      "workflow reusable de organización",
+      "secrets: inherit"
+    ]
+  },
+  {
+    "title": "§36 · El reveal: Cosmos.BuildingBlocks",
+    "code": [
+      "// Tu motor hecho a mano == la plantilla del equipo:",
+      "// AggregateRoot (Raise + Apply(T) + Version)",
+      "//   -> Cosmos.EventSourcing.Abstractions",
+      "// IEventStore + MartenEventStore + UnitOfWorkMiddleware",
+      "//   -> Cosmos.EventSourcing.CritterStack",
+      "// record IEvent / IPublicEvent / IPrivateEvent",
+      "//   -> Cosmos.EventDriven.Abstractions",
+      "// senders + sobre + RabbitMQ/ASB",
+      "//   -> Cosmos.EventDriven.CritterStack(.RabbitMQ/.AzureServiceBus)",
+      "// ITenantResolver + TrustedHeaders/ProxyTenantResolver",
+      "//   -> Cosmos.MultiTenancy(.AspNetCore/.CritterStack)",
+      "// TestStore + CommandHandlerTestBase (Given-When-Then)",
+      "//   -> Cosmos.EventSourcing.Testing.Utilities"
+    ],
+    "concepts": [
+      "Cosmos.BuildingBlocks"
+    ]
+  }
+]
