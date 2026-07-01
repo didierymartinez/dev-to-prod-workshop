@@ -23,7 +23,7 @@ Pero el tenant **sí** puede llegar: cuando un evento se publica, se estampa en 
 > ```csharp
 > await bus.PublishAsync(evento, new DeliveryOptions { TenantId = tenant.TenantId }.WithHeader("user_id", tenant.UserId));
 > ```
-> Sin ese `DeliveryOptions.TenantId`, el `IMessageContext.TenantId` del receptor llega **`null`** y el resolver de abajo lanza. (Ese es el "otro extremo" que cierra el hilo del tenant.)
+> Sin ese `DeliveryOptions.TenantId`, el `IMessageContext.TenantId` del receptor llega **`null`** y el resolver de abajo lanza.
 
 > [!NOTE]
 > 🆕 **`IMessageContext` —el contexto del mensaje que Wolverine está procesando ahora; hermano de `IMessageBus`, te da metadatos como el tenant y los headers—.** Donde `IMessageBus` ([Senders y el sobre](senders-y-sobre.md)) es para **publicar** mensajes, `IMessageContext` es para **leer** el que estás manejando: su `TenantId` y su `Envelope.Headers`. Lo inyecta **Wolverine** al correr el handler (lo pides como parámetro o en el constructor y aparece resuelto). Aquí lo usamos para recuperar el `TenantId` del sobre y el header `user_id` que se estampó al publicar (con `.WithHeader("user_id", …)`, como muestra la nota de arriba).

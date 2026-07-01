@@ -31,7 +31,7 @@ La regla del event sourcing real (y de la plantilla del equipo): **todo acceso a
 
 ## 🔁 El almacén, ahora asíncrono
 
-Los métodos del `EventStore` cambian de firma: en vez de devolver una lista al instante, devuelven una **`Task`** (la promesa de un resultado futuro), y reciben un parámetro nuevo, el **`CancellationToken`**.
+Los métodos del `EventStore` cambian de firma: en vez de devolver una lista al instante, devuelven una **`Task`**, y reciben un parámetro nuevo, el **`CancellationToken`**.
 
 > [!NOTE]
 > **¿Qué es ese `CancellationToken ct = default`?** Es una señal de *"ya no necesito esto, abandona"*: si el cliente cierra la página o se cumple un *timeout*, la operación se corta en vez de seguir gastando. Toda API real de base de datos lo recibe (y las de la plantilla, también). Lo dejamos con `= default` para no tener que pasarlo en cada llamada todavía. **Por ahora el `ct` es un hueco reservado: lo recibimos en las firmas, pero aún no lo encadenamos** (los handlers todavía llaman a `GetAsync()`/`AppendAsync()` sin pasarlo). Eso lo haremos cuando importe —cuando detrás haya una base de datos real que pueda cancelarse—. Lo que queremos dejar grabado hoy es el **hábito de la firma**: cuando un método sea `async`, déjale su `CancellationToken` listo.
