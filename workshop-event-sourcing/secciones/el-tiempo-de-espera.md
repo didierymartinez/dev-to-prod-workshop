@@ -1,6 +1,6 @@
 # El tiempo de espera (async/await)
 
-Tienes el flujo completo de event sourcing… pero vive en RAM. Cuando el programa se apaga, el `InMemoryEventStore` se va a la basura con toda su historia. Para que las empresas sobrevivan a un reinicio habrá que enviar los hechos **fuera del proceso**, a una base de datos real — y eso trae un costo nuevo: **el tiempo de espera**.
+Tienes el flujo completo de event sourcing… pero vive en RAM. Cuando el programa se apaga, el `EventStore` se va a la basura con toda su historia. Para que las empresas sobrevivan a un reinicio habrá que enviar los hechos **fuera del proceso**, a una base de datos real — y eso trae un costo nuevo: **el tiempo de espera**.
 
 > [!NOTE]
 > Aún **no** persistimos en esta sección (Postgres llega en unas secciones, en [Docker y PostgreSQL](docker-postgres.md)); aquí **preparamos la forma `async`** para que, cuando aparezca la espera real, el código ya **no tenga que cambiar**. Hoy el almacén sigue en RAM — pero con firmas asíncronas.
@@ -31,37 +31,37 @@ La regla del event sourcing real (y de la plantilla del equipo): **todo acceso a
 
 ## 🔁 El almacén, ahora asíncrono
 
-Los métodos del `InMemoryEventStore` cambian de firma: en vez de devolver una lista al instante, devuelven una **`Task`** (la promesa de un resultado futuro), y reciben un parámetro nuevo, el **`CancellationToken`**.
+Los métodos del `EventStore` cambian de firma: en vez de devolver una lista al instante, devuelven una **`Task`** (la promesa de un resultado futuro), y reciben un parámetro nuevo, el **`CancellationToken`**.
 
 > [!NOTE]
 > **¿Qué es ese `CancellationToken ct = default`?** Es una señal de *"ya no necesito esto, abandona"*: si el cliente cierra la página o se cumple un *timeout*, la operación se corta en vez de seguir gastando. Toda API real de base de datos lo recibe (y las de la plantilla, también). Lo dejamos con `= default` para no tener que pasarlo en cada llamada todavía. **Por ahora el `ct` es un hueco reservado: lo recibimos en las firmas, pero aún no lo encadenamos** (los handlers todavía llaman a `GetAsync()`/`AppendAsync()` sin pasarlo). Eso lo haremos cuando importe —cuando detrás haya una base de datos real que pueda cancelarse—. Lo que queremos dejar grabado hoy es el **hábito de la firma**: cuando un método sea `async`, déjale su `CancellationToken` listo.
 
-El `InMemoryEventStore` no habla con ninguna red — todo está en RAM, así que **no espera de verdad**. Como no hay espera, envolvemos sus resultados en una `Task` ya completada:
+El `EventStore` no habla con ninguna red — todo está en RAM, así que **no espera de verdad**. Como no hay espera, envolvemos sus resultados en una `Task` ya completada:
 
 ```csharp
-// 🔁 Reemplaza el InMemoryEventStore de «El almacén en memoria» por esta versión asíncrona
-public class InMemoryEventStore
+// 🔁 Reemplaza tu EventStore (el de «Concurrencia optimista») por esta versión asíncrona
+public class EventStore
 {
     private readonly Dictionary<string, List<EventoAlmacenado>> _cajones = new();
 
-    // sin cambios: sigue entregándote el stream ya conectado
+    // sin cambios de fondo: sigue entregándote el stream ya conectado
     public EventStream<T> AbrirStream<T>(string aggregateId) where T : AggregateRoot, new()
         => new(this, aggregateId);
 
-    public Task<IEnumerable<EventoAlmacenado>> GetEventsAsync(string aggregateId, CancellationToken ct = default) =>
-        Task.FromResult<IEnumerable<EventoAlmacenado>>(
-            _cajones.GetValueOrDefault(aggregateId) ?? Enumerable.Empty<EventoAlmacenado>());
+    public Task<List<EventoAlmacenado>> GetEventsAsync(string aggregateId, CancellationToken ct = default)
+        => Task.FromResult(_cajones.ContainsKey(aggregateId) ? _cajones[aggregateId] : new());
 
-    public Task AppendEventAsync(string aggregateId, EventoAlmacenado evento, CancellationToken ct = default)
+    public Task AppendEventAsync(string aggregateId, EventoAlmacenado sobre, CancellationToken ct = default)
     {
-        var cajon = _cajones.GetValueOrDefault(aggregateId) ?? new();
-        var versionActual = cajon.Count == 0 ? 0 : cajon[^1].Version;
-        if (evento.Version != versionActual + 1)
-            throw new ConcurrencyException(
-                $"Esperaba la versión {versionActual + 1}, pero llegó la {evento.Version}.");
+        if (!_cajones.ContainsKey(aggregateId))
+            _cajones[aggregateId] = new();
+        var cajon = _cajones[aggregateId];
 
-        _cajones[aggregateId] = cajon;
-        cajon.Add(evento);
+        if (sobre.Version <= cajon.Count)   // esa posición ya está ocupada → alguien escribió primero
+            throw new ConcurrencyException(
+                $"La versión {sobre.Version} ya está ocupada (el cajón va en {cajon.Count}). Recarga y reintenta.");
+
+        cajon.Add(sobre);
         return Task.CompletedTask;   // no hubo espera real: la "promesa" ya está cumplida
     }
 }
@@ -81,7 +81,7 @@ public async Task<T> GetAsync()
     var entidad = new T { Id = _aggregateId };
     var sobres = (await _store.GetEventsAsync(_aggregateId)).ToList();   // ← await: libera el hilo mientras llega
     entidad.Load(sobres.Select(s => s.EventData));
-    _version = sobres.Count == 0 ? 0 : sobres[^1].Version;
+    _version = sobres.Count;
     return entidad;
 }
 
@@ -97,11 +97,11 @@ public async Task AppendAsync(object hecho)
 > ```csharp
 > public class EventStream<T> where T : AggregateRoot, new()
 > {
->     private readonly InMemoryEventStore _store;
+>     private readonly EventStore _store;
 >     private readonly string _aggregateId;
 >     private int _version;
 >
->     public EventStream(InMemoryEventStore store, string aggregateId)
+>     public EventStream(EventStore store, string aggregateId)
 >     {
 >         _store = store;
 >         _aggregateId = aggregateId;
@@ -112,7 +112,7 @@ public async Task AppendAsync(object hecho)
 >         var entidad = new T { Id = _aggregateId };
 >         var sobres = (await _store.GetEventsAsync(_aggregateId)).ToList();
 >         entidad.Load(sobres.Select(s => s.EventData));
->         _version = sobres.Count == 0 ? 0 : sobres[^1].Version;
+>         _version = sobres.Count;
 >         return entidad;
 >     }
 >
@@ -138,7 +138,7 @@ Y **ambos** handlers (`SuspenderHandler` y `CambiarPlanHandler`) pasan a `Handle
 
 ```csharp
 // 🔁 Handle → HandleAsync (y recibe su CancellationToken)
-public class SuspenderHandler(InMemoryEventStore store) : ICommandHandler<SuspenderEmpresa>
+public class SuspenderHandler(EventStore store) : ICommandHandler<SuspenderEmpresa>
 {
     public async Task HandleAsync(SuspenderEmpresa cmd, CancellationToken ct = default)
     {
@@ -149,7 +149,7 @@ public class SuspenderHandler(InMemoryEventStore store) : ICommandHandler<Suspen
     }
 }
 
-public class CambiarPlanHandler(InMemoryEventStore store) : ICommandHandler<CambiarPlanDeEmpresa>
+public class CambiarPlanHandler(EventStore store) : ICommandHandler<CambiarPlanDeEmpresa>
 {
     public async Task HandleAsync(CambiarPlanDeEmpresa cmd, CancellationToken ct = default)
     {
@@ -163,7 +163,7 @@ public class CambiarPlanHandler(InMemoryEventStore store) : ICommandHandler<Camb
 Y en el `Program.cs`, como los *top-level statements* ya son `async`, simplemente usas `await` (siembra `emp-7` primero, para que tenga historia que cargar):
 
 ```csharp
-var store = new InMemoryEventStore();
+var store = new EventStore();
 await store.AbrirStream<Empresa>("emp-7").AppendAsync(new EmpresaRegistrada("Constructora Andes", "Básico"));  // siembra
 
 await new SuspenderHandler(store).HandleAsync(new SuspenderEmpresa("emp-7", "falta de pago"));   // top-level async: solo await
@@ -192,7 +192,7 @@ Ahora las interfaces ya no mienten: dicen la verdad sobre la espera. Pero queda 
 
 ## ✅ Compruébalo
 
-- [ ] El `InMemoryEventStore`, el `EventStream` y los handlers son **todos** `async` (devuelven `Task`/`Task<T>`).
+- [ ] El `EventStore`, el `EventStream` y los handlers son **todos** `async` (devuelven `Task`/`Task<T>`).
 - [ ] `dotnet run` sigue funcionando con `await` en el `Program.cs`.
 - [ ] Sabes explicar por qué el almacén en memoria usa `Task.FromResult`/`Task.CompletedTask` (no hay espera real, pero cumple el contrato).
 - [ ] Sabes, a grandes rasgos, por qué evitamos `.Result`/`.Wait()` (bloquean un hilo en vez de liberarlo) y qué significa "async hasta arriba".
@@ -221,6 +221,6 @@ Hablar con una base de datos es **I/O que tarda**; con `Task` + `async`/`await` 
 
 ---
 
-[⬅️ Volver: El almacén en memoria (Event Store)](./el-almacen-en-memoria.md)
+[⬅️ Volver: Cuando dos escriben a la vez (concurrencia optimista)](./concurrencia-optimista.md)
 
 [➡️ Siguiente: De `new` al contenedor (Inyección de Dependencias)](./inyeccion-de-dependencias.md)

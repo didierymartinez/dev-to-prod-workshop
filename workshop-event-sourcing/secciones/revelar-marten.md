@@ -4,13 +4,13 @@ Llegó el momento. Tu motor tiene la **forma exacta** de producción ([El agrega
 
 ## 🎯 El Objetivo
 
-Reemplazar tu `InMemoryEventStore` por uno construido sobre **Marten** (Postgres real) **sin tocar** el dominio (`Empresa`, `Apply`, `decide`) ni los handlers.
+Reemplazar tu `EventStore` en RAM por uno construido sobre **Marten** (Postgres real) **sin tocar** el dominio (`Empresa`, `Apply`, `decide`) ni los handlers.
 
 ## El que lo hace posible: extrae la interfaz
 
-Hasta ahora los handlers reciben el tipo **concreto** `InMemoryEventStore`. Para poder cambiarlo por otro, necesitan depender de un **contrato**, no de una implementación. Es el momento de extraer `IEventStore` — y es justo ahora porque por fin hay una **segunda implementación** (la de Marten) que justifica la abstracción.
+Hasta ahora los handlers reciben el tipo **concreto** `EventStore`. Para poder cambiarlo por otro, necesitan depender de un **contrato**, no de una implementación. Es el momento de extraer `IEventStore` — y es justo ahora porque por fin hay una **segunda implementación** (la de Marten) que justifica la abstracción.
 
-> 🛠️ **Inténtalo tú.** (1) Extrae una interfaz `IEventStore` con los métodos públicos de tu almacén (`StartStream`, `GetAggregateRootAsync<T>`, `SaveChangesAsync`, `ExistsAsync<T>`). (2) Haz que `InMemoryEventStore` la implemente (`: IEventStore`). (3) En los tres handlers, cambia el parámetro `InMemoryEventStore store` por **`IEventStore store`**. Compila: debe seguir todo igual.
+> 🛠️ **Inténtalo tú.** (1) Extrae una interfaz `IEventStore` con los métodos públicos de tu almacén (`StartStream`, `GetAggregateRootAsync<T>`, `SaveChangesAsync`, `ExistsAsync<T>`). (2) **Renombra tu `EventStore` a `InMemoryEventStore`** —ahora que llega su hermana `MartenEventStore` (Postgres), el prefijo distingue la implementación en RAM de la de verdad— y haz que implemente `IEventStore` (`: IEventStore`). (3) En los tres handlers, cambia el parámetro `EventStore store` por **`IEventStore store`**. Compila: debe seguir todo igual.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -25,7 +25,7 @@ public interface IEventStore
 }
 ```
 
-`public class InMemoryEventStore : IEventStore { … }` (su código no cambia, solo declara que cumple el contrato). Y en los handlers: `RegistrarEmpresaHandler(IEventStore store)`, `CambiarPlanHandler(IEventStore store)`, `SuspenderHandler(IEventStore store)`.
+`public class InMemoryEventStore : IEventStore { … }` (tu `EventStore` renombrado; su lógica no cambia, solo declara que cumple el contrato). Y en los handlers: `RegistrarEmpresaHandler(IEventStore store)`, `CambiarPlanHandler(IEventStore store)`, `SuspenderHandler(IEventStore store)`.
 </details>
 
 Con eso, el dominio y los handlers ya **no saben** si los hechos van a RAM o a Postgres. Solo conocen `IEventStore`. Ese desacople es lo que hace el swap trivial.
@@ -72,7 +72,7 @@ public class MartenEventStore(IDocumentSession session, IQuerySession querySessi
         where T : AggregateRoot, new()                             // tu rehidratar → AggregateStreamAsync
     {
         var ar = await querySession.Events.AggregateStreamAsync<T>(id, token: ct);
-        if (ar is not null) ar.Id = id;        // el id es la llave del stream (El almacén en memoria): lo estampamos al cargar
+        if (ar is not null) ar.Id = id;        // el id es la llave del stream (El almacén por id): lo estampamos al cargar
         RastrearModificado(ar);
         return ar;
     }
@@ -146,7 +146,7 @@ Verás una fila por hecho, con su `version`, el `type` (`empresa_registrada`, `p
 > ⚖️ **Cómo escribe Marten aquí (semilla para [Las dos vertientes](dos-vertientes.md)).** Fíjate que cargamos con `AggregateStreamAsync` y escribimos aparte con `Events.Append` — **dos pasos**. La doc de Marten recomienda hoy otro camino para el flujo de escritura: `FetchForWriting<T>(id)`, que carga **y** deja la sesión lista para anexar con **concurrencia optimista incluida**. La capa del equipo eligió `AggregateStreamAsync`+`Append` (verás por qué, y qué cuesta, en [Las dos vertientes](dos-vertientes.md) "las dos vertientes"). Por eso tu concurrencia ([El almacén directo](el-almacen-directo.md)) la haces tú, no `FetchForWriting`.
 
 > [!NOTE]
-> 🌱 **Semilla — el `Id` y los `Apply(T)`, dos caminos.** Mantuvimos los eventos **sin id** (el id es la llave del stream, [El almacén en memoria](el-almacen-en-memoria.md)) y lo estampamos al cargar (`ar.Id = id`). La plantilla del equipo toma el otro camino: su evento de creación **lleva** el id y su `Apply` lo estampa. Ambos funcionan con Marten; el nuestro deja los eventos más limpios. (Lo retomamos en [Las dos vertientes](dos-vertientes.md).)
+> 🌱 **Semilla — el `Id` y los `Apply(T)`, dos caminos.** Mantuvimos los eventos **sin id** (el id es la llave del stream, [El almacén por id](el-almacen-por-id.md)) y lo estampamos al cargar (`ar.Id = id`). La plantilla del equipo toma el otro camino: su evento de creación **lleva** el id y su `Apply` lo estampa. Ambos funcionan con Marten; el nuestro deja los eventos más limpios. (Lo retomamos en [Las dos vertientes](dos-vertientes.md).)
 
 > [!NOTE]
 > 🌱 **Semilla — el viaje en el tiempo, gratis.** `AggregateStreamAsync` acepta una **versión** o una **fecha**: `AggregateStreamAsync<Empresa>(id, version: 3)` te da la empresa **como era en la versión 3**. Marten te regala el *time-travel* que tu event store ya hacía posible. (La plantilla expone esas sobrecargas en su `IEventStore`.)

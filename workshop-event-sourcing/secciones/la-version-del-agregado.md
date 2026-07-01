@@ -1,6 +1,6 @@
 # La versión es del agregado
 
-En [El almacén en memoria](el-almacen-en-memoria.md) le pusiste a cada hecho un número de **versión** (el sobre `EventoAlmacenado`) y el almacén lo usa para rechazar una escritura si la versión no es la que toca: esa es la **concurrencia optimista**. Pero hay una pregunta incómoda: si cargas `emp-7` y te pregunto *"¿en qué versión estás?"*, tu `Empresa` **no sabe responder**. El número vive desperdigado —en el sobre `EventoAlmacenado` y en un `_version` privado, escondido dentro del `EventStream`—. Vamos a darle su hogar natural: el propio agregado.
+En [Concurrencia optimista](concurrencia-optimista.md) le pusiste a cada hecho un número de **versión** (el sobre `EventoAlmacenado`) y el almacén lo usa para rechazar una escritura si la versión no es la que toca: esa es la **concurrencia optimista**. Pero hay una pregunta incómoda: si cargas `emp-7` y te pregunto *"¿en qué versión estás?"*, tu `Empresa` **no sabe responder**. El número vive desperdigado —en el sobre `EventoAlmacenado` y en un `_version` privado, escondido dentro del `EventStream`—. Vamos a darle su hogar natural: el propio agregado.
 
 ## 🎯 El Objetivo
 
@@ -68,7 +68,7 @@ public async Task<T> GetAsync()
 > 🌱 **Semilla — esto era para que sobreviva a [El almacén directo](el-almacen-directo.md).** En la próxima sección el `EventStream`-ventana **desaparece**: un almacén directo tomará el agregado, leerá sus `UncommittedEvents` para guardarlos y su `Version` para el chequeo de concurrencia — directamente del agregado, sin intermediario. Mover la versión aquí fue el paso que lo hace posible.
 
 > [!NOTE]
-> 🌱 **Semilla — Marten poblará este mismo `Version`.** Cuando reveles Marten ([Revelar Marten](revelar-marten.md)), al rehidratar él te rellena `Version` (con esta misma forma `{ get; protected set; }`). Un matiz para [Las dos vertientes](dos-vertientes.md): tu `InMemoryEventStore` **sí** hace cumplir la concurrencia optimista (el `ConcurrencyException` de [El almacén en memoria](el-almacen-en-memoria.md)); la capa del equipo tiene `Version` pero —lo verás en "las dos vertientes"— no la usa para frenar escrituras concurrentes. Aquí la dejamos lista igual.
+> 🌱 **Semilla — Marten poblará este mismo `Version`.** Cuando reveles Marten ([Revelar Marten](revelar-marten.md)), al rehidratar él te rellena `Version` (con esta misma forma `{ get; protected set; }`). Un matiz para [Las dos vertientes](dos-vertientes.md): tu `EventStore` **sí** hace cumplir la concurrencia optimista (el `ConcurrencyException` de [Concurrencia optimista](concurrencia-optimista.md)); la capa del equipo tiene `Version` pero —lo verás en "las dos vertientes"— no la usa para frenar escrituras concurrentes. Aquí la dejamos lista igual.
 
 ---
 
@@ -77,7 +77,7 @@ public async Task<T> GetAsync()
 Pon esto en tu `Program.cs` y corre `dotnet run`:
 
 ```csharp
-var store = new InMemoryEventStore();
+var store = new EventStore();
 var s = store.AbrirStream<Empresa>("emp-7");
 await s.AppendAsync(new EmpresaRegistrada("Constructora Andes", "Básico"));
 await s.AppendAsync(new PlanCambiado("Premium"));

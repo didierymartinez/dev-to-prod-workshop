@@ -19,7 +19,8 @@ Vale la pena verlo junto. Esto es un motor de Event Sourcing real:
 | [Decidir el futuro](decidir-el-futuro.md) | `decide` | emitir hechos validando reglas |
 | [El Command Handler](el-command-handler.md) | `CommandHandler` | orquestar **cargar → decidir → guardar** |
 | [El despachador](el-despachador.md) | `record`-comando + `ICommandHandler<T>` + `Despachador` | rutear cada comando a su handler por tipo (un **mediador** a mano) |
-| [El almacén en memoria](el-almacen-en-memoria.md) | `InMemoryEventStore` + el sobre `EventoAlmacenado` (con `Version`) | numerar cada hecho; almacén por id + concurrencia optimista |
+| [El almacén por id](el-almacen-por-id.md) | `EventStore` (un cajón por id) + `AbrirStream` | almacén central por id; handlers registrados una vez |
+| [Concurrencia optimista](concurrencia-optimista.md) | el sobre `EventoAlmacenado` (con `Version`) + validación | numerar cada hecho; detectar escrituras que chocan |
 | [El tiempo de espera](el-tiempo-de-espera.md) | `async/await` | no agotar hilos al esperar I/O |
 | [Inyección de Dependencias](inyeccion-de-dependencias.md) | contenedor de DI | ensamblar sin `new` regado |
 | [Docker y PostgreSQL](docker-postgres.md) | Docker + Postgres/`JSONB` | persistir de verdad |
@@ -56,20 +57,20 @@ Ninguna de estas es "imposible" — las podrías construir. Pero son **meses** d
 
 Hay dos librerías hermanas (mismo autor, la familia se llama **Critter Stack**) que hacen exactamente lo que tú ya entiendes:
 
-- **Marten** — convierte **PostgreSQL** en un **event store** (y base documental) de primera. Guarda streams de eventos, los rehidrata reproduciéndolos, lleva la versión, serializa y **deserializa al tipo correcto** por ti, y trae proyecciones, multi-tenancy y time-travel horneados. Es tu `InMemoryEventStore` + todo el plumbing de Postgres de [Docker y PostgreSQL](docker-postgres.md), hecho por expertos.
+- **Marten** — convierte **PostgreSQL** en un **event store** (y base documental) de primera. Guarda streams de eventos, los rehidrata reproduciéndolos, lleva la versión, serializa y **deserializa al tipo correcto** por ti, y trae proyecciones, multi-tenancy y time-travel horneados. Es tu `EventStore` + todo el plumbing de Postgres de [Docker y PostgreSQL](docker-postgres.md), hecho por expertos.
 - **Wolverine** — un **mediador** —algo que recibe un comando y lo entrega a quien sabe manejarlo, sin que el emisor conozca al handler: justo lo que hace tu `Despachador` de [El despachador](el-despachador.md)— **+ mensajería**. Encuentra tus handlers, despacha comandos, **comitea (guarda) por ti** al final de cada uno, y publica eventos a un **broker** (un servicio de mensajería intermedio —tipo cola— que aún no construyes) con **outbox/inbox** durable. Es tu `CommandHandler` y tu orquestación, industrializados.
 
 > [!NOTE]
 > 💡 Wolverine **no** reemplaza tu contenedor de DI ([Inyección de Dependencias](inyeccion-de-dependencias.md)): se **apoya** en él. Lo que reemplaza es el **despacho** de comandos y el "guardar al final" que escribías a mano.
 
-> 🛠️ **Inténtalo tú.** Empareja cada pieza tuya con la herramienta que crees que la reemplaza: `InMemoryEventStore` · `CommandHandler` + save manual · el bus de eventos (que aún no construyes) · multi-tenancy/proyecciones.
+> 🛠️ **Inténtalo tú.** Empareja cada pieza tuya con la herramienta que crees que la reemplaza: `EventStore` · `CommandHandler` + save manual · el bus de eventos (que aún no construyes) · multi-tenancy/proyecciones.
 
 <details>
 <summary>👉 El mapa "tu pieza → su equivalente"</summary>
 
 | Tu pieza (a mano) | La reemplaza | Cómo (a grandes rasgos) |
 |---|---|---|
-| `InMemoryEventStore` + plumbing de Postgres | **Marten** | guarda/rehidrata streams, versión y serialización por ti |
+| `EventStore` + plumbing de Postgres | **Marten** | guarda/rehidrata streams, versión y serialización por ti |
 | `CommandHandler` + despacho + `Save` manual | **Wolverine** | media comandos por convención + commit automático |
 | el bus de eventos (lo construirás en [Público vs privado](publico-vs-privado.md)+) | **Wolverine** | publica eventos a un broker con outbox/inbox |
 | multi-tenancy · proyecciones · upcasting | **Marten** | capacidades de su event store que activas: multi-tenancy viene listo; proyecciones y upcasting los defines tú sobre su soporte |

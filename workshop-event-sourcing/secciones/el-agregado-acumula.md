@@ -28,7 +28,7 @@ La salida es darle la vuelta: que la empresa **recuerde** lo que decidió. Cada 
 ## 🔧 Refactor 1: el agregado acumula sus hechos
 
 > 🛠️ **Inténtalo tú.** Dos cambios:
-> 1. En la base **`AggregateRoot`**, añade una lista privada de hechos no confirmados, un método **`protected void Raise(object hecho)`** que solo la encola, una propiedad de **solo lectura** `UncommittedEvents` para asomarse a ella, y un `ClearUncommittedEvents()` para vaciarla. *(Conserva el `Id` de [El almacén en memoria](el-almacen-en-memoria.md) y el `Load`/`Aplicar` abstracto de [Refactorizando el motor](refactorizando-el-motor.md); solo **sumas** la maquinaria de acumulación.)*
+> 1. En la base **`AggregateRoot`**, añade una lista privada de hechos no confirmados, un método **`protected void Raise(object hecho)`** que solo la encola, una propiedad de **solo lectura** `UncommittedEvents` para asomarse a ella, y un `ClearUncommittedEvents()` para vaciarla. *(Conserva el `Id` de [El almacén por id](el-almacen-por-id.md) y el `Load`/`Aplicar` abstracto de [Refactorizando el motor](refactorizando-el-motor.md); solo **sumas** la maquinaria de acumulación.)*
 > 2. En `Empresa`, **🔁 reemplaza** los **tres** métodos de decisión para que sean **`void`** y usen `Raise(...)` en vez de `return` — sí, los tres: `Suspender` deja de devolver `EmpresaSuspendida?` y `Reactivar` deja de devolver `EmpresaReactivada`; ahora son `void`. La **validación** de `CambiarPlan` sigue lanzando; la **idempotencia** de `Suspender` pasa de `return null` a simplemente **`return`** (no encola nada); `Reactivar` ni valida ni es idempotente: solo levanta su hecho.
 
 <details>
@@ -95,7 +95,7 @@ Ahora `Suspender` ya no devuelve nada: encola (o no). El handler deja de recibir
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```csharp
-public class CambiarPlanHandler(InMemoryEventStore store) : ICommandHandler<CambiarPlanDeEmpresa>
+public class CambiarPlanHandler(EventStore store) : ICommandHandler<CambiarPlanDeEmpresa>
 {
     public async Task HandleAsync(CambiarPlanDeEmpresa cmd, CancellationToken ct = default)
     {
@@ -110,7 +110,7 @@ public class CambiarPlanHandler(InMemoryEventStore store) : ICommandHandler<Camb
     }
 }
 
-public class SuspenderHandler(InMemoryEventStore store) : ICommandHandler<SuspenderEmpresa>
+public class SuspenderHandler(EventStore store) : ICommandHandler<SuspenderEmpresa>
 {
     public async Task HandleAsync(SuspenderEmpresa cmd, CancellationToken ct = default)
     {
@@ -142,7 +142,7 @@ public class SuspenderHandler(InMemoryEventStore store) : ICommandHandler<Suspen
 Arma este `Program.cs` que registre una empresa, le cambie el plan, y la suspenda **dos veces** (la segunda es la prueba de la idempotencia):
 
 ```csharp
-var store = new InMemoryEventStore();
+var store = new EventStore();
 await store.AbrirStream<Empresa>("emp-7").AppendAsync(new EmpresaRegistrada("Constructora Andes", "Básico"));
 
 await new CambiarPlanHandler(store).HandleAsync(new CambiarPlanDeEmpresa("emp-7", "Premium"));

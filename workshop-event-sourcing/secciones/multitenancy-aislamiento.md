@@ -1,6 +1,6 @@
 # ¿De quién son estos eventos? (de un cliente a muchos)
 
-Tu almacén guarda streams con la llave = **id del agregado** ([El almacén en memoria](el-almacen-en-memoria.md)). Pero la plataforma sirve a **muchas** empresas-cliente, y los datos de una **no** deben mezclarse con los de otra. A cada cliente lo llamamos un **tenant**. Y aquí hay una trampa: ¿qué pasa si dos tenants tienen una empresa con el **mismo** id?
+Tu almacén guarda streams con la llave = **id del agregado** ([El almacén por id](el-almacen-por-id.md)). Pero la plataforma sirve a **muchas** empresas-cliente, y los datos de una **no** deben mezclarse con los de otra. A cada cliente lo llamamos un **tenant**. Y aquí hay una trampa: ¿qué pasa si dos tenants tienen una empresa con el **mismo** id?
 
 ## 🎯 El Objetivo
 
