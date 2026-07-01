@@ -63,7 +63,7 @@ Cada taller declara su **prerequisito**. Sigue la ruta que te interese; todas pa
 | ① | [Básico — El ciclo de vida del software](workshop-basics/README.md) | ✅ Completo | `workshop-basics/` |
 | ② | [DevOps — Operar en producción](workshop-devops/README.md) | ✅ Completo | `workshop-devops/` |
 | ③ | Estilos y diseño arquitectónico | 📋 Planeado | — |
-| ④ | [EDA + Event Sourcing (Critter Stack)](workshop-event-sourcing/README.md) | ✅ Completo | `workshop-event-sourcing/` (36 secciones; la vieja `eventsourcing-workshops-basics/` quedó como guía) |
+| ④ | [EDA + Event Sourcing (Critter Stack)](workshop-event-sourcing/README.md) | ✅ Completo | `workshop-event-sourcing/` (37 secciones; la vieja `eventsourcing-workshops-basics/` quedó como guía) |
 | ⑤ | Microservicios | 📋 Planeado | — |
 | ⑥ | Observabilidad | 📋 Planeado | — |
 | ⑦ | DevOps avanzado | 📋 Planeado | — |

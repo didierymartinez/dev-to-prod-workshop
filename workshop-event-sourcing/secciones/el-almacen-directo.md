@@ -27,7 +27,7 @@ La salida: un almacén que **recuerda** qué agregados tocaste durante la operac
 ¿Por qué "recordar"? Hagamos primero lo **obvio** y veámoslo fallar. Un almacén que apunta lo que **nace** (`StartStream`), pero que al **cargar** solo te devuelve el agregado, sin apuntarlo:
 
 ```csharp
-public class InMemoryEventStore
+public class EventStore
 {
     private readonly Dictionary<string, List<EventoAlmacenado>> _cajones = new();
     private readonly List<AggregateRoot> _iniciados = new();   // solo lo que NACE aquí
@@ -66,7 +66,7 @@ public class InMemoryEventStore
 Ahora un handler que **carga → decide → guarda** una empresa que ya existe:
 
 ```csharp
-public class CambiarPlanHandler(InMemoryEventStore store) : ICommandHandler<CambiarPlanDeEmpresa>
+public class CambiarPlanHandler(EventStore store) : ICommandHandler<CambiarPlanDeEmpresa>
 {
     public async Task HandleAsync(CambiarPlanDeEmpresa cmd, CancellationToken ct = default)
     {
@@ -81,7 +81,7 @@ public class CambiarPlanHandler(InMemoryEventStore store) : ICommandHandler<Camb
 Para probarlo necesitamos crear una empresa. Dale a `Empresa` una **fábrica estática** que la dé de alta levantando su `EmpresaRegistrada` (la reusaremos en *El alta*, más abajo):
 
 ```csharp
-// en Empresa (el evento de creación NO lleva id; el id es la llave del stream, El almacén en memoria)
+// en Empresa (el evento de creación NO lleva id; el id es la llave del stream, El almacén por id)
 public static Empresa Registrar(string id, string nombre, string plan)
 {
     var empresa = new Empresa { Id = id };
@@ -93,7 +93,7 @@ public static Empresa Registrar(string id, string nombre, string plan)
 Ahora el experimento: damos de alta `emp-7` —y esto **sí** se persiste, porque nació aquí (`StartStream` la apunta en `_iniciados`)—; luego la **cargamos** y le cambiamos el plan:
 
 ```csharp
-var store = new InMemoryEventStore();
+var store = new EventStore();
 
 var creada = Empresa.Registrar("emp-7", "Constructora Andes", "Básico");
 store.StartStream(creada);
@@ -111,10 +111,10 @@ La cura es apuntar **también** lo que cargas. Eso pide una **segunda lista**.
 
 ## El almacén directo (te lo muestro: el rastreo es sutil)
 
-Esta pieza —un almacén que rastrea agregados y los drena al guardar— es maquinaria fina, así que te la muestro entera. **🔁 Reemplaza tu `InMemoryEventStore`** por esta versión (y **borra** la clase `EventStream<T>` y el viejo `AbrirStream`: ya no existen):
+Esta pieza —un almacén que rastrea agregados y los drena al guardar— es maquinaria fina, así que te la muestro entera. **🔁 Reemplaza tu `EventStore`** por esta versión (y **borra** la clase `EventStream<T>` y el viejo `AbrirStream`: ya no existen):
 
 ```csharp
-public class InMemoryEventStore
+public class EventStore
 {
     private readonly Dictionary<string, List<EventoAlmacenado>> _cajones = new();
 
@@ -156,7 +156,7 @@ public class InMemoryEventStore
         foreach (var ar in _modificados.Where(a => a.UncommittedEvents.Count > 0))
         {
             var actual = _cajones.TryGetValue(ar.Id, out var c) ? c.Count : 0;
-            if (actual != ar.Version)             // concurrencia optimista (El almacén en memoria), ahora con ar.Version (La versión del agregado)
+            if (actual != ar.Version)             // concurrencia optimista, ahora con ar.Version (La versión del agregado)
                 throw new ConcurrencyException($"Esperaba la versión {ar.Version} de '{ar.Id}', pero está en {actual}.");
             Volcar(ar, desdeVersion: ar.Version);
         }
@@ -179,7 +179,7 @@ public class InMemoryEventStore
 Lo importante de leer ahí:
 - **Dos listas** = la Unit of Work. `_iniciados` (agregados nacidos en esta operación, vía `StartStream`) y `_modificados` (cargados con `Get` para mutar). El almacén **recuerda** lo que tocaste.
 - **`SaveChangesAsync` drena todo de un golpe** y limpia el rastreo. Es el **único** punto que persiste — y el único que el handler tendrá que llamar.
-- La **concurrencia optimista** de [El almacén en memoria](el-almacen-en-memoria.md) se mudó aquí: antes de volcar un agregado modificado, comprueba que el stream **siga** en la versión con la que cargó (`ar.Version`, de [La versión del agregado](la-version-del-agregado.md)). Por eso pusimos la versión en el agregado.
+- La **concurrencia optimista** de [Concurrencia optimista](concurrencia-optimista.md) se mudó aquí: antes de volcar un agregado modificado, comprueba que el stream **siga** en la versión con la que cargó (`ar.Version`, de [La versión del agregado](la-version-del-agregado.md)). Por eso pusimos la versión en el agregado.
 
 > [!NOTE]
 > ⚖️ **Poder ≠ deber: la frontera del agregado es la frontera de la transacción.** Tu `SaveChangesAsync` *puede* persistir **varios** agregados juntos, pero la **regla de diseño** (Evans/Vernon) es **1 transacción = 1 agregado** —regla de pulgar, no ley—. ¿Cuándo cruzarla? El **criterio de Vernon**: ¿dejar los datos consistentes es **trabajo del usuario que ejecuta este caso de uso**? → misma transacción. ¿Es trabajo de **otro usuario o del sistema**? → **consistencia eventual**, en otra transacción (vía un evento, [Diseñar con eventos](disenar-con-eventos.md)). Una transacción que abarca muchos agregados acopla su consistencia y escala peor. *(El diseño de agregados a fondo —invariantes, tamaño y frontera, referencias por id— es del taller ③ Estilos y diseño arquitectónico.)*
@@ -194,7 +194,7 @@ Lo importante de leer ahí:
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```csharp
-public class RegistrarEmpresaHandler(InMemoryEventStore store) : ICommandHandler<RegistrarEmpresa>
+public class RegistrarEmpresaHandler(EventStore store) : ICommandHandler<RegistrarEmpresa>
 {
     public async Task HandleAsync(RegistrarEmpresa cmd, CancellationToken ct = default)
     {
@@ -222,7 +222,7 @@ Ahora el premio: los handlers de mutación se vuelven **cargar → actuar → gu
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```csharp
-public class CambiarPlanHandler(InMemoryEventStore store) : ICommandHandler<CambiarPlanDeEmpresa>
+public class CambiarPlanHandler(EventStore store) : ICommandHandler<CambiarPlanDeEmpresa>
 {
     public async Task HandleAsync(CambiarPlanDeEmpresa cmd, CancellationToken ct = default)
     {
@@ -233,7 +233,7 @@ public class CambiarPlanHandler(InMemoryEventStore store) : ICommandHandler<Camb
     }
 }
 
-public class SuspenderHandler(InMemoryEventStore store) : ICommandHandler<SuspenderEmpresa>
+public class SuspenderHandler(EventStore store) : ICommandHandler<SuspenderEmpresa>
 {
     public async Task HandleAsync(SuspenderEmpresa cmd, CancellationToken ct = default)
     {
@@ -264,7 +264,7 @@ Fíjate qué desapareció: el `foreach (var hecho in empresa.UncommittedEvents)`
 Pon esto en tu `Program.cs` y corre `dotnet run`:
 
 ```csharp
-var store = new InMemoryEventStore();
+var store = new EventStore();
 
 await new RegistrarEmpresaHandler(store).HandleAsync(new RegistrarEmpresa("emp-7", "Constructora Andes", "Básico"));
 await new CambiarPlanHandler(store).HandleAsync(new CambiarPlanDeEmpresa("emp-7", "Premium"));

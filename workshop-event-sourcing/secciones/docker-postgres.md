@@ -1,6 +1,6 @@
 # Persistencia real (Docker y PostgreSQL)
 
-Llevamos varias secciones con una bomba de tiempo escondida: el `InMemoryEventStore` vive en **RAM**. Apaga el programa —o reinicia el servidor— y el diario de **todas** las empresas se va a la basura. Lo ignoramos a propósito, para construir el motor sin distraernos. Pero una `Empresa` cuya historia desaparece al reiniciar no le sirve a nadie. Toca persistir de verdad.
+Llevamos varias secciones con una bomba de tiempo escondida: el `EventStore` vive en **RAM**. Apaga el programa —o reinicia el servidor— y el diario de **todas** las empresas se va a la basura. Lo ignoramos a propósito, para construir el motor sin distraernos. Pero una `Empresa` cuya historia desaparece al reiniciar no le sirve a nadie. Toca persistir de verdad.
 
 ## 🎯 El Objetivo
 
@@ -98,7 +98,7 @@ Host=localhost;Port=5432;Database=gestion_eventstore;Username=gestion;Password=d
 
 ### El Descubrimiento
 
-Tienes una bóveda incombustible (Postgres) encendida. Pero mira tu app: **sigue** usando el `InMemoryEventStore`. Para hablar con Postgres tendrías que escribir, a mano, toda esta fontanería:
+Tienes una bóveda incombustible (Postgres) encendida. Pero mira tu app: **sigue** usando el `EventStore`. Para hablar con Postgres tendrías que escribir, a mano, toda esta fontanería:
 
 - Abrir y administrar la conexión de red (con una librería como Npgsql).
 - Crear la tabla: `CREATE TABLE eventos (aggregate_id text, version int, timestamp timestamptz, data jsonb, ...)`.

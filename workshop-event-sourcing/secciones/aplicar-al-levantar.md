@@ -83,7 +83,7 @@ Misma lógica de [Refactorizando el motor](refactorizando-el-motor.md), pero la 
 > 🌱 **Semilla — estos `Apply(T)` son el gancho de la herramienta.** Marten rehidrata un agregado **llamando tus `Apply(TipoDeEvento)` uno por uno** sobre el stream (es su convención; el `TestStore` del equipo hace lo mismo, buscando el `Apply` que casa por reflexión). Por eso los hicimos **públicos** y por tipo: cuando reveles Marten ([Revelar Marten](revelar-marten.md)), tu `Apply(PlanCambiado)` ya es justo lo que la librería invoca — sin tocarlo. Incluso tu `Load`/dispatcher desaparecerán: la herramienta los pone por ti.
 
 > [!NOTE]
-> 🌱 **Semilla — dónde nace el `Id` (solo un adelanto; no cambies nada).** Tu `Apply(EmpresaRegistrada)` está **completo y correcto así, sin tocar el `Id`**: en nuestro diseño el id es la **llave del stream** y se estampa al cargar (`new T { Id = … }`, [El almacén en memoria](el-almacen-en-memoria.md)); el evento **no lo lleva**. La herramienta que adoptaremos ([Revelar Marten](revelar-marten.md)) toma el otro camino —su evento de creación **carga el id** y lo estampa dentro de su `Apply`—. Las dos son válidas; cuál encaja mejor con Marten lo veremos al revelarlo.
+> 🌱 **Semilla — dónde nace el `Id` (solo un adelanto; no cambies nada).** Tu `Apply(EmpresaRegistrada)` está **completo y correcto así, sin tocar el `Id`**: en nuestro diseño el id es la **llave del stream** y se estampa al cargar (`new T { Id = … }`, [El almacén por id](el-almacen-por-id.md)); el evento **no lo lleva**. La herramienta que adoptaremos ([Revelar Marten](revelar-marten.md)) toma el otro camino —su evento de creación **carga el id** y lo estampa dentro de su `Apply`—. Las dos son válidas; cuál encaja mejor con Marten lo veremos al revelarlo.
 
 ---
 
@@ -94,7 +94,7 @@ dotnet run
 ```
 
 ```csharp
-var store = new InMemoryEventStore();
+var store = new EventStore();
 await store.AbrirStream<Empresa>("emp-7").AppendAsync(new EmpresaRegistrada("Constructora Andes", "Básico"));
 
 var emp = await store.AbrirStream<Empresa>("emp-7").GetAsync();

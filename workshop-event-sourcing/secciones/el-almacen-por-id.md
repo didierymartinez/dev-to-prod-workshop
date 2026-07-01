@@ -1,16 +1,36 @@
-# El almacén en memoria (Event Store)
+# El almacén: un cajón por empresa
 
-Acabas de construir el **`Despachador`** y, tal como te dije, lo dejaste de lado: era un andamio para *entender* el ruteo por tipo. Retomamos el hilo donde de verdad sigue — el ciclo **cargar → decidir → guardar** de [El Command Handler](el-command-handler.md).
+Ya tienes un **`Despachador`** que rutea cualquier comando a su handler ([El despachador](el-despachador.md)). Al usarlo —quizá ya lo notaste probando tu código— aparece un dolor apenas nace la **segunda** empresa; y ese dolor es, justamente, lo que pide la pieza que construimos aquí.
 
-Tu `EventStream` ya **lee** (`Get`) y **escribe** (`Append`) la historia de **una** empresa, y un Command Handler orquesta el ciclo. Pero todo eso vive sobre **un** stream suelto. Con **mil** empresas tendrías mil streams sueltos flotando en el programa. Falta un **almacén central** que custodie la historia de **todas** y te dé la correcta por su **id** — y que, ahora que habrá varios escritores, **detecte los choques**.
+## 💥 El dolor: ¿y cuando nace la segunda empresa?
+
+En [El despachador](el-despachador.md) registraste tus handlers atados a **un** stream:
+
+```csharp
+var stream1 = new EventStream<Empresa>();
+
+var despachador = new Despachador();
+despachador.Registrar(new SuspenderHandler(stream1));      // ← atado a la empresa 1
+despachador.Registrar(new CambiarPlanHandler(stream1));
+```
+
+Funciona para **una** empresa. Pero llega la segunda, con su propio `stream2`… ¿registras otra vez?
+
+```csharp
+despachador.Registrar(new SuspenderHandler(stream2));   // 💥 MISMA llave: typeof(SuspenderEmpresa)
+```
+
+El despachador rutea por **tipo del comando**, así que este `Registrar` **pisa** al de la empresa 1 (misma entrada del diccionario). No caben dos empresas en un mismo despachador.
+
+La causa de fondo no es el despachador: es que el handler está **atado a un stream** —a **una** empresa (`new SuspenderHandler(stream1)`)—, y por eso te haría falta uno por empresa. Si en cambio el handler recibiera un **almacén que tenga a todas** las empresas y abriera la correcta **por su `id`** (que viaja en el comando), **un solo** handler serviría a **todas** — y lo registrarías **una vez, en un despachador**. Ese **almacén central por id** es la pieza que falta.
 
 ## 🎯 El Objetivo
 
-Un único almacén que custodie y entregue la historia de **cualquier** empresa por su **id**; y que el Command Handler busque la empresa por id en vez de cargar un stream suelto.
+Un único almacén que custodie la historia de **cualquier** empresa por su **id**; y que el handler reciba **ese almacén** (no un stream fijo) y abra la empresa que el comando indique. Handlers registrados **una vez**, sirviendo a **todas** las empresas.
 
 ## Cada empresa, su id
 
-Para guardar muchas historias juntas, primero hay que poder **distinguirlas**: cada empresa necesita un **`Id`**. Hasta ahora una empresa era solo su estado y vivía en un único stream —no le hacía falta—; ahora que vamos a guardar miles, el id es imprescindible. Se lo damos a la clase base:
+Para guardar muchas historias juntas, primero hay que **distinguirlas**: cada empresa necesita un **`Id`**. Se lo damos a la clase base:
 
 ```csharp
 // 🔁 AggregateRoot ahora lleva un Id
@@ -22,113 +42,110 @@ public abstract class AggregateRoot
 }
 ```
 
-## 🔢 El sobre: numerar cada hecho
-
-Antes de guardar muchas historias juntas, conviene **numerar** cada hecho. Una vez archivado, cada hecho ocupa una **posición fija** en la historia de su empresa: el 1.º, el 2.º, el 3.º… Esa posición es su **versión**. La grabamos (con la fecha) junto al hecho, en un **sobre**:
-
-```csharp
-// el sobre: envuelve el hecho con su POSICIÓN en el stream y cuándo se anotó
-public record EventoAlmacenado(int Version, DateTime Timestamp, object EventData);
-```
-
-> 💡 El sobre **no** lleva quién es la empresa: el cajón **ya es** de una empresa (su id es el rótulo). Solo añade lo que el hecho por sí mismo no sabe: su **posición** y su fecha. Al **leer**, se desenvuelve — al agregado le interesa el hecho, no el sobre.
-
 > [!NOTE]
-> 🌱 **Semilla — ¿para qué numerar?** Hoy el número parece decorativo. Pero es la **llave** para detectar conflictos: cuando haya **varios escritores** sobre el mismo stream, comparar *"¿la versión que esperabas sigue libre?"* es lo que evita que dos escrituras se pisen. Eso es la **concurrencia optimista**, y la construyes **en esta misma sección, más abajo**.
+> 🆕 **Por qué el `Id` sí tiene `set` (y el estado no).** El `Plan`, `Suspendida`, etc. son `{ get; private set; }` —solo cambian por replay—. El `Id` es distinto: no es dato de negocio que la empresa *decida*, es su **rótulo**, y quien la carga (el stream) se lo **estampa** desde fuera. Por eso su `set` es accesible.
 
 ## El almacén: un cajón por empresa
 
-El almacén guarda los hechos de **cada empresa en su propio cajón**, rotulado con su id. En C#, eso es un **`Dictionary`**: la llave es el id; el valor, la lista ordenada de **sobres** (`EventoAlmacenado`, que **acabas de crear** arriba) de esa empresa.
+El almacén guarda los hechos de **cada empresa en su propio cajón**, rotulado con su id. En C#, eso es un **`Dictionary`**: la llave es el id; el valor, la lista de hechos de esa empresa.
 
-> 🛠️ **Inténtalo tú.** Crea la clase `InMemoryEventStore` (vive en RAM) con un `Dictionary<string, List<EventoAlmacenado>>` (la llave = el id). Dale dos métodos donde **el id es un parámetro**: `GetEvents(string aggregateId)` que devuelve la lista de ese cajón (o vacía si no existe), y `AppendEvent(string aggregateId, EventoAlmacenado evento)` que mete el sobre en ese cajón.
+> 🛠️ **Inténtalo tú.** Crea la clase `EventStore` con un `Dictionary<string, List<object>>` (la llave = el id). Dale dos métodos donde **el id es un parámetro**: `GetEvents(string aggregateId)` que devuelve la lista de ese cajón (o una vacía si no existe), y `AppendEvent(string aggregateId, object hecho)` que **crea el cajón si no existe** y mete el hecho.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```csharp
-public class InMemoryEventStore
+public class EventStore
 {
-    private readonly Dictionary<string, List<EventoAlmacenado>> _cajones = new();
+    private readonly Dictionary<string, List<object>> _cajones = new();
 
-    public IEnumerable<EventoAlmacenado> GetEvents(string aggregateId) =>
-        _cajones.GetValueOrDefault(aggregateId) ?? Enumerable.Empty<EventoAlmacenado>();
+    public List<object> GetEvents(string aggregateId)
+        => _cajones.ContainsKey(aggregateId) ? _cajones[aggregateId] : new();
 
-    public void AppendEvent(string aggregateId, EventoAlmacenado evento)
+    public void AppendEvent(string aggregateId, object hecho)
     {
-        var cajon = _cajones.GetValueOrDefault(aggregateId) ?? new();
-        _cajones[aggregateId] = cajon;
-        cajon.Add(evento);
+        if (!_cajones.ContainsKey(aggregateId))   // 1ª vez: crea el cajón EN el diccionario
+            _cajones[aggregateId] = new();
+        _cajones[aggregateId].Add(hecho);
     }
 }
 ```
+
+> [!WARNING]
+> Ojo con dos trampas del `Dictionary`: (1) `_cajones[id]` **lanza** `KeyNotFoundException` si la llave no existe (no devuelve `null`), por eso `GetEvents` comprueba con `ContainsKey`. (2) En `AppendEvent`, crea el cajón **dentro** del diccionario antes de añadir; si añadieras a una lista vacía suelta, el hecho se perdería.
 </details>
 
-Fíjate: el **id es siempre un parámetro**. Tanto para leer como para escribir, le dices al almacén **de qué cajón** hablas. El almacén no sabe de empresas ni de replay: solo guarda y entrega cajones por su rótulo. Es de **bajo nivel** — la app no lo tocará directo; para eso está el stream.
+Fíjate: el **id es siempre un parámetro**. El almacén no sabe de empresas ni de replay: solo guarda y entrega cajones por su rótulo. Es de **bajo nivel** — la app no lo tocará directo; para eso está el stream.
 
 > [!NOTE]
-> 🌱 **Semilla — ¿y una interfaz `IEventStore`?** Todavía **no**. Una interfaz solo gana su sueldo cuando hay **algo que varía detrás de ella** (varias implementaciones, o un test que mete una versión falsa). Hoy hay **una sola** implementación. Cuando cambiemos este almacén por una base de datos real **sin tocar el resto del código**, ahí sí extraeremos `IEventStore`. Abstraer tiene su momento, y no es este.
+> 🌱 **Semilla — este no será tu único almacén.** El de hoy guarda en RAM, perfecto para aprender. Pero más adelante nacerán **hermanos con otros propósitos**: uno contra una **base de datos real** para producción ([Revelar Marten](revelar-marten.md)) y uno **en memoria pensado para tests** ([El TestStore](teststore.md)). El día que existan varios, extraeremos una interfaz `IEventStore` para poder **intercambiarlos sin tocar el resto del código**.
 
 ## El `EventStream`: ahora el almacén te lo entrega
 
-Hasta [El Command Handler](el-command-handler.md), tu `EventStream` era **dueño** de su propia lista. Ahora que los hechos viven en el **almacén central**, el stream deja de guardarlos y **delega**: se lo **pides** al almacén con un id, y él te lo entrega ya conectado.
+Hasta [El Command Handler](el-command-handler.md), tu `EventStream` era **dueño** de su propia lista. Ahora que los hechos viven en el **almacén central**, el stream deja de guardarlos y **delega**: le pides al almacén el stream de un id, y el stream que recibes **guarda por dentro dos cosas** —una referencia al almacén y ese id—. Así, cuando dices `Get()` o `Append(...)`, el stream ya sabe **a qué almacén** y **de qué cajón (id)** hablar, sin que tú lo repitas: por dentro llama a `_store.GetEvents(id)` / `_store.AppendEvent(id, …)`.
+
+> 🛠️ **Inténtalo tú (2 piezas).**
+> 1. **🔁 Reescribe** el `EventStream<T>` de [El flujo de vida](el-flujo-de-vida.md): que **ya no guarde su lista**. Recibe `(store, id)` por constructor; en `Get()` pide los hechos al almacén (`store.GetEvents(id)`) y rehidrata; en `Append(hecho)` se lo pasa al almacén (`store.AppendEvent(id, hecho)`).
+> 2. Dale al `EventStore` un método **`AbrirStream<T>(string id)`** que **cree y devuelva** el `EventStream<T>` de ese id, guardándole dentro el almacén y el id. *(Pista: `AbrirStream` vive **dentro** del `EventStore`, así que ahí `this` **es el propio almacén**; pásaselo al stream al crearlo —`new(this, id)`— y el stream lo guardará en `_store` para poder llamarlo después.)*
+
+> [!NOTE]
+> 🆕 **Idioma de C# que verás en la solución.**
+> - `new(this, aggregateId)` — *target-typed new*: como el tipo de retorno ya dice `EventStream<T>`, no repites el nombre; `new(...)` basta.
+> - `new T { Id = _aggregateId }` — crea el agregado **y** le fija una propiedad de un tiro (*inicializador de objeto*), sobre el `new T()` genérico que ya conoces.
+> - `AbrirStream<T>(...) where T : AggregateRoot, new()` — la **misma** restricción de `EventStream<T>`, ahora en un **método** genérico (no una clase): el método también necesita poder hacer `new T()`.
+
+<details>
+<summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```csharp
-var stream = store.AbrirStream<Empresa>("emp-7");   // "almacén, dame el stream de la empresa emp-7"
-```
-
-A partir de ahí solo lees o escribes con ese stream; **nunca vuelves a mencionar el almacén ni el id**. ¿Cómo? El propio almacén se incluye a sí mismo (`this`) al entregártelo:
-
-```csharp
-// dentro de InMemoryEventStore: el método que te entrega el stream ya conectado
+// AbrirStream vive en EventStore, así que this = el propio almacén; se lo pasamos al stream para que sepa a quién llamar
 public EventStream<T> AbrirStream<T>(string aggregateId) where T : AggregateRoot, new()
-    => new(this, aggregateId);   // ← el almacén se incluye a sí mismo; por eso el stream sabe volver a él
+    => new(this, aggregateId);
 ```
 
 ```csharp
-// 🔁 Reemplaza el EventStream<T> de «El flujo de vida»: ya no guarda la lista; habla con el almacén y numera con el sobre
+// 🔁 Reemplaza el EventStream<T> de «El flujo de vida»: ya no guarda la lista; habla con el almacén
 public class EventStream<T> where T : AggregateRoot, new()
 {
-    private readonly InMemoryEventStore _store;
-    private readonly string _aggregateId;       // el id del cajón de esta empresa
-    private int _version;                        // la versión cargada (la lee al cargar, la sube al escribir)
+    private readonly EventStore _store;
+    private readonly string _aggregateId;
 
-    public EventStream(InMemoryEventStore store, string aggregateId)
+    public EventStream(EventStore store, string aggregateId)
     {
         _store = store;
         _aggregateId = aggregateId;
     }
 
-    public T Get()                       // LEER: trae el cajón, recuerda la versión y rehidrata
+    public T Get()                       // LEER: trae los hechos del cajón y rehidrata
     {
         var entidad = new T { Id = _aggregateId };
-        var sobres  = _store.GetEvents(_aggregateId).ToList();
-        entidad.Load(sobres.Select(s => s.EventData));            // desenvuelve: solo el hecho
-        _version = sobres.Count == 0 ? 0 : sobres[^1].Version;    // recuerda la última posición
+        entidad.Load(_store.GetEvents(_aggregateId));
         return entidad;
     }
 
-    public void Append(object hecho)     // ESCRIBIR: el hecho ocupa la siguiente posición
-    {
-        _version++;
-        _store.AppendEvent(_aggregateId, new(_version, DateTime.UtcNow, hecho));
-    }
+    public void Append(object hecho)     // ESCRIBIR: al cajón de esta empresa
+        => _store.AppendEvent(_aggregateId, hecho);
 }
 ```
+</details>
 
-Con esto, el id deja de estar enredado: es **uno solo** —el id de la empresa— y aparece en tres momentos, siempre el **mismo valor**:
-
-1. Se lo das al **almacén** al pedir el stream (`store.AbrirStream<Empresa>("emp-7")`).
-2. El **stream** se lo pasa al almacén en cada `GetEvents`/`AppendEvent` → es la **llave del cajón**.
-3. El **stream** se lo **estampa** a la empresa al cargarla → es su **identidad**.
-
-Llave del diccionario, parámetro del almacén e identidad del agregado **son el mismo valor**. No son tres ids; es uno que tú entregas una vez y viaja solo.
-
-> [!NOTE]
-> 🌱 **Semilla — este `EventStream` es un andamio nuestro.** Nos sirve para hacer visible el ciclo (cargar → escribir) y llevar la cuenta de la versión. Pero el almacén de verdad (el que adoptaremos) **no te entrega un objeto así**: te da **directamente la empresa** ya rehidratada, y guardas pidiéndole al propio almacén que persista. Cuando lleguemos ahí, el `EventStream` **desaparece** ([El almacén directo](el-almacen-directo.md)). Anótalo: este objeto es un peldaño, no la meta.
+> 🔍 **¿Lo lograste?** Antes de encadenar nada más, prueba **una** empresa a través del stream que entrega el almacén:
+> ```csharp
+> var store = new EventStore();
+> var s = store.AbrirStream<Empresa>("emp-7");
+> s.Append(new EmpresaRegistrada("Constructora Andes", "Básico"));
+> Console.WriteLine(store.AbrirStream<Empresa>("emp-7").Get().Nombre);   // Constructora Andes
+> ```
+> Si eso imprime el nombre, la pieza más difícil ya está.
 
 ## El handler ya no carga un stream suelto: lo busca por id
 
-Ahora el Command Handler recibe el **almacén** (no un stream suelto) y abre el stream de la empresa que el comando indica. Y por eso **el comando recupera su `EmpresaId`**:
+Ahora el handler recibe el **almacén** (no un stream fijo) y abre el stream de la empresa que el comando indica. Y por eso **el comando recupera su `EmpresaId`**:
+
+> 🛠️ **Inténtalo tú.** (1) **🔁** Añade `EmpresaId` a cada comando (`CambiarPlanDeEmpresa`, `SuspenderEmpresa`). (2) **🔁** Cambia los handlers para que reciban el `EventStore` por constructor y abran el stream con `store.AbrirStream<Empresa>(cmd.EmpresaId)`.
+
+<details>
+<summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```csharp
 // 🔁 el comando ahora dice de QUÉ empresa habla
@@ -136,7 +153,7 @@ public record CambiarPlanDeEmpresa(string EmpresaId, string NuevoPlan);
 public record SuspenderEmpresa(string EmpresaId, string Motivo);
 
 // 🔁 el handler recibe el almacén y abre el stream por id
-public class SuspenderHandler(InMemoryEventStore store) : ICommandHandler<SuspenderEmpresa>
+public class SuspenderHandler(EventStore store) : ICommandHandler<SuspenderEmpresa>
 {
     public void Handle(SuspenderEmpresa cmd)
     {
@@ -148,100 +165,60 @@ public class SuspenderHandler(InMemoryEventStore store) : ICommandHandler<Suspen
 }
 ```
 
-> [!NOTE]
-> 🔁 **Haz el mismo cambio en `CambiarPlanHandler`.** Arriba solo se muestra `SuspenderHandler`, pero `CambiarPlanHandler` cambia **igual**: recibe el `InMemoryEventStore` por constructor, abre el stream con `store.AbrirStream<Empresa>(cmd.EmpresaId)` y lee `cmd.NuevoPlan`. Si lo dejas con la firma vieja (`EventStream<Empresa>`), **no compilará**.
+`CambiarPlanHandler` cambia **igual**: recibe el `EventStore`, abre por `cmd.EmpresaId` y lee `cmd.NuevoPlan`.
+</details>
 
 ## Probémoslo: un almacén, muchas empresas
 
+Ahora sí — el dolor del inicio, resuelto. **Un** despachador, handlers registrados **una vez**, y el `EmpresaId` del comando elige la empresa:
+
 ```csharp
-var store = new InMemoryEventStore();
+var store = new EventStore();
+var despachador = new Despachador();
+despachador.Registrar(new SuspenderHandler(store));      // ← el ALMACÉN, no un stream; UNA vez
+despachador.Registrar(new CambiarPlanHandler(store));
 
-var s7 = store.AbrirStream<Empresa>("emp-7");
-s7.Append(new EmpresaRegistrada("Constructora Andes", "Básico"));
-s7.Append(new PlanCambiado("Premium"));
-
-var s9 = store.AbrirStream<Empresa>("emp-9");
-s9.Append(new EmpresaRegistrada("Interprensa", "Básico"));
+despachador.Enviar(new SuspenderEmpresa("emp-7", "falta de pago"));    // empresa 7
+despachador.Enviar(new CambiarPlanDeEmpresa("emp-9", "Premium"));      // empresa 9 — mismo handler
 
 var andes = store.AbrirStream<Empresa>("emp-7").Get();
-Console.WriteLine($"{andes.Id}: {andes.Nombre}, plan {andes.Plan}");
-// emp-7: Constructora Andes, plan Premium
+Console.WriteLine($"{andes.Id}: suspendida={andes.Suspendida}");
+// emp-7: suspendida=True
 ```
 
-`dotnet run`: dos empresas en el mismo almacén, cada una en su cajón, sin un solo acceso directo al store.
+`dotnet run`: dos empresas en el mismo almacén, cada una en su cajón, con handlers que se registraron **una sola vez**.
 
-## 🔧 ¿Y si dos peticiones tocan la misma empresa a la vez?
-
-Ahora que hay varios escritores, mira el dolor. Dos peticiones abren su propio stream de "Constructora Andes" **al mismo tiempo**, cada una la rehidrata, decide algo y lo escribe:
-
-```csharp
-var a = store.AbrirStream<Empresa>("emp-7");
-var b = store.AbrirStream<Empresa>("emp-7");
-a.Get();   // A carga la empresa
-b.Get();   // B la carga al mismo tiempo (la ve igual que A)
-
-a.Append(new EmpresaSuspendida("falta de pago"));   // A la suspende
-b.Append(new PlanCambiado("Enterprise"));            // B le cambia el plan
-```
-
-Ambas escrituras entran tan tranquilas. Pero **B decidió "Enterprise" mirando una empresa que A acababa de suspender** — trabajó sobre un estado que ya no era cierto, y nadie se dio cuenta. Aquí cobra sentido la **versión** que pusiste en cada sobre (el `EventoAlmacenado` de «🔢 El sobre», arriba): cada hecho declara **en qué posición** entra; si esa posición ya está ocupada, es que alguien escribió primero. El almacén lo **rechaza**:
-
-```csharp
-public class ConcurrencyException(string mensaje) : Exception(mensaje);
-
-// 🔁 AppendEvent valida la versión antes de aceptar
-public void AppendEvent(string aggregateId, EventoAlmacenado evento)
-{
-    var cajon = _cajones.GetValueOrDefault(aggregateId) ?? new();
-    var versionActual = cajon.Count == 0 ? 0 : cajon[^1].Version;   // cajon[^1] = el último elemento
-
-    if (evento.Version != versionActual + 1)
-        throw new ConcurrencyException(
-            $"Esperaba la versión {versionActual + 1}, pero llegó la {evento.Version}. " +
-            "Alguien escribió primero: recarga la empresa y reintenta.");
-
-    _cajones[aggregateId] = cajon;
-    cajon.Add(evento);
-}
-```
-
-Ahora el choque se nota: si "Constructora Andes" va en la versión 2, `a.Append` escribe la 3 (entra), y `b.Append` —que también cree que le toca la 3— **choca** y lanza `ConcurrencyException` en vez de pisar a A en silencio.
-
-> 💡 El mensaje que verás dice *"Esperaba la versión 4, pero llegó la 3"*: como A **ya** dejó el cajón en la 3, el almacén ahora espera la **4** — y la 3 que trae B ya está ocupada. Ese desajuste (lo que esperaba el cajón ≠ lo que trae B) **es** el choque; el número exacto sube porque A escribió primero.
+Con esto, el id es **uno solo** que aparece en tres momentos, siempre el **mismo valor**: se lo das al **almacén** al pedir el stream, el **stream** se lo pasa al almacén en cada `GetEvents`/`AppendEvent` (la **llave del cajón**), y el **stream** se lo **estampa** a la empresa al cargarla (su **identidad**). No son tres ids; es uno que entregas una vez y viaja solo.
 
 > [!NOTE]
-> Esto que construiste tiene nombre: **control de concurrencia optimista**. **¿Por qué "optimista"?** Asumes que los choques son **raros**, así que **no bloqueas** a nadie mientras trabaja (eso sería *pesimista*, y cuesta caro). Dejas que todos avancen y solo **al guardar** verificas la versión; si chocó, **fallas y reintentas** (recargar → reaplicar → reintentar).
->
-> 🌱 En producción no lo escribes a mano: las librerías que adoptaremos hacen exactamente esta verificación de "versión esperada" por ti al guardar un stream.
+> 🌱 **Semilla — este `EventStream` es un andamio.** Nos sirve para ver el ciclo (cargar → escribir). Pero el almacén de verdad (el que adoptaremos) **no te entrega un objeto así**: te da **directamente la empresa** rehidratada. Cuando lleguemos ahí, el `EventStream` **desaparece** ([El almacén directo](el-almacen-directo.md)). Es un peldaño, no la meta.
 
 ---
 
 ### El Descubrimiento
 
-La arquitectura ya refleja la verdad del patrón: un **almacén central** (`InMemoryEventStore`) con un **cajón por empresa rotulado con su id**, un **`EventStream`** que te entrega el almacén para leer (`Get`) y escribir (`Append`) la historia de una de ellas, y un **handler** que busca la empresa por id.
+Un **almacén central** (`EventStore`) con un **cajón por empresa rotulado con su id**, un **`EventStream`** que el almacén te **entrega** para leer (`Get`) y escribir (`Append`) la historia de una, y un **handler** que la busca por id. Registras los handlers **una vez** y sirven para todas las empresas — el dolor del despachador-por-empresa, disuelto.
 
 ```
-InMemoryEventStore
+EventStore
    ├── "emp-7" → [EmpresaRegistrada, PlanCambiado, EmpresaSuspendida, …]
    ├── "emp-9" → [EmpresaRegistrada, …]
    └── "emp-…" → […]
 ```
 
-El id es **uno solo** —el rótulo del cajón— que viaja del handler al stream y al almacén. Y la `Version` que numeraba los hechos resultó ser el **detector de conflictos**.
-
 > [!NOTE]
-> 🌱 **Semilla — reconstruir el estado es solo UNA vista de los eventos.** `Get()` recorre los hechos para armar el objeto `Empresa`. Pero de **esos mismos** hechos podrías derivar otras vistas: un *listado de empresas por estado*, un *conteo de suspensiones por mes*… A cada vista derivada se le llama **proyección**, y a separar el modelo de escritura (los eventos) del de lectura (las proyecciones) se le llama **CQRS**. Lo veremos a fondo; por ahora: **el estado actual es solo una de muchas vistas que puedes sacar del diario**.
+> 🌱 **Semilla — reconstruir el estado es solo UNA vista de los eventos.** `Get()` recorre los hechos para armar la `Empresa`. Pero de **esos mismos** hechos podrías derivar otras vistas: un *listado por estado*, un *conteo de suspensiones por mes*… A cada vista derivada se le llama **proyección**, y a separar escritura (eventos) de lectura (proyecciones), **CQRS**. Lo verás a fondo más adelante.
 
-Queda una fragilidad: este almacén vive en RAM —**si el servidor se reinicia, se pierde todo**— y hablar con una base de datos real es **I/O que tarda**. En la próxima sección enfrentamos ese mundo: la espera, y por qué cambia la forma de nuestro código.
+Pero falta un peligro que aparece justo cuando hay **muchos escritores** sobre el mismo cajón: dos peticiones que tocan la misma empresa a la vez. Eso —y su cura— es la próxima sección.
 
 ---
 
 ## ✅ Compruébalo
 
 - [ ] `dotnet run` escribe y lee **dos** empresas distintas (`emp-7`, `emp-9`) **siempre a través del stream**, nunca tocando el `store` directo.
-- [ ] El comando recuperó su `EmpresaId` y el handler abre el stream **por ese id** desde el almacén.
+- [ ] Los handlers se registran **una sola vez** (reciben el `EventStore`, no un stream), y el comando trae su `EmpresaId`.
 - [ ] Confirma que el id es **uno solo**: la llave del diccionario, el parámetro del stream y el `Id` de la empresa son el **mismo valor**.
-- [ ] Provoca el choque con **dos streams** sobre `emp-7` (ambos `Get`, ambos `Append`): el segundo lanza `ConcurrencyException`.
+- [ ] Explica por qué el diseño de [El despachador](el-despachador.md) no escalaba a dos empresas (pista: la llave del despachador es el **tipo** del comando).
 
 ---
 
@@ -249,13 +226,13 @@ Queda una fragilidad: este almacén vive en RAM —**si el servidor se reinicia,
 
 Piensa la respuesta a esto (es tu reflexión de la sección):
 
-> 💭 **Reto:** abre dos streams de la misma empresa, `Get` en ambos, `Append` en ambos. ¿Qué excepción salta y por qué? ¿Qué tres caras tiene el mismo id?
+> 💭 **Reto:** ¿por qué registrar los handlers atados a un stream no escalaba a dos empresas? ¿Qué tres caras tiene el mismo id ahora?
 
 Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
 
 ```bash
 git add .
-git commit -m "ES · El almacén en memoria" -m "<aquí TU respuesta, con tus palabras>"
+git commit -m "ES · El almacén: un cajón por empresa" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 
@@ -263,10 +240,10 @@ git push
 
 ## 🧠 En una frase
 
-Un **almacén** (`InMemoryEventStore`: un cajón de sobres por id) custodia las historias de **muchas** empresas; el **`EventStream`** —que ahora te **entrega** el almacén— lee (`Get`) y escribe (`Append`) la de una; el **handler** la busca por **id**; y al guardar se verifica la **versión esperada** (**concurrencia optimista**) para que dos escrituras simultáneas no se pisen.
+Un **almacén** (`EventStore`: un cajón de hechos por id) custodia las historias de **muchas** empresas; el **`EventStream`** —que ahora te **entrega** el almacén— lee (`Get`) y escribe (`Append`) la de una; y el **handler**, registrado una sola vez, la busca por el **`EmpresaId`** del comando. Un id que viaja solo.
 
 ---
 
 [⬅️ Volver: El despachador (dado un comando, encuentra su handler)](./el-despachador.md)
 
-[➡️ Siguiente: El tiempo de espera (async/await)](./el-tiempo-de-espera.md)
+[➡️ Siguiente: Cuando dos escriben a la vez (concurrencia optimista)](./concurrencia-optimista.md)

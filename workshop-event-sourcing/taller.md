@@ -91,15 +91,24 @@ Este es el **guion para dictar el taller en vivo**. Tú das los **conceptos**; a
 
 ---
 
-## 7 · El almacén en memoria (Event Store)  ·  📄 [el-almacen-en-memoria.md](secciones/el-almacen-en-memoria.md)
-**🧑‍🏫 Presentas:** el **Event Store** (almacén central de eventos por **id**); el id como **llave**; la **concurrencia optimista**.
+## 7 · El almacén: un cajón por empresa  ·  📄 [el-almacen-por-id.md](secciones/el-almacen-por-id.md)
+**🧑‍🏫 Presentas:** el **dolor de empresa2** — los handlers atados a un stream **colisionan por tipo** en el despachador → hace falta un **almacén central por id**.
 **🛠️ Pides que hagan:**
-1. **🔁** `AggregateRoot` gana `Id` (`{ get; set; }`).
-2. Crea `InMemoryEventStore` con `Dictionary<string, List<EventoAlmacenado>>`; métodos `GetEvents(id)` y `AppendEvent(id, sobre)` (el **id es parámetro**).
-3. Añade `AbrirStream<T>(id)` (el almacén se incluye con `this`); **🔁 reescribe** `EventStream` para **delegar** en el almacén y llevar su `_version`.
-4. **🔁** El comando gana `EmpresaId`; el handler recibe el **almacén** y abre el stream por `cmd.EmpresaId`.
-5. **(Concurrencia)** **🔁** `AppendEvent` valida la **versión esperada** → lanza `ConcurrencyException`. Demo: dos streams de la misma empresa, ambos `Get`, ambos `Append`.
-**✅ Deben ver:** dos empresas en el mismo almacén por su id; y el **choque** (segundo `Append`) lanza `ConcurrencyException`.
+1. **🔁** `AggregateRoot` gana `Id` (`{ get; set; }` — es el rótulo, se estampa desde fuera).
+2. Crea `EventStore` con `Dictionary<string, List<object>>`; métodos `GetEvents(id)` y `AppendEvent(id, hecho)` (el **id es parámetro**).
+3. Añade `AbrirStream<T>(id)` (dentro del store, `this` = el almacén, se lo pasa al stream); **🔁 reescribe** `EventStream` para **delegar** (guarda `_store` + `_aggregateId`).
+4. **🔁** El comando gana `EmpresaId`; el handler recibe el **almacén** y abre el stream por `cmd.EmpresaId` → se registran **una vez**, para todas.
+**✅ Deben ver:** dos empresas (`emp-7`, `emp-9`) en el mismo almacén, con handlers registrados una sola vez.
+
+---
+
+## 7b · Cuando dos escriben a la vez (concurrencia optimista)  ·  📄 [concurrencia-optimista.md](secciones/concurrencia-optimista.md)
+**🧑‍🏫 Presentas:** el peligro de **dos escritores a la vez** sobre la misma empresa (actualización perdida, en silencio); la **concurrencia optimista** (no bloquear; verificar la versión al guardar).
+**🛠️ Pides que hagan:**
+1. El **sobre `EventoAlmacenado(Version, …)`** — numerar cada hecho con su posición.
+2. **🔁** El `EventStore` guarda **sobres**; `AppendEvent` **valida la versión** → lanza `ConcurrencyException` si la posición ya está ocupada.
+3. **🔁** El `EventStream` numera al escribir y **desenvuelve** (`.Select`) al leer.
+**✅ Deben ver:** con un escritor, versiones 1,2,3…; con **dos** streams de la misma empresa (ambos `Get`, ambos `Append`), el segundo lanza `ConcurrencyException`.
 
 ---
 

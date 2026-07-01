@@ -11,7 +11,7 @@ Dejar de ensamblar el sistema con `new` por todos lados, y que algo lo arme por 
 Ese `new SuspenderHandler(...)` no es nuevo: lo vienes escribiendo **a mano** desde [El despachador](el-despachador.md) (donde registrabas `Registrar(new SuspenderHandler(stream))`) y en cada handler del almacén y de async. Es el dolor que se venía sembrando — hoy le ponemos nombre y se lo quitamos.
 
 ```csharp
-var almacen = new InMemoryEventStore();
+var almacen = new EventStore();
 var handler = new SuspenderHandler(almacen);
 ```
 
@@ -31,10 +31,10 @@ El arranque se vuelve una pesadilla de cableado: estás **armando los escritorio
 
 La industria lo resuelve con **inyección de dependencias (DI)**. Imagina un **recepcionista** muy eficiente:
 
-1. **El registro** (`IServiceCollection`): al arrancar, le enseñas cómo se fabrica cada cosa. *"Cuando alguien necesite el almacén, fabrícale un `InMemoryEventStore`."*
-2. **El suministro** (`IServiceProvider`): cuando alguien necesita un `SuspenderHandler`, el recepcionista **lee su constructor**, ve que pide un `InMemoryEventStore`, lo fabrica, se lo **inyecta**, y te entrega el handler listo.
+1. **El registro** (`IServiceCollection`): al arrancar, le enseñas cómo se fabrica cada cosa. *"Cuando alguien necesite el almacén, fabrícale un `EventStore`."*
+2. **El suministro** (`IServiceProvider`): cuando alguien necesita un `SuspenderHandler`, el recepcionista **lee su constructor**, ve que pide un `EventStore`, lo fabrica, se lo **inyecta**, y te entrega el handler listo.
 
-El handler ya no toma el control de crear su almacén; simplemente **exige** un `InMemoryEventStore` en su constructor y confía en que se lo darán. Eso —que el control de crear las dependencias pase de tu clase a alguien externo— se llama **Inversión de Control (IoC)**.
+El handler ya no toma el control de crear su almacén; simplemente **exige** un `EventStore` en su constructor y confía en que se lo darán. Eso —que el control de crear las dependencias pase de tu clase a alguien externo— se llama **Inversión de Control (IoC)**.
 
 ## En .NET: `ServiceCollection`
 
@@ -51,17 +51,17 @@ using Microsoft.Extensions.DependencyInjection;
 
 var services = new ServiceCollection();
 
-services.AddSingleton<InMemoryEventStore>();   // UNO solo para toda la app
+services.AddSingleton<EventStore>();   // UNO solo para toda la app
 services.AddTransient<SuspenderHandler>();     // uno NUEVO cada vez que lo pidan
 services.AddTransient<CambiarPlanHandler>();   // y el otro handler que ya tienes (con 50, esto crece)
 
 var proveedor = services.BuildServiceProvider();
 
 // sembramos "emp-7": como el almacén es Singleton, esta es la MISMA instancia que recibirá el handler
-var almacen = proveedor.GetRequiredService<InMemoryEventStore>();
+var almacen = proveedor.GetRequiredService<EventStore>();
 await almacen.AbrirStream<Empresa>("emp-7").AppendAsync(new EmpresaRegistrada("Constructora Andes", "Básico"));
 
-// pedimos el handler: el recepcionista lee su constructor, fabrica el InMemoryEventStore y se lo inyecta
+// pedimos el handler: el recepcionista lee su constructor, fabrica el EventStore y se lo inyecta
 var handler = proveedor.GetRequiredService<SuspenderHandler>();
 await handler.HandleAsync(new SuspenderEmpresa("emp-7", "falta de pago"));
 ```
@@ -72,7 +72,7 @@ Sin un solo `new` nuestro: el contenedor armó el grafo.
 > **Los tiempos de vida** importan: `AddSingleton` (una instancia para toda la app), `AddScoped` (una por petición/mensaje), `AddTransient` (una nueva cada vez). Trampa clásica (*captive dependency*): meter un `Scoped` dentro de un `Singleton` lo "congela" con la primera instancia — un bug silencioso. Lo retomaremos cuando importe.
 
 > [!NOTE]
-> 🌱 **Semilla — hoy `Singleton`, mañana `Scoped`.** Registramos el almacén como `AddSingleton` porque el `InMemoryEventStore` no tiene estado por petición. Pero **no automatices "almacén = Singleton"**: cuando llegue **Marten** ([El gran reveal — Marten](revelar-marten.md)), el almacén será una **sesión por petición/mensaje** → se registrará **`Scoped`**.
+> 🌱 **Semilla — hoy `Singleton`, mañana `Scoped`.** Registramos el almacén como `AddSingleton` porque el `EventStore` no tiene estado por petición. Pero **no automatices "almacén = Singleton"**: cuando llegue **Marten** ([El gran reveal — Marten](revelar-marten.md)), el almacén será una **sesión por petición/mensaje** → se registrará **`Scoped`**.
 
 ## 🧬 Desarmemos la "magia": un mini-contenedor en ~20 líneas
 
@@ -108,19 +108,19 @@ public class MiniContenedor
 ```csharp
 var c = new MiniContenedor();
 // como aún no hay interfaces, no registramos nada: el contenedor crea las clases concretas directamente
-var handler = c.Resolver<SuspenderHandler>();   // lee su ctor, fabrica el InMemoryEventStore, lo inyecta
+var handler = c.Resolver<SuspenderHandler>();   // lee su ctor, fabrica el EventStore, lo inyecta
 ```
 
 > 💡 El `MiniContenedor` es un **juguete para entender** que un contenedor no es magia — no lo necesitas en tu app (ahí usas el `ServiceCollection` de arriba). Constrúyelo, pruébalo para verlo funcionar, y luego puedes **borrarlo** o dejarlo en un archivo aparte. *(Su método `Registrar<TServicio, TImpl>` —el "libro" interfaz→implementación— hoy no se usa: aún no hay interfaces que mapear, por eso el demo resuelve la clase concreta directo. Lo ejercitarás al extraer `IEventStore` ([El gran reveal — Marten](revelar-marten.md)), cuando aparezca la 2ª implementación.)*
 
 > [!NOTE]
-> **¿Qué es la "reflexión"?** Es la capacidad de C# de **inspeccionarse a sí mismo en ejecución**: `concreto.GetConstructors()` pregunta "¿qué constructores tiene esta clase?", `GetParameters()` "¿qué pide cada uno?", y `Activator.CreateInstance` crea el objeto. El mini-contenedor lee el constructor del `SuspenderHandler`, ve que pide un `InMemoryEventStore`, lo resuelve (recursión: si ese a su vez pidiera cosas, las arma), y lo construye. **Eso es todo lo esencial de un contenedor.** El de .NET le añade tiempos de vida, validación y rendimiento — pero el corazón es esto. La próxima vez que `AddSingleton<…>()` parezca magia, recuerda: **acabas de escribirla**.
+> **¿Qué es la "reflexión"?** Es la capacidad de C# de **inspeccionarse a sí mismo en ejecución**: `concreto.GetConstructors()` pregunta "¿qué constructores tiene esta clase?", `GetParameters()` "¿qué pide cada uno?", y `Activator.CreateInstance` crea el objeto. El mini-contenedor lee el constructor del `SuspenderHandler`, ve que pide un `EventStore`, lo resuelve (recursión: si ese a su vez pidiera cosas, las arma), y lo construye. **Eso es todo lo esencial de un contenedor.** El de .NET le añade tiempos de vida, validación y rendimiento — pero el corazón es esto. La próxima vez que `AddSingleton<…>()` parezca magia, recuerda: **acabas de escribirla**.
 
 ---
 
 ### El Descubrimiento
 
-La inyección de dependencias no es una comodidad: es el **puente entre tu dominio y la infraestructura**. Tu `SuspenderHandler` **recibe** su almacén en vez de crearlo. Hoy lo recibe **concreto** (`InMemoryEventStore`); el día que dependa de una **abstracción**, dejará de saber si la persistencia es RAM, Postgres o un archivo. En la DI conviven **cuatro** ideas distintas, no una:
+La inyección de dependencias no es una comodidad: es el **puente entre tu dominio y la infraestructura**. Tu `SuspenderHandler` **recibe** su almacén en vez de crearlo. Hoy lo recibe **concreto** (`EventStore`); el día que dependa de una **abstracción**, dejará de saber si la persistencia es RAM, Postgres o un archivo. En la DI conviven **cuatro** ideas distintas, no una:
 
 - **DIP** (principio): depender de **abstracciones**, no de concretos. Aún **no** lo aplicamos —hay una sola implementación—; lo harás al enchufar Marten, y ahí sentirás su valor.
 - **IoC** (patrón): que algo externo controle la creación.
@@ -137,7 +137,7 @@ La inyección de dependencias no es una comodidad: es el **puente entre tu domin
 > [!NOTE]
 > 🌱 **Semilla — el contenedor en runtime también se puede evitar.** El contenedor de .NET resuelve por reflexión **en cada petición**. Wolverine va más allá: **genera código C# inspeccionable** que hace la inyección de forma explícita (más rápido y sin sorpresas). Lo verás cuando levantemos esa última magia.
 
-La DI es vital aprenderla **ahora** porque, en la próxima fase, descubrirás que **Marten** no es más que una caja de instrucciones para este recepcionista: cuando escribas `services.AddMarten(...)`, Marten le enseñará al contenedor cómo conectarse a la base de datos y proveer un Event Store de producción — borrando de un plumazo el `InMemoryEventStore` y todo lo que construimos a mano para simular el almacenamiento.
+La DI es vital aprenderla **ahora** porque, en la próxima fase, descubrirás que **Marten** no es más que una caja de instrucciones para este recepcionista: cuando escribas `services.AddMarten(...)`, Marten le enseñará al contenedor cómo conectarse a la base de datos y proveer un Event Store de producción — borrando de un plumazo el `EventStore` y todo lo que construimos a mano para simular el almacenamiento.
 
 Y ahí, con **una segunda implementación**, por fin tendrá sentido **extraer `IEventStore`**: tus handlers pasarán a depender de esa abstracción y **no cambiarán** al reemplazar el almacén. Esa —y no antes— es la utilidad de abstraer.
 
@@ -148,7 +148,7 @@ Es hora de conectar Postgres de verdad.
 ## ✅ Compruébalo
 
 - [ ] Reemplazaste los `new` manuales del `Program.cs` por `services.Add…` + `GetRequiredService<…>`.
-- [ ] Construiste el `MiniContenedor` y resolviste un `SuspenderHandler` con su `InMemoryEventStore` inyectado, sin `new` tuyo.
+- [ ] Construiste el `MiniContenedor` y resolviste un `SuspenderHandler` con su `EventStore` inyectado, sin `new` tuyo.
 - [ ] Sabes distinguir **DIP / IoC / DI / contenedor** y qué hace cada tiempo de vida (Singleton/Scoped/Transient).
 - [ ] Explica, con tus palabras, por qué un contenedor "no es magia de C#" (diccionario + reflexión + recursión).
 
@@ -172,7 +172,7 @@ git push
 
 ## 🧠 En una frase
 
-Un **contenedor de DI** arma el grafo de objetos por ti —lees su corazón en 20 líneas: registro + reflexión del constructor + recursión— para que tus clases **reciban** sus dependencias ya armadas (hoy el `InMemoryEventStore` concreto; mañana, una abstracción) sin tener que crearlas a mano.
+Un **contenedor de DI** arma el grafo de objetos por ti —lees su corazón en 20 líneas: registro + reflexión del constructor + recursión— para que tus clases **reciban** sus dependencias ya armadas (hoy el `EventStore` concreto; mañana, una abstracción) sin tener que crearlas a mano.
 
 ---
 

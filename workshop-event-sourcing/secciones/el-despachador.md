@@ -58,7 +58,7 @@ public class SuspenderHandler(EventStream<Empresa> stream)
 > **¿Por qué un `record`?** Además de darle a cada intención un **tipo** propio (lo que el ruteo necesita), una vez expresada no debería **alterarse en tránsito**: el `record` la hace **inmutable** y comparable por su contenido (un DTO limpio). Y de regalo: como ahora es **un dato con tipo**, puede **viajar** (llegar de una API o una cola), **loguearse**, **encolarse** o **reintentarse** — algo que un `string` suelto no permitía.
 
 > [!NOTE]
-> 💡 **Todavía sin id.** Manejamos **una** empresa, sobre su stream — el comando no necesita decir *cuál*. Cuando lleguen **muchas** ([El almacén en memoria](el-almacen-en-memoria.md)), el comando ganará un `EmpresaId`.
+> 💡 **Todavía sin id.** Manejamos **una** empresa, sobre su stream — el comando no necesita decir *cuál*. Cuando lleguen **muchas** ([El almacén por id](el-almacen-por-id.md)), el comando ganará un `EmpresaId`.
 
 ## 🔧 Pieza 2 — un contrato común (`ICommandHandler<T>`)
 
@@ -201,9 +201,9 @@ Ninguna de las dos apareció "porque sí" en [El Command Handler](el-command-han
 > 🌳 **Cosecha — esto es lo que Wolverine hará por ti.** Acabas de construir las dos mitades de un **mediador** de comandos: `Registrar` (llenar la tabla *tipo → handler*) y `Enviar` (rutear por tipo). Cuando reveles Wolverine ([El gran reveal (2)](revelar-wolverine.md)): `Discovery.IncludeAssembly` hace tu `Registrar` —escanea el ensamblado y arma la tabla sola— y `bus.InvokeAsync(comando)` hace tu `Enviar`. Por eso, cuando Wolverine **descubre por convención**, tu `ICommandHandler<T>` se vuelve **opcional**: el framework encuentra el `Handle` solo. Pero tú, sin esa magia, **necesitabas** el contrato para escribir el despachador — y eso es lo que te deja entender qué hace el framework por dentro.
 
 > [!NOTE]
-> 💡 **El `Despachador` es un andamio para *entender*, no para arrastrar.** Lo construiste para **sentir** por qué hacían falta el tipo-comando y el contrato. Pero es un juguete didáctico: en la próxima sección el handler cambiará (recibirá el almacén), y luego se volverá async — y este `Despachador` sencillo dejará de encajar. **Constrúyelo, pruébalo… y déjalo de lado** — no lo lleves a las siguientes secciones. El despachador *de verdad* lo pone Wolverine.
+> 💡 **El `Despachador` es un andamio para *entender*, no la meta.** Lo construiste para **sentir** por qué hacían falta el tipo-comando y el contrato. Lo **seguirás usando** un tramo —de hecho, en la próxima sección lo usas tal cual, con handlers que ahora reciben el almacén—; pero cuando el motor se vuelva **async** (unas secciones adelante) este `Despachador` sencillo **dejará de encajar** (su `Handle` síncrono no casa con un `HandleAsync`). Ahí lo jubilamos: el despachador *de verdad* lo pone **Wolverine**.
 >
-> Dos cosas para anotar de su **cableado** (`Registrar(new SuspenderHandler(stream))`): (1) ata cada handler a **un** stream fijo — solo sirve con **una** empresa; cuando llegue el almacén-por-id ([El almacén en memoria](el-almacen-en-memoria.md)), el handler abrirá el stream **por id dentro de `Handle`**, no lo recibirá ya fijado. (2) Ese `new …` a mano —el del `Registrar` y el de cada handler— es el **germen del "infierno de los `new`"** que despacharás con **inyección de dependencias** unas secciones más adelante.
+> Dos cosas para anotar de su **cableado** (`Registrar(new SuspenderHandler(stream))`): (1) ata cada handler a **un** stream fijo — solo sirve con **una** empresa; cuando llegue el almacén-por-id ([El almacén por id](el-almacen-por-id.md)), el handler abrirá el stream **por id dentro de `Handle`**, no lo recibirá ya fijado. (2) Ese `new …` a mano —el del `Registrar` y el de cada handler— es el **germen del "infierno de los `new`"** que despacharás con **inyección de dependencias** unas secciones más adelante.
 
 ---
 
@@ -248,4 +248,4 @@ Para tener **un punto que rutee cualquier comando a su handler** nacen, en su mo
 
 [⬅️ Volver: El Command Handler](./el-command-handler.md)
 
-[➡️ Siguiente: El almacén en memoria (Event Store)](./el-almacen-en-memoria.md)
+[➡️ Siguiente: El almacén: un cajón por empresa](./el-almacen-por-id.md)
