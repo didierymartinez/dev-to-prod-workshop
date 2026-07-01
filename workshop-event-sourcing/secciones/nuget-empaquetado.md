@@ -50,7 +50,7 @@ jobs:
     secrets: inherit   # la NUGET_API_KEY viaja por secrets:inherit
 ```
 
-Y un manifiesto, `paquetes-nuget.yml` —que vive en la **raíz de `.github/`** (es un manifiesto, **no** un workflow: no lo busques dentro de `.github/workflows/`)—, es la **única fuente de verdad** de qué se publica (lista `package_id` + `project_path` por paquete; los proyectos de test **no** se listan). Una versión, un tag `v<MAJOR.MINOR.PATCH>`, todos los paquetes a la vez.
+Y un manifiesto, `paquetes-nuget.yml` —que vive en la **raíz de `.github/`** (es un manifiesto, **no** un workflow: no lo busques dentro de `.github/workflows/`)—, es la **única fuente de verdad** de qué se publica (lista `package_id` + `project_path` por paquete; los proyectos de test **no** se listan).
 
 > [!NOTE]
 > 🌱 **Semilla — esto es el puente al taller de DevOps.** Empaquetar y publicar es **CI/CD**: workflows de GitHub Actions, secretos, versionado, releases. El taller de DevOps lo cubre a fondo (pipelines reutilizables, `secrets: inherit`, entornos con aprobación). Aquí solo necesitas saber **cómo está empaquetada la plantilla** que mantienes: LOCKSTEP + `Directory.Build.props` + `release-nuget.yml`.

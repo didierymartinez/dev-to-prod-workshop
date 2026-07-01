@@ -16,7 +16,7 @@ await sender.PublishAsync(hecho);     // 2. …esto nunca corre → el hecho que
 
 Son **dos** sistemas (la BD y el broker) y no hay forma de escribir en ambos de forma **atómica** —indivisible: o se hace completo o no se hace—: si confirmas la BD y luego el broker está caído o el proceso muere, los datos quedan **inconsistentes**. Al revés es peor: publicar antes de confirmar y que la confirmación falle → anunciaste un hecho que **no pasó**.
 
-El truco clásico: convertir las dos escrituras en **una**. El mensaje a publicar se guarda **en la misma transacción** —un grupo de operaciones que pasan todas o ninguna— que el hecho, en una tabla **outbox** ("bandeja de salida"). Luego, un **relay** (un proceso de fondo) lee esa bandeja y publica, **reintentando** hasta lograrlo. Si el proceso muere, el mensaje sigue en la outbox: al revivir, el relay lo envía. Nunca se pierde.
+El truco clásico: convertir las dos escrituras en **una**. El mensaje a publicar se guarda **en la misma transacción** —un grupo de operaciones que pasan todas o ninguna— que el hecho, en una tabla **outbox** ("bandeja de salida"). Luego, un **relay** (un proceso de fondo) lee esa bandeja y publica, **reintentando** hasta lograrlo. Si el proceso muere, el mensaje sigue en la outbox: al revivir, el relay lo envía.
 
 ## 🔧 Un outbox (y un inbox) ingenuos
 
