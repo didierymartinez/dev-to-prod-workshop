@@ -45,7 +45,7 @@ static PlanCambiado Upcast(PlanCambiadoV1 viejo) => new(viejo.Plan, CambiadoPor:
 Registras ese upcaster en Marten (es **su** mecanismo; lo configuras tú) y, de ahí en adelante, tu código **solo conoce `PlanCambiado`**: los eventos v1 del diario se traducen al vuelo al cargarlos.
 
 > [!NOTE]
-> ⚖️ **Qué trae la plantilla.** La capa del equipo **no incluye upcasters**: el upcasting es un mecanismo de **Marten** (lo registras desde su doc). Lo único que la plantilla fija de base es `EventNamingStyle.SmarterTypeName` (cómo se guarda el **nombre del tipo** de cada evento — clave para que Marten sepa qué versión está leyendo) y `StreamIdentity.AsString`. Cuando te toque versionar un evento, ahí es donde consultas la doc de Marten y enchufas el upcaster.
+> ⚖️ **Qué trae la plantilla.** La capa del equipo **no incluye upcasters**: el upcasting es un mecanismo de **Marten** (lo registras desde su doc). La plantilla solo fija dos cosas de base: `EventNamingStyle.SmarterTypeName` y `StreamIdentity.AsString`. `SmarterTypeName` controla cómo se guarda el **nombre del tipo** de cada evento. Ese nombre es clave para que Marten sepa qué versión está leyendo. Cuando te toque versionar un evento, ahí es donde consultas la doc de Marten y enchufas el upcaster.
 
 > [!NOTE]
 > 🌱 **Semilla — los eventos públicos pesan más al versionar.** Un evento **privado** ([Público vs privado](publico-vs-privado.md)) lo cambias con un upcaster y listo. Pero un `IPublicEvent` es un **contrato** que otros servicios consumen: cambiarlo puede romperles a **ellos**. Por eso los públicos se versionan con extra cuidado (a menudo publicando una v2 nueva y manteniendo la v1 un tiempo), no solo con un upcaster interno.

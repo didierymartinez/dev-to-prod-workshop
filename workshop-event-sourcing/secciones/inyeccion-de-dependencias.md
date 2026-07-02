@@ -76,7 +76,7 @@ Sin un solo `new` nuestro: el contenedor armó el grafo.
 
 ## 🧬 Desarmemos la "magia": un mini-contenedor en ~20 líneas
 
-Dijimos "el recepcionista lo fabrica por arte de magia". No hay magia: un contenedor es **un diccionario + reflexión del constructor + recursión**. Construyamos uno de juguete para probarlo — es el mismo patrón didáctico del **`Despachador`** de [El despachador](el-despachador.md): un juguete para *entender* (allá, el ruteo por tipo; aquí, el ensamblado de dependencias) antes de usar la herramienta de verdad:
+Dijimos "el recepcionista lo fabrica por arte de magia". No hay magia: un contenedor es **un diccionario + reflexión del constructor + recursión**. Construyamos uno de juguete para probarlo. Es un juguete para *entender* cómo funciona por dentro, antes de usar la herramienta de verdad:
 
 ```csharp
 public class MiniContenedor
@@ -135,7 +135,7 @@ La inyección de dependencias no es una comodidad: es el **puente entre tu domin
 > Menos ceremonia (sin constructor ni campos), y el framework inyecta exactamente lo que cada método necesita. Cuando veas dependencias en la **firma del método**, no es raro: es a propósito.
 
 > [!NOTE]
-> 🌱 **Semilla — el contenedor en runtime también se puede evitar.** El contenedor de .NET resuelve por reflexión **en cada petición**. Wolverine va más allá: **genera código C# inspeccionable** que hace la inyección de forma explícita (más rápido y sin sorpresas). Lo verás cuando levantemos esa última magia.
+> 🌱 **Semilla — el contenedor en runtime también se puede evitar.** El contenedor de .NET resuelve por reflexión **en cada petición**. Wolverine va más allá: **genera código C# inspeccionable** que hace la inyección de forma explícita (más rápido y sin sorpresas). Lo verás más adelante, con Wolverine.
 
 La DI es vital aprenderla **ahora** porque, en la próxima fase, descubrirás que **Marten** no es más que una caja de instrucciones para este recepcionista: cuando escribas `services.AddMarten(...)`, Marten le enseñará al contenedor cómo conectarse a la base de datos y proveer un Event Store de producción — borrando de un plumazo el `EventStore` y todo lo que construimos a mano para simular el almacenamiento.
 

@@ -1,6 +1,6 @@
 # El almacén directo (y la Unit of Work)
 
-Tu motor ya tiene la forma de producción casi completa. Falta el último gran refactor de la convergencia: **jubilar el `EventStream`-ventana**. Nos sirvió para entender "la historia de una empresa", pero es una capa extra entre tú y el almacén — y choca con cómo trabaja la herramienta real. La reemplazamos por un almacén al que le hablas **directo**, con una pieza que **guarda por ti**: la **Unit of Work**.
+Tu motor ya tiene la forma de producción casi completa. Falta el último gran refactor de la convergencia: **jubilar el `EventStream`-ventana**. Nos sirvió para entender "la historia de una empresa", pero es una capa extra entre tú y el almacén. La reemplazamos por un almacén al que le hablas **directo**, con una pieza que **guarda por ti**: la **Unit of Work**.
 
 ## 🎯 El Objetivo
 
@@ -24,7 +24,7 @@ La salida: un almacén que **recuerda** qué agregados tocaste durante la operac
 
 ## Un cambio de forma: el agregado lleva su id
 
-Hasta ahora el `EventStream` cargaba el id y hacía `store.AppendEvent(id, hecho)`: el almacén recibía `(id, hecho)` y la empresa **nunca necesitó saber el suyo**. Aquí eso cambia. Al almacén le entregas el **agregado entero** (`StartStream(ar)`), y al guardar él drena `ar.UncommittedEvents`. Para archivar esos hechos tiene que saber **en qué cajón van** — y lo lee de `ar.Id`. Sin ese id, el almacén no sabría dónde guardarlo (de hecho, más abajo verás la guarda `if (string.IsNullOrEmpty(ar.Id)) throw`). Así que, por fin, el agregado necesita su **propia identidad**. Súmala a la base `AggregateRoot` (lo demás —`Load`, `Raise`, `Version`— queda igual):
+Hasta ahora el `EventStream` cargaba el id y hacía `store.AppendEvent(id, hecho)`: el almacén recibía `(id, hecho)` y la empresa **nunca necesitó saber el suyo**. Aquí eso cambia. Al almacén le entregas el **agregado entero** (`StartStream(ar)`), y al guardar él drena `ar.UncommittedEvents`. Para archivar esos hechos tiene que saber **en qué cajón van** — y lo lee de `ar.Id`. Sin ese id, el almacén no sabría dónde guardarlo. Así que, por fin, el agregado necesita su **propia identidad**. Súmala a la base `AggregateRoot` (lo demás —`Load`, `Raise`, `Version`— queda igual):
 
 ```csharp
 // 🔁 AggregateRoot ahora lleva su Id

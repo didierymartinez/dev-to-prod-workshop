@@ -50,7 +50,7 @@ builder.Services.AddWolverine(ExtensionDiscovery.ManualOnly, options =>   // ←
 });
 ```
 
-Fíjate que **el corazón es idéntico** al host largo (mismo `IncludeAssembly` + `IntegrateWithWolverine` + `UnitOfWorkMiddleware` + `AutoApplyTransactions`). En el **host** solo cambian: `AddWolverine(ManualOnly)` (en vez de `UseWolverine`), `DurabilityMode.Solo` (en vez de `Balanced`), y que se cablea en `IServiceCollection`. La tercera diferencia serverless —el **envío**— viene abajo.
+Fíjate que la parte central es idéntica al host largo: mismo `IncludeAssembly`, `IntegrateWithWolverine`, `UnitOfWorkMiddleware` y `AutoApplyTransactions`. En el host solo cambian tres cosas: usas `AddWolverine(ManualOnly)` en vez de `UseWolverine`, `DurabilityMode.Solo` en vez de `Balanced`, y lo cableas en `IServiceCollection`. El tercer cambio, el envío, viene abajo.
 
 **2. La durabilidad: `Solo` en vez de `Balanced`.** `Balanced` (el del host largo) asume **varias instancias persistentes coordinándose** entre sí para repartirse el trabajo de fondo. En serverless cada instancia va **sola y se apaga**: no hay nada que coordinar, así que `DurabilityMode.Solo` (un solo nodo, sin coordinación).
 
@@ -62,7 +62,7 @@ options.HabilitarAzureServiceBus(cs);           options.HabilitarAzureServiceBus
 options.PublicarEvento<EmpresaSuspendida>("empresas");   options.PublicarEventoServerless<EmpresaSuspendida>("empresas");   // SendInline()
 ```
 
-`SendInline()` envía el evento **en el acto**, durante la invocación, sin pasar por el outbox durable — porque, como vimos, aquí no hay quién lo vacíe después.
+`SendInline()` envía el evento **en el acto**, durante la invocación, sin pasar por el outbox durable — porque aquí no hay quién lo vacíe después.
 
 ## Lado a lado
 

@@ -21,7 +21,7 @@ Reproducir la película entera de cada empresa solo para mirar un dato es carís
 
 ## Una proyección: pliega los hechos en un documento consultable
 
-Una **proyección** es un *fold* —plegar la lista de eventos en un solo estado, como el replay— de los eventos hacia un documento de lectura. Igual que tu `Apply` reconstruye el agregado, una proyección reconstruye una **vista**. Marten las mantiene por ti. Defines el documento de lectura y cómo cada hecho lo actualiza:
+Una **proyección** pliega la lista de eventos en un solo documento de lectura, igual que el replay. Igual que tu `Apply` reconstruye el agregado, una proyección reconstruye una **vista**. Marten las mantiene por ti. Defines el documento de lectura y cómo cada hecho lo actualiza:
 
 ```csharp
 using Marten.Events.Aggregation;
@@ -56,7 +56,7 @@ using JasperFx.Events.Projections;
 options.Projections.Add<EmpresaResumenProjection>(ProjectionLifecycle.Inline);   // o .Async, o .Live
 ```
 
-Y ahora consultar es **directo**, con LINQ, sin reproducir nada. La sesión de solo-lectura de Marten —`IQuerySession`, que abres con `store.QuerySession()` (donde `store` es el **`IDocumentStore`** de Marten que te inyecta el contenedor, **no** tu `IEventStore`)— expone `Query<T>()` sobre cualquier documento, incluido tu modelo de lectura:
+Y ahora consultar es **directo**, con LINQ, sin reproducir nada. Abres una sesión de solo-lectura con `store.QuerySession()`. Aquí `store` es el **`IDocumentStore`** de Marten que te inyecta el contenedor, **no** tu `IEventStore`. Esa sesión (`IQuerySession`) expone `Query<T>()` sobre cualquier documento, incluido tu modelo de lectura:
 
 ```csharp
 await using var querySession = store.QuerySession();

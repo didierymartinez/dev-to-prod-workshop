@@ -13,7 +13,7 @@ await store.GetAggregateRootAsync<Empresa>(tenantId, id, ct);   // tenantId aqu�
 await sender.PublishAsync(tenantId, evento);                    // …y aquí. Ruido en cada firma, y un olvido filtra datos entre clientes.
 ```
 
-La salida: una interfaz mínima que responde *"¿cuál es el tenant (y el usuario) de esta operación?"*. La inyectas donde la necesites y dejas de arrastrar el parámetro.
+La solución: una interfaz mínima que responde *"¿cuál es el tenant (y el usuario) de esta operación?"*. La inyectas donde la necesites y dejas de arrastrar el parámetro.
 
 ## 🔧 Refactor: un `ITenantResolver`
 
@@ -95,7 +95,7 @@ git push
 
 ## 🧠 En una frase
 
-El tenant no se **pasa** por parámetro, se **resuelve** del contexto: una interfaz `ITenantResolver { TenantId; UserId }` —con una implementación que lee headers HTTP **confiables** (`X-Tenant-Id`/`X-User-Id`) estampados por un gateway, y **lanza** si faltan— que inyectas donde haga falta; es el `ITenantResolver`/`TrustedHeadersTenantResolver` de la plantilla.
+El tenant no se **pasa** por parámetro, se **resuelve** del contexto. La interfaz `ITenantResolver { TenantId; UserId }` responde por él. Una implementación lee los headers HTTP **confiables** (`X-Tenant-Id`/`X-User-Id`) que estampó un gateway, y **lanza** si faltan. La inyectas donde haga falta. Es el `ITenantResolver`/`TrustedHeadersTenantResolver` de la plantilla.
 
 ---
 

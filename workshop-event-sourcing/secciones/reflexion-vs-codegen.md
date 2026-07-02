@@ -1,6 +1,6 @@
 # Levanta la última magia: reflexión vs codegen
 
-Wolverine "encuentra" tus handlers y corre un middleware **por convención**. Marten "reconstruye" tu `Empresa` **por convención**, llamando tus `Apply`. Suena a magia — y en este taller, **si parece magia, falta una sección**. Abramos la caja: ¿cómo lo hacen, y por qué no es lento?
+Wolverine "encuentra" tus handlers y corre un middleware **por convención**. Marten "reconstruye" tu `Empresa` **por convención**, llamando tus `Apply`. Suena a magia. Abramos la caja: ¿cómo lo hacen, y por qué no es lento?
 
 ## 🎯 El Objetivo
 
@@ -8,7 +8,7 @@ Entender que las herramientas **no usan reflexión en cada llamada**: **generan 
 
 ## Lo que hiciste a mano: reflexión
 
-Tu mini-contenedor de [Inyección de Dependencias](inyeccion-de-dependencias.md) resolvía dependencias con **reflexión**: `Type`, `GetConstructors`, `Activator.CreateInstance` (y el `TestStore` que viene buscará tus `Apply` con `MethodInfo`). Funciona, pero tiene dos costos:
+Tu mini-contenedor de [Inyección de Dependencias](inyeccion-de-dependencias.md) resolvía dependencias con **reflexión**: `Type`, `GetConstructors`, `Activator.CreateInstance`. Funciona, pero tiene dos costos:
 
 - **Velocidad:** inspeccionar tipos y llamar por `MethodInfo` en **cada** petición es más lento que una llamada normal de C#.
 - **Errores tardíos:** si falta un handler, no lo sabes al compilar — **revienta en ejecución** cuando llega el comando.
@@ -19,10 +19,10 @@ La reflexión es flexible, pero pagas por llamada y pierdes la red del compilado
 
 Wolverine no inspecciona tipos en cada comando. En el **arranque**, mira tus handlers y **escribe una clase C#** —código real— que llama tu `Handle`, corre tu middleware (`After`/`Finally`) y **comitea la sesión** (la política `AutoApplyTransactions` de [Revelar Wolverine](revelar-wolverine.md)), **directo**, sin reflexión. Esa clase se compila una vez (`UseRuntimeCompilation`, que ya pusiste en [Revelar Wolverine](revelar-wolverine.md)) y se reutiliza. Resultado: la velocidad de una llamada normal, decidida al arrancar, no en caliente.
 
-Y puedes **leerla**. Wolverine deja ver (y hasta exportar a disco) el código que generó para cada mensaje: verás, en C# legible, "crea el handler, resuelve el `IEventStore`, llama `Handle(cmd, store, ct)`, corre `After()`, comitea, corre `Finally()`". No es un truco: es exactamente lo que tú habrías escrito a mano para `CambiarPlanDeEmpresa`, generado por ti.
+Y puedes **leerla**. Wolverine deja ver (y hasta exportar a disco) el código que generó para cada mensaje: verás, en C# legible, "crea el handler, resuelve el `IEventStore`, llama `Handle(cmd, store, ct)`, corre `After()`, comitea, corre `Finally()`". No es un truco: es exactamente lo que tú habrías escrito a mano para `CambiarPlanDeEmpresa`.
 
 > [!NOTE]
-> **Marten hace lo mismo.** Para rehidratar tu `Empresa`, Marten genera código que llama tus `Apply(EmpresaRegistrada)`, `Apply(PlanCambiado)`… en orden — no busca los métodos por reflexión en cada lectura. Y el SQL que viste en [Revelar Marten](revelar-marten.md) (`mt_events`) también lo gestiona/pre-genera. Por eso la Critter Stack es rápida **y** inspeccionable a la vez.
+> **Marten hace lo mismo.** Para rehidratar tu `Empresa`, Marten genera código que llama tus `Apply(EmpresaRegistrada)`, `Apply(PlanCambiado)`… en orden — no busca los métodos por reflexión en cada lectura. Y el SQL contra `mt_events` que viste en [Revelar Marten](revelar-marten.md) también lo pre-genera. Por eso la Critter Stack es rápida **y** inspeccionable a la vez.
 
 ## ¿Por qué generar código y no usar reflexión?
 

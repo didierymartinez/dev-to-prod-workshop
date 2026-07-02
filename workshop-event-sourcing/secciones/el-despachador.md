@@ -1,6 +1,6 @@
 # El despachador: dado un comando, encuentra su handler
 
-En [El Command Handler](el-command-handler.md) quedó **una clase por comando** —`CambiarPlanHandler`, `SuspenderHandler`—, cada una con su `Handle`. Pero para ejecutar uno **eliges la clase y la llamas a mano**: `new SuspenderHandler(stream).Handle("falta de pago")`. Eres **tú** quien sabe, para cada comando, qué clase instanciar. Vamos a quitarte ese trabajo — y, al hacerlo, van a **nacer** las piezas que faltaban.
+En [El Command Handler](el-command-handler.md) quedó **una clase por comando** —`CambiarPlanHandler`, `SuspenderHandler`—, cada una con su `Handle`. Pero para ejecutar uno **eliges la clase y la llamas a mano**: `new SuspenderHandler(stream).Handle("falta de pago")`. Eres **tú** quien sabe, para cada comando, qué clase crear. Vamos a quitarte ese trabajo — y, al hacerlo, van a **nacer** las piezas que faltaban.
 
 ## 🎯 El Objetivo
 

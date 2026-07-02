@@ -1,6 +1,6 @@
 # Transportes reales: RabbitMQ y Azure Service Bus
 
-Tienes el concepto del outbox/inbox ([Outbox e Inbox](outbox-inbox.md)) y los senders ([Senders y el sobre](senders-y-sobre.md)). Falta el último tramo del lado público: conectar tus `IPublicEvent` a un **broker real** para que **otros servicios** los oigan. El equipo usa dos, según el despliegue: **RabbitMQ** (dockerizado) y **Azure Service Bus** (nube). El truco: tu dominio **no cambia** — solo se **configura** a dónde van los hechos públicos.
+Tienes el concepto del outbox/inbox ([Outbox e Inbox](outbox-inbox.md)) y los senders ([Senders y el sobre](senders-y-sobre.md)). Falta el último tramo del lado público: conectar tus `IPublicEvent` a un **broker real** para que **otros servicios** los oigan. El equipo usa dos, según el despliegue: **RabbitMQ** (dockerizado) y **Azure Service Bus** (nube). Tu dominio no cambia. Solo configuras a dónde van los hechos públicos.
 
 ## 🎯 El Objetivo
 
@@ -38,7 +38,7 @@ Asómate al panel en **http://localhost:15672** (guest / guest): ahí verás, en
 
 ## RabbitMQ: un exchange por servicio
 
-El equipo envuelve la API de Wolverine en tres helpers (idioma/herramienta nueva — te los muestro). Primero **instala el transporte de RabbitMQ** para Wolverine:
+Vas a añadir tres helpers de Wolverine para RabbitMQ. Te los muestro. Primero **instala el transporte de RabbitMQ** para Wolverine:
 
 ```bash
 dotnet add package WolverineFx.RabbitMQ
@@ -87,7 +87,7 @@ options.PublishMessage<EmpresaSuspendida>().ToAzureServiceBusTopic("empresas").U
 > [!NOTE]
 > 💡 **Para probar ASB en local, sin Azure ni costo** (verificado e2e): usa el **emulador oficial de Azure Service Bus de Microsoft** (`mcr.microsoft.com/azure-messaging/servicebus-emulator` + un backend SQL —`azure-sql-edge` en Apple Silicon—, ambos en Docker) con un connection string que termine en `…;UseDevelopmentEmulator=true;`. Es el único que habla el mismo handshake (**CBS**) que el SDK .NET. Dos ajustes que **el emulador exige y Azure real no**:
 > 1. **Pre-declara el topic** `empresas` (con al menos una subscription) en el `Config.json` del emulador — **no auto-provisiona** en runtime como RabbitMQ; publicar a un topic no declarado falla con `MessagingEntityNotFound` y Wolverine reintenta en bucle.
-> 2. Añade **`.SystemQueuesAreEnabled(false)`** a `UseAzureServiceBus(...)` — si no, Wolverine intenta crear sus colas de control y el emulador las rechaza inundando el log (en Azure real se crean solas). Es el mismo flag que el camino serverless de [Serverless (Azure Functions)](serverless-azure-functions.md) ya trae.
+> 2. Añade **`.SystemQueuesAreEnabled(false)`** a `UseAzureServiceBus(...)` — si no, Wolverine intenta crear sus colas de control y el emulador las rechaza inundando el log (en Azure real se crean solas).
 >
 > *(Ojo: emuladores genéricos tipo LocalStack/floci-az **NO** sirven aquí — su capa AMQP usa SASL `PLAIN`/`ANONYMOUS`, que el SDK .NET de ASB rechaza con `MSSBCBS`.)*
 

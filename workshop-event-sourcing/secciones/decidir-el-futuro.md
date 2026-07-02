@@ -29,7 +29,7 @@ public class Empresa : AggregateRoot
 ```
 </details>
 
-Fíjate en algo importante: `CambiarPlan` **no** toca la propiedad `Plan`. Solo **devuelve** el hecho `PlanCambiado`. El estado cambia únicamente cuando ese hecho se **aplica** (el `switch Aplicar` que ya tienes) al reproducir la historia. Decidir y aplicar son dos cosas separadas — recuérdalo, es la columna vertebral del patrón.
+Fíjate en algo importante: `CambiarPlan` **no** toca la propiedad `Plan`. Solo **devuelve** el hecho `PlanCambiado`. El estado cambia únicamente cuando ese hecho se **aplica** (el `switch Aplicar` que ya tienes) al reproducir la historia. Decidir y aplicar son dos cosas separadas. Recuérdalo: es la idea central de todo esto.
 
 ## El ciclo de vida: cargar → actuar → guardar
 
@@ -85,7 +85,7 @@ stream.Append(orden2.Suspender("falta de pago"));   // hoy emite OTRA VEZ → el
 ```
 
 > [!NOTE]
-> 🔍 **Lo que descubres al correrlo: el agregado debe estar recargado.** Fíjate en los dos `Get()` de arriba. Si en cambio reusaras la **misma** instancia (`empresa.Suspender(...)` dos veces seguidas), `Suspendida` seguiría en `false` —`decide` **no muta** el objeto (míralo: el cuerpo de `Suspender` solo hace `return new …`, ninguna línea asigna a una propiedad de `this`); el cambio vive en el diario, no en la instancia que tienes en mano— y la guarda que estás por escribir **nunca dispararía**. La idempotencia funciona porque **cada orden recarga** el agregado: el `Get()` lo rehidrata con el hecho ya guardado, así que la segunda orden **sí** ve `Suspendida = true`. Ese ciclo *cargar → actuar → guardar* por comando es justo lo que formaliza el [Command Handler](el-command-handler.md).
+> 🔍 **Lo que descubres al correrlo: el agregado debe estar recargado.** Fíjate en los dos `Get()` de arriba. Si en cambio reusaras la **misma** instancia (`empresa.Suspender(...)` dos veces seguidas), `Suspendida` seguiría en `false`. `decide` **no muta** el objeto: el cuerpo de `Suspender` solo hace `return new …`, ninguna línea asigna a una propiedad de `this`. El cambio vive en el diario, no en la instancia que tienes en mano. Y la guarda que estás por escribir **nunca dispararía**. La idempotencia funciona porque **cada orden recarga** el agregado: el `Get()` lo rehidrata con el hecho ya guardado, así que la segunda orden **sí** ve `Suspendida = true`. Ese ciclo *cargar → actuar → guardar* por comando es justo lo que formaliza el [Command Handler](el-command-handler.md).
 
 El agregado es el **guardián de las reglas**, así que la defensa nace **dentro** de la `Empresa`, mirando su estado **antes** de emitir.
 
@@ -143,7 +143,7 @@ stream.Append(e.Suspender("x"));   // ⚠ ¡emite OTRA VEZ! e.Suspendida SIGUE e
                                    //   decide no mutó e → el if (Suspendida) nunca se cumple
 ```
 
-La idempotencia no la da el `if` solo: la da **recargar** entre órdenes (el `Get()` que rehidrata desde el diario) — justo lo que hará el [Command Handler](el-command-handler.md) en cada comando.
+El `if` solo no logra la idempotencia. La logra **recargar** entre órdenes: el `Get()` rehidrata desde el diario. Es justo lo que hará el [Command Handler](el-command-handler.md) en cada comando.
 
 Y como `Suspender` ahora puede devolver `null`, **comprueba antes de archivar** (no metas `null` en el diario):
 
@@ -154,7 +154,7 @@ if (hecho is not null) stream.Append(hecho);
 
 > [!IMPORTANT]
 > 🏷️ **Dos motivos distintos para NO emitir un hecho — no los confundas:**
-> - **Validación (rechazar):** la operación es **inválida** (cambiar el plan de una empresa suspendida). Es un **error**: lanzas una excepción para que el llamador se entere. Nunca te "tragues" una regla violada.
+> - **Validación (rechazar):** la operación es **inválida** (cambiar el plan de una empresa suspendida). Es un **error**: lanzas una excepción para que quien llamó al método se entere. Nunca te "tragues" una regla violada.
 > - **Idempotencia (no-op):** la operación es **válida pero redundante** (suspender algo ya suspendido; la orden llegó dos veces). **No es un error**: simplemente no emites un hecho duplicado y sigues.
 >
 > Las dos viven en el agregado, pero una **grita** y la otra **calla**. (Más adelante, en mensajería, verás la *segunda* línea de defensa de la idempotencia: deduplicar por id de mensaje.)

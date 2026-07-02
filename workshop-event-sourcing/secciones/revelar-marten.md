@@ -43,7 +43,7 @@ Ahora la pieza nueva. La **API de Marten es idioma nuevo**, así que te la muest
 ```csharp
 using Marten;
 
-// El change-tracker (Unit of Work), igual que en «El almacén directo»; la plantilla lo factoriza en esta base (aquí solo la hereda MartenEventStore — es su forma de organizarlo, no una reutilización que sientas en el taller)
+// El change-tracker (Unit of Work), igual que en «El almacén directo». La plantilla del equipo lo pone en una clase base que hereda MartenEventStore.
 public abstract class MartenUnitOfWork
 {
     private readonly List<AggregateRoot> _modificados = [];
@@ -104,7 +104,7 @@ El mapeo, lado a lado:
 | `ExistsAsync` | `querySession.Events.FetchStreamStateAsync(id)` |
 
 > [!NOTE]
-> **Un matiz fino entre tu almacén en memoria ([El almacén directo](el-almacen-directo.md)) y Marten** (no te detiene, pero el anclaje es 1:1 con esto claro): en [El almacén directo](el-almacen-directo.md) `SaveChangesAsync` drenaba **las dos listas** (`_iniciados` y `_modificados`). Con Marten, `StartStream` **ya entrega** los hechos del agregado nuevo a la sesión en el momento (línea `session.Events.StartStream(ar.Id, ar.UncommittedEvents)`); por eso el `SaveChangesAsync` de arriba solo recorre los **modificados** y `RastrearIniciado` sirve para la **unión** de agregados y la limpieza, **no** para re-anexar. Lo que difiere el commit en ambos casos es la misma idea —nada toca Postgres hasta `session.SaveChangesAsync()`—, solo cambia *cuándo* se entregan los hechos del alta. (Así es exacto en la plantilla del equipo.)
+> **Un matiz entre tu almacén en memoria ([El almacén directo](el-almacen-directo.md)) y Marten** (no te detiene, pero conviene verlo): en [El almacén directo](el-almacen-directo.md) `SaveChangesAsync` drenaba **las dos listas** (`_iniciados` y `_modificados`). Con Marten, `StartStream` **ya entrega** los hechos del agregado nuevo a la sesión en el momento (línea `session.Events.StartStream(ar.Id, ar.UncommittedEvents)`). Por eso el `SaveChangesAsync` de arriba solo recorre los **modificados**. Y `RastrearIniciado` sirve para agrupar los agregados y limpiar, **no** para volver a anexar. En ambos casos, nada toca Postgres hasta `session.SaveChangesAsync()`. Solo cambia *cuándo* se entregan los hechos del alta. (Así es exacto en la plantilla del equipo.)
 
 > [!IMPORTANT]
 > **Lo que NO cambió:** ni `Empresa`, ni sus `Apply(T)`, ni `decide`, ni los handlers, ni `IEventStore`. Marten rehidrata **llamando tus `Apply(EmpresaRegistrada)`, `Apply(PlanCambiado)`…** por convención — por eso en [Aplicar al levantar](aplicar-al-levantar.md) los hicimos **públicos y por tipo**. Tu motor *era* la forma que Marten esperaba.

@@ -1,6 +1,6 @@
 # El gran reveal (2): Wolverine y el commit automático
 
-Marten reemplazó tu almacén ([Revelar Marten](revelar-marten.md)). Falta la otra mitad del Critter Stack: **Wolverine**, que reemplaza dos cosas que hiciste a mano — el **despacho** de comandos ([El despachador](el-despachador.md)) y el contenedor que arma handlers ([Inyección de Dependencias](inyeccion-de-dependencias.md)) — y, de regalo, te quita el `SaveChangesAsync` de encima.
+Marten reemplazó tu almacén ([Revelar Marten](revelar-marten.md)). Falta la otra mitad del Critter Stack: **Wolverine**, que reemplaza dos cosas que hiciste a mano: el **despacho** de comandos ([El despachador](el-despachador.md)) y el contenedor que arma handlers ([Inyección de Dependencias](inyeccion-de-dependencias.md)). Además, te quita el `SaveChangesAsync` de encima.
 
 ## 🎯 El Objetivo
 
@@ -8,7 +8,7 @@ Que Wolverine **descubra y ejecute** tus handlers por convención, y que el **gu
 
 ## El dolor: dos plomerías que se repiten
 
-1. **Cada handler termina igual:** `await store.SaveChangesAsync(ct);`. Es un *cross-cutting concern* —algo transversal a todos— repetido a mano. Si un día olvidas la línea, ese comando no persiste.
+1. **Cada handler termina igual:** `await store.SaveChangesAsync(ct);`. Es lo mismo en todos los handlers, repetido a mano. Si un día olvidas la línea, ese comando no persiste.
 2. **El despacho lo armas tú:** en [El Command Handler](el-command-handler.md) escribiste el `ICommandHandler<T>`, en [El despachador](el-despachador.md) construiste el despachador que rutea cada comando a su handler por tipo, y en [Inyección de Dependencias](inyeccion-de-dependencias.md) un mini-contenedor que los **construye** (resuelve sus dependencias). Es plomería: encontrar el handler del comando, armarlo y llamarlo.
 
 Wolverine hace ambas: **descubre** tus handlers (sin que registres cada uno) y ejecuta un **middleware** —código que corre antes/después de tu handler sin que el handler lo invoque— alrededor de cada comando, que hace el `SaveChanges` por ti.
@@ -17,7 +17,7 @@ Wolverine hace ambas: **descubre** tus handlers (sin que registres cada uno) y e
 
 Wolverine no necesita tu `ICommandHandler<T>`: encuentra, **por convención**, cualquier clase con un método `Handle`/`HandleAsync`, y le **inyecta las dependencias como parámetros**. Tus handlers se simplifican — y **pierden el `SaveChangesAsync`**:
 
-> 🛠️ **Inténtalo tú.** **🔁 Ajusta** tus handlers (los que ya implementan `ICommandHandler<T>` con el `IEventStore` por **constructor**, de [Revelar Marten](revelar-marten.md)): déjalos **cargar** (o `StartStream`) y **decidir** — y **borra el `await store.SaveChangesAsync(ct)`**. En un momento veremos quién lo llama por ti.
+> 🛠️ **Inténtalo tú.** **🔁 Ajusta** tus handlers de [Revelar Marten](revelar-marten.md): los que implementan `ICommandHandler<T>` con el `IEventStore` por **constructor**. Déjalos **cargar** (o `StartStream`) y **decidir**. **Borra el `await store.SaveChangesAsync(ct)`**. En un momento veremos quién lo llama por ti.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -99,7 +99,7 @@ dotnet add package WolverineFx.RuntimeCompilation # el compilador de código en 
 ```
 
 > [!IMPORTANT]
-> **¿Por qué un paquete aparte para el codegen?** Desde Wolverine 6, el **núcleo ya no incluye** el compilador de código en caliente: vive en `WolverineFx.RuntimeCompilation`. Si no lo instalas, `UseRuntimeCompilation()` **no existe** y, peor, la app **no arranca** (Wolverine corre en modo dinámico pero sin un compilador Roslyn registrado, y lanza una excepción al iniciar). Con el paquete referenciado, `UseRuntimeCompilation()` queda disponible y registra ese compilador. *(En producción puedes pre-generar el código en disco —ese mismo código que [Reflexión vs codegen](reflexion-vs-codegen.md) te enseña a inspeccionar— para arrancar sin compilar en caliente.)*
+> **¿Por qué un paquete aparte para el codegen?** Desde Wolverine 6, el **núcleo ya no incluye** el compilador de código en caliente: vive en `WolverineFx.RuntimeCompilation`. Si no lo instalas, `UseRuntimeCompilation()` **no existe** y, peor, la app **no arranca** (Wolverine corre en modo dinámico pero sin un compilador Roslyn registrado, y lanza una excepción al iniciar). Con el paquete referenciado, `UseRuntimeCompilation()` queda disponible y registra ese compilador. *(En producción puedes pre-generar el código en disco —ese mismo código— para arrancar sin compilar en caliente.)*
 
 Con eso, el cableado:
 
