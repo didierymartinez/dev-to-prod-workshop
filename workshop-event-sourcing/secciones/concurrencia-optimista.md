@@ -166,4 +166,3 @@ Cada hecho se archiva en un **sobre `EventoAlmacenado`** con su **versión** (su
 
 [⬅️ Volver: El almacén: un cajón por empresa](./el-almacen-por-id.md)
 
-[➡️ Siguiente: El tiempo de espera (async/await)](./el-tiempo-de-espera.md)
