@@ -28,7 +28,7 @@ La salida es darle la vuelta: que la empresa **recuerde** lo que decidió. Cada 
 ## 🔧 Refactor 1: el agregado acumula sus hechos
 
 > 🛠️ **Inténtalo tú.** Dos cambios:
-> 1. En la base **`AggregateRoot`**, añade una lista privada de hechos no confirmados, un método **`protected void Raise(object hecho)`** que solo la encola, una propiedad de **solo lectura** `UncommittedEvents` para asomarse a ella, y un `ClearUncommittedEvents()` para vaciarla. *(Conserva el `Id` de [El almacén por id](el-almacen-por-id.md) y el `Load`/`Aplicar` abstracto de [Refactorizando el motor](refactorizando-el-motor.md); solo **sumas** la maquinaria de acumulación.)*
+> 1. En la base **`AggregateRoot`**, añade una lista privada de hechos no confirmados, un método **`protected void Raise(object hecho)`** que solo la encola, una propiedad de **solo lectura** `UncommittedEvents` para asomarse a ella, y un `ClearUncommittedEvents()` para vaciarla. *(Conserva el `Load`/`Aplicar` abstracto de [Refactorizando el motor](refactorizando-el-motor.md); solo **sumas** la maquinaria de acumulación.)*
 > 2. En `Empresa`, **🔁 reemplaza** los **tres** métodos de decisión para que sean **`void`** y usen `Raise(...)` en vez de `return` — sí, los tres: `Suspender` deja de devolver `EmpresaSuspendida?` y `Reactivar` deja de devolver `EmpresaReactivada`; ahora son `void`. La **validación** de `CambiarPlan` sigue lanzando; la **idempotencia** de `Suspender` pasa de `return null` a simplemente **`return`** (no encola nada); `Reactivar` ni valida ni es idempotente: solo levanta su hecho.
 
 <details>
@@ -40,8 +40,6 @@ La base, ahora con la maquinaria de acumulación (🔁 reemplaza tu `AggregateRo
 public abstract class AggregateRoot
 {
     private readonly List<object> _uncommittedEvents = new();
-
-    public string Id { get; set; } = "";
 
     // los hechos que el agregado decidió pero aún no se han archivado
     public IReadOnlyList<object> UncommittedEvents => _uncommittedEvents.AsReadOnly();

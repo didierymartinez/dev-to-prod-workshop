@@ -52,7 +52,7 @@ Y en `EventStream.GetAsync`, el agregado ya es la fuente de la versión:
 ```csharp
 public async Task<T> GetAsync()
 {
-    var entidad = new T { Id = _aggregateId };
+    var entidad = new T();
     var sobres = (await _store.GetEventsAsync(_aggregateId)).ToList();
     entidad.Load(sobres.Select(s => s.EventData));
     _version = entidad.Version;          // 🔁 reemplaza SOLO esta línea (antes: sobres[^1].Version)

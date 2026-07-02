@@ -22,6 +22,18 @@ Ese `foreach` + `Clear` es **fontanería de persistencia** repetida en cada hand
 
 La salida: un almacén que **recuerda** qué agregados tocaste durante la operación, y al final los persiste **todos de un golpe**. Esa pieza tiene nombre: **Unit of Work** (unidad de trabajo).
 
+## Un cambio de forma: el agregado lleva su id
+
+Hasta ahora el `EventStream` cargaba el id y hacía `store.AppendEvent(id, hecho)`: el almacén recibía `(id, hecho)` y la empresa **nunca necesitó saber el suyo**. Aquí eso cambia. Al almacén le entregas el **agregado entero** (`StartStream(ar)`), y al guardar él drena `ar.UncommittedEvents`. Para archivar esos hechos tiene que saber **en qué cajón van** — y lo lee de `ar.Id`. Sin ese id, el almacén no sabría dónde guardarlo (de hecho, más abajo verás la guarda `if (string.IsNullOrEmpty(ar.Id)) throw`). Así que, por fin, el agregado necesita su **propia identidad**. Súmala a la base `AggregateRoot` (lo demás —`Load`, `Raise`, `Version`— queda igual):
+
+```csharp
+// 🔁 AggregateRoot ahora lleva su Id
+public string Id { get; set; } = "";
+```
+
+> [!NOTE]
+> 🆕 **Por qué el `Id` tiene `set` (y el estado no).** El `Plan`, `Suspendida`, etc. son `{ get; private set; }` —solo cambian por replay—. El `Id` es distinto: no es un dato de negocio que la empresa *decida*, es su **rótulo**, y quien la crea o la carga se lo **estampa** desde fuera (`new Empresa { Id = id }` al nacer, `new T { Id = id }` al rehidratar). Por eso su `set` es accesible.
+
 ## 🟢 El intento ingenuo: solo recuerdo lo que nace
 
 ¿Por qué "recordar"? Hagamos primero lo **obvio** y veámoslo fallar. Un almacén que apunta lo que **nace** (`StartStream`), pero que al **cargar** solo te devuelve el agregado, sin apuntarlo:

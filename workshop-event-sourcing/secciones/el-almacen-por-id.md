@@ -28,23 +28,6 @@ La causa de fondo no es el despachador: es que el handler está **atado a un str
 
 Un único almacén que custodie la historia de **cualquier** empresa por su **id**; y que el handler reciba **ese almacén** (no un stream fijo) y abra la empresa que el comando indique. Handlers registrados **una vez**, sirviendo a **todas** las empresas.
 
-## Cada empresa, su id
-
-Para guardar muchas historias juntas, primero hay que **distinguirlas**: cada empresa necesita un **`Id`**. Se lo damos a la clase base:
-
-```csharp
-// 🔁 AggregateRoot ahora lleva un Id
-public abstract class AggregateRoot
-{
-    public string Id { get; set; } = "";
-    public void Load(IEnumerable<object> historia) { foreach (var h in historia) Aplicar(h); }
-    protected abstract void Aplicar(object hecho);
-}
-```
-
-> [!NOTE]
-> 🆕 **Por qué el `Id` sí tiene `set` (y el estado no).** El `Plan`, `Suspendida`, etc. son `{ get; private set; }` —solo cambian por replay—. El `Id` es distinto: no es dato de negocio que la empresa *decida*, es su **rótulo**, y quien la carga (el stream) se lo **estampa** desde fuera. Por eso su `set` es accesible.
-
 ## El almacén: un cajón por empresa
 
 El almacén guarda los hechos de **cada empresa en su propio cajón**, rotulado con su id. En C#, eso es un **`Dictionary`**: la llave es el id; el valor, la lista de hechos de esa empresa.
@@ -91,7 +74,6 @@ Hasta [El Command Handler](el-command-handler.md), tu `EventStream` era **dueño
 > [!NOTE]
 > 🆕 **Idioma de C# que verás en la solución.**
 > - `new(this, aggregateId)` — *target-typed new*: como el tipo de retorno ya dice `EventStream<T>`, no repites el nombre; `new(...)` basta.
-> - `new T { Id = _aggregateId }` — crea el agregado **y** le fija una propiedad de un tiro (*inicializador de objeto*), sobre el `new T()` genérico que ya conoces.
 > - `AbrirStream<T>(...) where T : AggregateRoot, new()` — la **misma** restricción de `EventStream<T>`, ahora en un **método** genérico (no una clase): el método también necesita poder hacer `new T()`.
 
 <details>
@@ -118,7 +100,7 @@ public class EventStream<T> where T : AggregateRoot, new()
 
     public T Get()                       // LEER: trae los hechos del cajón y rehidrata
     {
-        var entidad = new T { Id = _aggregateId };
+        var entidad = new T();
         entidad.Load(_store.GetEvents(_aggregateId));
         return entidad;
     }
@@ -182,13 +164,13 @@ despachador.Enviar(new SuspenderEmpresa("emp-7", "falta de pago"));    // empres
 despachador.Enviar(new CambiarPlanDeEmpresa("emp-9", "Premium"));      // empresa 9 — mismo handler
 
 var andes = store.AbrirStream<Empresa>("emp-7").Get();
-Console.WriteLine($"{andes.Id}: suspendida={andes.Suspendida}");
+Console.WriteLine($"emp-7: suspendida={andes.Suspendida}");
 // emp-7: suspendida=True
 ```
 
 `dotnet run`: dos empresas en el mismo almacén, cada una en su cajón, con handlers que se registraron **una sola vez**.
 
-Con esto, el id es **uno solo** que aparece en tres momentos, siempre el **mismo valor**: se lo das al **almacén** al pedir el stream, el **stream** se lo pasa al almacén en cada `GetEvents`/`AppendEvent` (la **llave del cajón**), y el **stream** se lo **estampa** a la empresa al cargarla (su **identidad**). No son tres ids; es uno que entregas una vez y viaja solo.
+Con esto, el id es **uno solo** que entregas **una vez**: se lo das al **almacén** al pedir el stream (`AbrirStream(id)`), y el **stream** se lo pasa en cada `GetEvents`/`AppendEvent` como la **llave del cajón**. No son varios ids; es uno que entregas una vez y viaja solo.
 
 > [!NOTE]
 > 🌱 **Semilla — este `EventStream` es un andamio.** Nos sirve para ver el ciclo (cargar → escribir). Pero el almacén de verdad (el que adoptaremos) **no te entrega un objeto así**: te da **directamente la empresa** rehidratada. Cuando lleguemos ahí, el `EventStream` **desaparece** ([El almacén directo](el-almacen-directo.md)). Es un peldaño, no la meta.
@@ -217,7 +199,7 @@ Pero falta un peligro que aparece justo cuando hay **muchos escritores** sobre e
 
 - [ ] `dotnet run` escribe y lee **dos** empresas distintas (`emp-7`, `emp-9`) **siempre a través del stream**, nunca tocando el `store` directo.
 - [ ] Los handlers se registran **una sola vez** (reciben el `EventStore`, no un stream), y el comando trae su `EmpresaId`.
-- [ ] Confirma que el id es **uno solo**: la llave del diccionario, el parámetro del stream y el `Id` de la empresa son el **mismo valor**.
+- [ ] Confirma que el id es **uno solo**: el que pasas a `AbrirStream` es la **misma llave** del cajón en el diccionario.
 - [ ] Explica por qué el diseño de [El despachador](el-despachador.md) no escalaba a dos empresas (pista: la llave del despachador es el **tipo** del comando).
 
 ---
@@ -226,7 +208,7 @@ Pero falta un peligro que aparece justo cuando hay **muchos escritores** sobre e
 
 Piensa la respuesta a esto (es tu reflexión de la sección):
 
-> 💭 **Reto:** ¿por qué registrar los handlers atados a un stream no escalaba a dos empresas? ¿Qué tres caras tiene el mismo id ahora?
+> 💭 **Reto:** ¿por qué registrar los handlers atados a un stream no escalaba a dos empresas? ¿Cómo viaja el **mismo** id desde `AbrirStream` hasta la llave del cajón?
 
 Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
 

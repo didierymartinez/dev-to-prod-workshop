@@ -78,7 +78,7 @@ La asincronía sube como una cascada: si el almacén espera, el stream que lo ll
 // 🔁 EventStream: Get → GetAsync, Append → AppendAsync
 public async Task<T> GetAsync()
 {
-    var entidad = new T { Id = _aggregateId };
+    var entidad = new T();
     var sobres = (await _store.GetEventsAsync(_aggregateId)).ToList();   // ← await: libera el hilo mientras llega
     entidad.Load(sobres.Select(s => s.EventData));
     _version = sobres.Count;
@@ -109,7 +109,7 @@ public async Task AppendAsync(object hecho)
 >
 >     public async Task<T> GetAsync()
 >     {
->         var entidad = new T { Id = _aggregateId };
+>         var entidad = new T();
 >         var sobres = (await _store.GetEventsAsync(_aggregateId)).ToList();
 >         entidad.Load(sobres.Select(s => s.EventData));
 >         _version = sobres.Count;
