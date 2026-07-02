@@ -86,7 +86,7 @@ public class EventStream<T> where T : AggregateRoot, new()
 
     public T Get()
     {
-        var entidad = new T { Id = _aggregateId };
+        var entidad = new T();
         var sobres  = _store.GetEvents(_aggregateId);
         entidad.Load(sobres.Select(s => s.EventData));   // desenvuelve: solo el hecho
         _version = sobres.Count;                          // recuerda la posición en que cargué
