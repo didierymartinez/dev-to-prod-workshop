@@ -1,6 +1,6 @@
 # De `new` al contenedor (Inyección de Dependencias)
 
-El motor está listo para el mundo asíncrono. Pero mira el `Program.cs`: para que todo funcione, **tú** armas las piezas a mano.
+Tu motor ya está probado ([Given-When-Then](given-when-then.md)). Pero mira el `Program.cs`: para que todo funcione, **tú** armas las piezas a mano — y cuando lo expongas por HTTP, ese cableado a mano se vuelve inmanejable.
 
 ## 🎯 El Objetivo
 
@@ -59,11 +59,11 @@ var proveedor = services.BuildServiceProvider();
 
 // sembramos "emp-7": como el almacén es Singleton, esta es la MISMA instancia que recibirá el handler
 var almacen = proveedor.GetRequiredService<EventStore>();
-await almacen.AbrirStream<Empresa>("emp-7").AppendAsync(new EmpresaRegistrada("Constructora Andes", "Básico"));
+almacen.AbrirStream<Empresa>("emp-7").Append(new EmpresaRegistrada("Constructora Andes", "Básico"));
 
 // pedimos el handler: el recepcionista lee su constructor, fabrica el EventStore y se lo inyecta
 var handler = proveedor.GetRequiredService<SuspenderHandler>();
-await handler.HandleAsync(new SuspenderEmpresa("emp-7", "falta de pago"));
+handler.Handle(new SuspenderEmpresa("emp-7", "falta de pago"));
 ```
 
 Sin un solo `new` nuestro: el contenedor armó el grafo.
@@ -176,6 +176,6 @@ Un **contenedor de DI** arma el grafo de objetos por ti —lees su corazón en 2
 
 ---
 
-[⬅️ Volver: El tiempo de espera (async/await)](./el-tiempo-de-espera.md)
+[⬅️ Volver: Given-When-Then (probar decisiones)](./given-when-then.md)
 
-[➡️ Siguiente: Persistencia real (Docker y PostgreSQL)](./docker-postgres.md)
+[➡️ Siguiente: La API HTTP](./la-api-http.md)

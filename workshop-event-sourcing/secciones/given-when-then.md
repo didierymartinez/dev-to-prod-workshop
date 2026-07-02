@@ -1,104 +1,121 @@
-# Given-When-Then: probar decisiones
+# Given-When-Then: probar decisiones como especificación
 
-Ya tienes un `TestStore` en memoria ([El TestStore](teststore.md)). Falta una forma **limpia** de escribir los tests. En Event Sourcing un test no mira filas de una tabla — mira los **hechos** que un comando produjo. La gramática que encaja perfecto: **Given** (hechos previos) → **When** (un comando) → **Then** (los hechos emitidos). Es lo que el equipo usa, con xUnit y AwesomeAssertions.
+En [Probar el motor](probar-el-motor.md) tu test pasó — pero costó cuatro líneas de plomería expresar una regla de una línea.
 
 ## 🎯 El Objetivo
 
-Una clase base de test con **`Given`/`When`/`Then`** (y un `And` para el estado) que pruebe tus handlers **sin base de datos**, sobre el `TestStore`.
+Una clase base que deje escribir cada test como una **especificación**: `Given` los hechos previos → `When` el comando → `Then` los hechos esperados, sin el `yaEstaban`/`Skip`/`Select` a mano.
 
-## El dolor: Arrange-Act-Assert crudo es verboso
+## 💥 El dolor: la regla queda enterrada bajo la plomería
 
-Escribir cada test "a pelo" se repite y se ve feo. Creas el store, siembras eventos, montas el handler, lo ejecutas, sacas los eventos y los comparas. Cada vez. Y oculta lo esencial. La forma natural en ES es nombrar tres verbos:
+Mira el test de la sección anterior. Solo dos líneas son la regla que pruebas; el resto es andamiaje:
 
-- **Given** los hechos que ya pasaron (la historia previa).
-- **When** ejecuto un comando.
-- **Then** verifico los hechos **nuevos** que se emitieron (y, si quiero, el estado con **And**).
+```csharp
+var store  = new EventStore();                                        // plomería
+var stream = store.AbrirStream<Empresa>("emp-7");                     // plomería
+stream.Append(new EmpresaRegistrada("Constructora Andes", "Básico")); // ← la regla: dado un registro
+var yaEstaban = store.GetEvents("emp-7").Count;                       // plomería
+
+new SuspenderHandler(store).Handle(new SuspenderEmpresa("emp-7", "falta de pago"));  // ← al suspender
+
+var nuevos = store.GetEvents("emp-7").Skip(yaEstaban).Select(s => s.EventData);      // plomería
+Assert.Equal(new EmpresaSuspendida("falta de pago"), Assert.Single(nuevos));         // ← se emite la suspensión
+```
+
+Montar el store, sembrar, marcar el corte, recortar los nuevos: se repite **idéntico** en cada test. Y en Event Sourcing todos los tests tienen la misma forma —*dados unos hechos, al llegar un comando, se emiten otros hechos*—, así que vale la pena decir esa forma **una vez**.
 
 ## 🔧 Una base de test
 
-El test que quieres poder escribir se lee como la especificación del comportamiento —**Given → When → Then**—, sin BD:
+Quieres que cada test se lea así — la regla, sin andamiaje:
 
 ```csharp
-public class CambiarPlanTests : CommandHandlerAsyncTest<CambiarPlanDeEmpresa>
+public class SuspenderTests : HandlerTest<SuspenderEmpresa>
 {
-    protected override ICommandHandler<CambiarPlanDeEmpresa> Handler => new CambiarPlanHandler(EventStore);
+    protected override ICommandHandler<SuspenderEmpresa> Handler => new SuspenderHandler(Store);
 
     [Fact]
-    public async Task Cambiar_el_plan_de_una_empresa_activa_emite_PlanCambiado()
+    public void Suspender_una_empresa_activa_emite_EmpresaSuspendida()
     {
-        Given(new EmpresaRegistrada("Constructora Andes", "Básico"));   // historia previa
-        await WhenAsync(new CambiarPlanDeEmpresa(AggregateId, "Premium"));  // el comando
-        Then(new PlanCambiado("Premium"));                              // el hecho emitido
-        And<Empresa, string>(e => e.Plan, "Premium");                   // …y el estado resultante
+        Given(new EmpresaRegistrada("Constructora Andes", "Básico"));   // el pasado
+        When(new SuspenderEmpresa(EmpresaId, "falta de pago"));         // el comando
+        Then(new EmpresaSuspendida("falta de pago"));                   // el hecho esperado
     }
 }
 ```
 
-Para que ese test compile y corra en verde, construye la base:
+> 🛠️ **Inténtalo tú.** Escribe una base `HandlerTest<TCommand>` sobre un `EventStore` compartido. Expón el handler bajo prueba con una propiedad abstracta `Handler` (un `ICommandHandler<TCommand>`, el contrato de [El despachador](el-despachador.md)) que cada test implementa. `Given(params object[])` siembra la historia y **recuerda cuántos hechos había**; `When(comando)` lo pasa a `Handler.Handle`; `Then(params object[])` afirma que los hechos **nuevos** (los de después del `Given`) son exactamente esos. Luego reescribe tu test de la sección anterior heredando de ella.
 
-> 🛠️ **Inténtalo tú.** Una `CommandHandlerTestBase` con: `Given(params object[])` (siembra historia en el `TestStore`), `Then(params object[])` (afirma los hechos nuevos con `BeEquivalentTo`), y `And(proyección, esperado)` (afirma el **estado** del agregado rehidratado). Y una `CommandHandlerAsyncTest<TCommand>` con `WhenAsync(comando)` (ejecuta el handler y guarda).
+> [!NOTE]
+> 🆕 **Idioma de C#: `params` y `Assert.Equal` sobre listas.** `params object[] esperados` deja llamar `Then(a, b)` o `Then()` sin construir un arreglo a mano. `Assert.Equal(esperados, nuevos)` cuando ambos son colecciones **compara elemento por elemento, por valor** (tus hechos son `record`): un `Then()` vacío afirma que **no** se emitió nada.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```csharp
-using AwesomeAssertions;
+using Xunit;
 
-public abstract class CommandHandlerTestBase
+public abstract class HandlerTest<TCommand>
 {
-    protected string AggregateId = "emp-7";
-        protected readonly TestStore EventStore = new();
+    protected readonly EventStore Store = new();
+    protected readonly string EmpresaId = "emp-7";
+    private int _yaEstaban;
 
-    protected void Given(params object[] eventos) => EventStore.AppendPreviousEvents(AggregateId, eventos);
+    // cada test dice qué handler prueba
+    protected abstract ICommandHandler<TCommand> Handler { get; }
 
-    protected void Then(params object[] esperados) =>
-        EventStore.GetNewEvents(AggregateId).Should().BeEquivalentTo(esperados);
+    // Given: siembra la historia previa y recuerda dónde termina
+    protected void Given(params object[] pasado)
+    {
+        var stream = Store.AbrirStream<Empresa>(EmpresaId);
+        foreach (var hecho in pasado) stream.Append(hecho);
+        _yaEstaban = Store.GetEvents(EmpresaId).Count;
+    }
 
-    protected void And<T, TR>(Func<T, TR> proyeccion, TR esperado) where T : AggregateRoot, new() =>
-        proyeccion(EventStore.GetAggregateRoot<T>(AggregateId)).Should().Be(esperado);
-}
+    // When: ejecuta el comando con el handler bajo prueba
+    protected void When(TCommand comando) => Handler.Handle(comando);
 
-public abstract class CommandHandlerAsyncTest<TCommand> : CommandHandlerTestBase
-{
-        protected abstract ICommandHandler<TCommand> Handler { get; }
-    protected async Task WhenAsync(TCommand cmd) { await Handler.HandleAsync(cmd); EventStore.SaveChanges(); }
+    // Then: los hechos que aparecieron DESPUÉS del Given son exactamente estos
+    protected void Then(params object[] esperados)
+    {
+        var nuevos = Store.GetEvents(EmpresaId).Skip(_yaEstaban).Select(s => s.EventData);
+        Assert.Equal(esperados, nuevos);
+    }
 }
 ```
 </details>
 
-> [!NOTE]
-> **Dos detalles para que compile.** (1) `new CambiarPlanHandler(EventStore)` funciona porque desde [Revelar Marten](revelar-marten.md)/[Revelar Wolverine](revelar-wolverine.md) tu handler recibe **`IEventStore`** (no `InMemoryEventStore`), y el `TestStore` *es* un `IEventStore` — por eso le puedes pasar el doble de test. (2) `[Fact]` es el atributo de **xUnit** que marca un método como un test que el runner ejecuta.
+## 🔍 ¿Lo lograste?
 
-> [!NOTE]
-> **Pruebas EVENTOS, no filas.** Fíjate que `Then` compara la **lista de hechos producidos** —no el contenido de una tabla—. Eso es lo natural en ES: un comando se juzga por **lo que pasó** (`PlanCambiado`), no por cómo quedó una fila. `And` cubre el otro ángulo: el **estado** derivado, para casos donde quieres afirmar el resultado acumulado. `BeEquivalentTo` (de AwesomeAssertions) compara los `record` **por valor**, sin que escribas comparaciones a mano.
+`dotnet test` sigue en **verde**, pero cada test cabe en tres líneas que se leen como la regla de negocio. Ahora prueba la idempotencia con la misma gramática — fíjate lo directo que queda el "no pasó nada" (un `Then()` vacío):
 
-> [!NOTE]
-> ⚖️ **Es `CommandHandlerTestBase` + `CommandHandlerTest`/`CommandHandlerAsyncTest` de la plantilla, 1:1.** Y trae un verbo más: `ThenIsPublishedPublicly(...)`/`ThenIsPublishedPrivately(...)`, que afirma los **eventos publicados** usando los `TestPublicEventSender`/`TestPrivateEventSender` (el doble en memoria de [Senders y el sobre](senders-y-sobre.md)). Así pruebas, sin broker, que un comando además **publicó** lo que debía. Por eso conservamos `ICommandHandler<T>` en [Revelar Wolverine](revelar-wolverine.md): la base inyecta el `TestStore` al handler y lo ejecuta genéricamente.
-
-> [!NOTE]
-> 🌱 **Semilla — esto es posible porque el dominio es puro.** Pudimos probar todo —`decide`, `Apply`, el handler— **sin base de datos ni mocks** porque el agregado es una función pura ([Los primeros hechos](los-primeros-hechos.md)/[Decidir el futuro](decidir-el-futuro.md)) y el handler habla con `IEventStore` (intercambiable por el `TestStore`). Es el pago de las "dos vertientes" ([Las dos vertientes](dos-vertientes.md)): la capa del equipo cuesta más código, pero esto es lo que compra.
+```csharp
+[Fact]
+public void Suspender_una_empresa_ya_suspendida_no_emite_nada()
+{
+    Given(new EmpresaRegistrada("Constructora Andes", "Básico"),
+          new EmpresaSuspendida("falta de pago"));
+    When(new SuspenderEmpresa(EmpresaId, "otra vez"));
+    Then();   // ningún hecho nuevo
+}
+```
 
 ---
 
-## 🔍 Comprueba
+## Lo que construiste
 
-Crea un proyecto de test (`dotnet new xunit` + `dotnet add package AwesomeAssertions`), pega la base y el test, y corre:
+Una **especificación ejecutable**: `Given` los hechos previos, `When` el comando, `Then` los hechos emitidos. En Event Sourcing un test se juzga por **lo que pasó** (los hechos), no por cómo quedó una fila — y `Then()` vacío dice "no pasó nada" sin rodeos. La plomería vive una vez en la base; cada test dice solo su regla.
 
-```bash
-dotnet test
-```
-
-> **¿Lo lograste?** Deberías ver **1 test en verde** (`Superado: 1`). Sembraste un `EmpresaRegistrada`, ejecutaste `CambiarPlanDeEmpresa`, y el test confirmó que se emitió `PlanCambiado("Premium")` y que el plan quedó en "Premium" — **sin Postgres, sin Marten, sin mocks**.
+> [!NOTE]
+> 🌱 **Semilla — esta base es la del equipo, y va a sobrevivir al motor.** Es, casi letra por letra, el `CommandHandlerTestBase` de la plantilla del equipo. Y cuando cambies el `EventStore` casero por una base de datos real, **esta misma gramática seguirá verde** con otro almacén debajo — solo cambia cómo se siembra y cómo se leen los hechos ([Tests de integración](tests-de-integracion.md)). Ese es el pago de tener el dominio desacoplado del almacenamiento.
 
 ---
 
 ## ✅ Compruébalo
 
-- [ ] Una `CommandHandlerTestBase` con `Given`/`Then`/`And` sobre el `TestStore` ([El TestStore](teststore.md)).
-- [ ] `CommandHandlerAsyncTest<TCommand>` con `WhenAsync` que ejecuta el handler (vía `ICommandHandler<T>`) y guarda.
-- [ ] Un test `[Fact]` que sigue Given→When→Then y pasa en verde.
-- [ ] Explicas por qué en ES `Then` compara **hechos producidos**, no filas, y para qué sirve `And` (estado).
-- [ ] Sabes que la plantilla añade `ThenIsPublishedPublicly/Privately` (con los `Test…EventSender` de [Senders y el sobre](senders-y-sobre.md)) para afirmar lo **publicado**.
+- [ ] Una base `HandlerTest<TCommand>` con `Given` (siembra + recuerda el corte), `When` (ejecuta vía `Handler`) y `Then` (afirma los hechos nuevos por valor).
+- [ ] Tu test de suspender hereda de ella y cabe en tres líneas legibles.
+- [ ] Un test de idempotencia usa `Then()` vacío para afirmar que no se emitió nada.
+- [ ] Explicas por qué en Event Sourcing el `Then` compara **hechos emitidos**, no el estado ni una fila.
 
 ---
 
@@ -106,7 +123,7 @@ dotnet test
 
 Piensa la respuesta a esto (es tu reflexión de la sección):
 
-> 💭 **Reto:** escribe un test Given→When→Then de un comando y ponlo en verde. ¿Por qué Then compara HECHOS y no filas?
+> 💭 ¿Qué plomería desapareció de cada test al mover `Given`/`When`/`Then` a la base? ¿Por qué `Then()` vacío es una afirmación útil?
 
 Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
 
@@ -120,10 +137,10 @@ git push
 
 ## 🧠 En una frase
 
-En Event Sourcing un test es **Given** (hechos previos) → **When** (un comando) → **Then** (los hechos emitidos), no filas de una tabla; una `CommandHandlerTestBase` sobre el `TestStore` ([El TestStore](teststore.md)) lo hace legible con AwesomeAssertions (`BeEquivalentTo`), prueba el dominio **sin BD ni mocks** (porque es puro), y la plantilla añade `ThenIsPublished…` para afirmar lo publicado.
+Como todos los tests de un motor de eventos tienen la misma forma —*dados unos hechos, al llegar un comando, se emiten otros*—, una base `HandlerTest<TCommand>` con `Given`/`When`/`Then` la dice una vez: cada test queda como una **especificación** que compara los hechos emitidos por valor, y `Then()` vacío afirma la idempotencia.
 
 ---
 
-[⬅️ Volver: Probar sin base de datos (el TestStore)](./teststore.md)
+[⬅️ Volver: Probar el motor sin UI ni base de datos](./probar-el-motor.md)
 
-[➡️ Siguiente: El idioma de la plantilla (extension members de C#14)](./extension-members.md)
+[➡️ Siguiente: De `new` al contenedor (Inyección de Dependencias)](./inyeccion-de-dependencias.md)
