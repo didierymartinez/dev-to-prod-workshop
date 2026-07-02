@@ -8,7 +8,7 @@ Que la `Empresa` **acumule** los hechos que decide (los recuerde en una lista), 
 
 ## El dolor: devolver un hecho no escala
 
-Hoy tu `CambiarPlan` **devuelve** el hecho y el handler lo archiva. Mira los dos olores que arrastra:
+Hoy tu `CambiarPlan` **devuelve** el hecho y el handler lo archiva. Mira los dos problemas que arrastra:
 
 ```csharp
 public async Task HandleAsync(SuspenderEmpresa cmd, CancellationToken ct = default)
@@ -21,7 +21,7 @@ public async Task HandleAsync(SuspenderEmpresa cmd, CancellationToken ct = defau
 ```
 
 1. **El handler tiene que saber de idempotencia.** Ese `if (hecho is not null)` existe porque `Suspender` devuelve `null` cuando la orden es redundante ([Decidir el futuro](decidir-el-futuro.md)). Pero esa es una **regla del agregado** filtrándose al handler. El handler debería obedecer, no conocer.
-2. **Un comando solo puede emitir UN hecho.** `Suspender` devuelve uno. ¿Y si una operación tuviera que emitir **dos** (p. ej. *reactivar y subir de plan* en un mismo paso)? "Devolver un hecho" no lo modela; "devolver una lista" obliga al handler a manejar `null`/vacío/lista. Incómodo.
+2. **Un comando solo puede emitir UN hecho.** `Suspender` devuelve uno. ¿Y si una operación tuviera que emitir **dos** (p. ej. *reactivar y subir de plan* en un mismo paso)? "Devolver un hecho" no modela dos hechos. "Devolver una lista" obliga al handler a manejar `null`, vacío o lista. Ninguna opción es cómoda.
 
 La salida es darle la vuelta: que la empresa **recuerde** lo que decidió. Cada decisión **levanta** (`Raise`) un hecho hacia una lista de *cambios sin confirmar*; el handler solo **drena** esa lista (la recorre archivando cada hecho y la vacía), tenga 0, 1 o 5 hechos.
 

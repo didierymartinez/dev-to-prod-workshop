@@ -1,6 +1,6 @@
 # El almacén: un cajón por empresa
 
-Ya tienes un **`Despachador`** que rutea cualquier comando a su handler ([El despachador](el-despachador.md)). Al usarlo —quizá ya lo notaste probando tu código— aparece un dolor apenas nace la **segunda** empresa; y ese dolor es, justamente, lo que pide la pieza que construimos aquí.
+Ya tienes un **`Despachador`** que rutea cualquier comando a su handler ([El despachador](el-despachador.md)). Al usarlo aparece un dolor apenas nace la **segunda** empresa. Ese dolor es lo que resolvemos aquí.
 
 ## 💥 El dolor: ¿y cuando nace la segunda empresa?
 
@@ -22,7 +22,7 @@ despachador.Registrar(new SuspenderHandler(stream2));   // 💥 MISMA llave: typ
 
 El despachador rutea por **tipo del comando**, así que este `Registrar` **pisa** al de la empresa 1 (misma entrada del diccionario). No caben dos empresas en un mismo despachador.
 
-La causa de fondo no es el despachador: es que el handler está **atado a un stream** —a **una** empresa (`new SuspenderHandler(stream1)`)—, y por eso te haría falta uno por empresa. Si en cambio el handler recibiera un **almacén que tenga a todas** las empresas y abriera la correcta **por su `id`** (que viaja en el comando), **un solo** handler serviría a **todas** — y lo registrarías **una vez, en un despachador**. Ese **almacén central por id** es la pieza que falta.
+La causa de fondo no es el despachador. Es que el handler está **atado a un stream**, o sea a **una** empresa (`new SuspenderHandler(stream1)`). Por eso te haría falta uno por empresa. En cambio, si el handler recibiera un **almacén con todas** las empresas y abriera la correcta **por su `id`** (que viaja en el comando), **un solo** handler serviría a **todas**. Y lo registrarías **una vez**. Ese **almacén central por id** es la pieza que falta.
 
 ## 🎯 El Objetivo
 
@@ -65,25 +65,14 @@ Fíjate: el **id es siempre un parámetro**. El almacén no sabe de empresas ni 
 
 ## El `EventStream`: ahora el almacén te lo entrega
 
-Hasta [El Command Handler](el-command-handler.md), tu `EventStream` era **dueño** de su propia lista. Ahora que los hechos viven en el **almacén central**, el stream deja de guardarlos y **delega**: le pides al almacén el stream de un id, y el stream que recibes **guarda por dentro dos cosas** —una referencia al almacén y ese id—. Así, cuando dices `Get()` o `Append(...)`, el stream ya sabe **a qué almacén** y **de qué cajón (id)** hablar, sin que tú lo repitas: por dentro llama a `_store.GetEvents(id)` / `_store.AppendEvent(id, …)`.
+Hasta [El Command Handler](el-command-handler.md), tu `EventStream` era **dueño** de su propia lista. Ahora los hechos viven en el **almacén central**. El stream deja de guardarlos y **delega**. Le pides al almacén el stream de un id. El stream que recibes guarda por dentro dos cosas: una referencia al almacén y ese id. Así, cuando dices `Get()` o `Append(...)`, el stream ya sabe a qué almacén y de qué cajón hablar. Por dentro llama a `_store.GetEvents(id)` / `_store.AppendEvent(id, …)`.
 
-> 🛠️ **Inténtalo tú (2 piezas).**
-> 1. **🔁 Reescribe** el `EventStream<T>` de [El flujo de vida](el-flujo-de-vida.md): que **ya no guarde su lista**. Recibe `(store, id)` por constructor; en `Get()` pide los hechos al almacén (`store.GetEvents(id)`) y rehidrata; en `Append(hecho)` se lo pasa al almacén (`store.AppendEvent(id, hecho)`).
-> 2. Dale al `EventStore` un método **`AbrirStream<T>(string id)`** que **cree y devuelva** el `EventStream<T>` de ese id, guardándole dentro el almacén y el id. *(Pista: `AbrirStream` vive **dentro** del `EventStore`, así que ahí `this` **es el propio almacén**; pásaselo al stream al crearlo —`new(this, id)`— y el stream lo guardará en `_store` para poder llamarlo después.)*
+### Paso 1 · Reescribe el `EventStream` para que delegue
 
-> [!NOTE]
-> 🆕 **Idioma de C# que verás en la solución.**
-> - `new(this, aggregateId)` — *target-typed new*: como el tipo de retorno ya dice `EventStream<T>`, no repites el nombre; `new(...)` basta.
-> - `AbrirStream<T>(...) where T : AggregateRoot, new()` — la **misma** restricción de `EventStream<T>`, ahora en un **método** genérico (no una clase): el método también necesita poder hacer `new T()`.
+> 🛠️ **Inténtalo tú.** **🔁 Reescribe** el `EventStream<T>` de [El flujo de vida](el-flujo-de-vida.md): que **ya no guarde su lista**. Recibe `(store, id)` por constructor; en `Get()` pide los hechos al almacén (`store.GetEvents(id)`) y rehidrata; en `Append(hecho)` se lo pasa al almacén (`store.AppendEvent(id, hecho)`).
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
-
-```csharp
-// AbrirStream vive en EventStore, así que this = el propio almacén; se lo pasamos al stream para que sepa a quién llamar
-public EventStream<T> AbrirStream<T>(string aggregateId) where T : AggregateRoot, new()
-    => new(this, aggregateId);
-```
 
 ```csharp
 // 🔁 Reemplaza el EventStream<T> de «El flujo de vida»: ya no guarda la lista; habla con el almacén
@@ -108,6 +97,27 @@ public class EventStream<T> where T : AggregateRoot, new()
     public void Append(object hecho)     // ESCRIBIR: al cajón de esta empresa
         => _store.AppendEvent(_aggregateId, hecho);
 }
+```
+</details>
+
+### Paso 2 · Que el almacén te lo entregue: `AbrirStream`
+
+Para crear un stream ahora, el **handler** tendría que escribir `new EventStream<Empresa>(store, id)` a mano — sabiendo cómo se arma (que hay que pasarle el `store` y el id). Mejor que **el almacén lo cree por ti**: así el handler solo dirá `store.AbrirStream<Empresa>(id)`, sin conocer las piezas del stream.
+
+> 🛠️ **Inténtalo tú.** Dale al `EventStore` un método **`AbrirStream<T>(string id)`** que **cree y devuelva** el `EventStream<T>` de ese id, guardándole dentro el almacén y el id. *(Pista: `AbrirStream` vive **dentro** del `EventStore`, así que ahí `this` **es el propio almacén**; pásaselo al stream al crearlo —`new(this, id)`— y el stream lo guardará en `_store` para poder llamarlo después.)*
+
+> [!NOTE]
+> 🆕 **Idioma de C# que verás en la solución.**
+> - `new(this, aggregateId)` — *target-typed new*: como el tipo de retorno ya dice `EventStream<T>`, no repites el nombre; `new(...)` basta.
+> - `AbrirStream<T>(...) where T : AggregateRoot, new()` — la **misma** restricción de `EventStream<T>`, ahora en un **método** genérico (no una clase): el método también necesita poder hacer `new T()`.
+
+<details>
+<summary>👉 Muéstrame una forma de hacerlo</summary>
+
+```csharp
+// AbrirStream vive en EventStore, así que this = el propio almacén; se lo pasamos al stream para que sepa a quién llamar
+public EventStream<T> AbrirStream<T>(string aggregateId) where T : AggregateRoot, new()
+    => new(this, aggregateId);
 ```
 </details>
 

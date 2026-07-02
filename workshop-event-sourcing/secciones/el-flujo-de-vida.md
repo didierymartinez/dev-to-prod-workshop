@@ -27,7 +27,7 @@ Antes de escribir ese objeto, ponle nombre a lo que va a envolver. En [Los prime
 > [!NOTE]
 > **No lo confundas con el `Stream` de C#.** El `System.IO.Stream` que quizá ya usaste lee bytes de un archivo o de la red. Nuestro **Event Stream** no tiene nada que ver: es la **historia de hechos de una empresa**, un concepto de Event Sourcing, no una tubería de bytes.
 
-El concepto, entonces, es la **historia**. Lo que nos falta es el **código para trabajar con ella**: un objeto que sea dueño de ese stream, lo guarde escondido, y nos deje leerlo y escribirlo. A ese envoltorio lo vamos a llamar `EventStream<T>` —porque representa el flujo de hechos de una entidad—. Ten clara la distinción desde ya: el **Event Stream** es la historia (el dato); la clase `EventStream<T>` es nuestro **objeto para leerla y escribirla** (el código). Y es un andamio: lo construimos a mano para *entender* el ciclo anotar→cargar→rehidratar, y más adelante una librería de verdad hará ese trabajo por nosotros —tanto, que esta clase **desaparecerá**: le pediremos la empresa directamente al almacén, sin envoltorio de por medio—.
+El concepto, entonces, es la **historia**. Lo que nos falta es el **código para trabajar con ella**: un objeto que sea dueño de ese stream, lo guarde escondido, y nos deje leerlo y escribirlo. A ese envoltorio lo vamos a llamar `EventStream<T>` —porque representa el flujo de hechos de una entidad—. Ten clara la distinción desde ya: el **Event Stream** es la historia (el dato); la clase `EventStream<T>` es nuestro **objeto para leerla y escribirla** (el código). Y es un andamio: lo construimos a mano para *entender* el ciclo anotar→cargar→rehidratar. Más adelante una librería de verdad hará ese trabajo por nosotros, y esta clase **desaparecerá**.
 
 ## 🔧 Refactor 1: el envoltorio para `Empresa`
 
@@ -98,7 +98,7 @@ public class EventStream<T> where T : AggregateRoot, new()
 ```
 
 > [!NOTE]
-> **¿Y ese `where T : AggregateRoot, new()`?** Es la **restricción especial** que prometimos: sobre el `T` del 💡 de arriba, le exige dos cosas — que sea un `AggregateRoot` (para poder llamarle `.Load(...)`) y que tenga un **constructor sin parámetros** (eso significa `new()`, para crear uno vacío con `new T()`). Sin esas dos garantías, el compilador no te dejaría usar `.Load` ni `new T()` dentro de la clase.
+> **¿Y ese `where T : AggregateRoot, new()`?** Es la **restricción especial** que prometimos. Le exige dos cosas al tipo `T` — que sea un `AggregateRoot` (para poder llamarle `.Load(...)`) y que tenga un **constructor sin parámetros** (eso significa `new()`, para crear uno vacío con `new T()`). Sin esas dos garantías, el compilador no te dejaría usar `.Load` ni `new T()` dentro de la clase.
 
 Y arriba, **reemplaza** tu `var historia = …; var empresa = new Empresa(historia);` por el stream: créalo, **anota** los hechos con `Append`, y luego pídele la empresa con `Get`:
 
@@ -117,7 +117,7 @@ Console.WriteLine($"{empresa.Nombre}: plan {empresa.Plan}");
 > ```
 > (Esta historia es corta —solo registro y cambio de plan—, por eso no aparece "suspendida".) Y revisa que ya **no** quede ni `EventStreamDeEmpresa` ni la `new List<object>{ … }` armada a mano: ahora los hechos entran **uno a uno por `Append`**.
 
-Quien consume ya **no sabe ni le importa** cómo se guarda ni cómo se rehidrata: `Append` para anotar, `.Get()` para recibir la `Empresa` lista — la lista cruda nunca sale a la luz. Ese patrón —un envoltorio que esconde la **lista de eventos** y te entrega el objeto— se llama **Repositorio**: `EventStream<T>` y "Repositorio" son el **mismo objeto** visto desde dos ángulos — *event stream* por la historia que envuelve, *repositorio* por la forma de esconderla y entregarte la empresa.
+Quien consume ya **no sabe ni le importa** cómo se guarda ni cómo se rehidrata: `Append` para anotar, `.Get()` para recibir la `Empresa` lista — la lista cruda nunca sale a la luz. Ese patrón —un envoltorio que esconde la **lista de eventos** y te entrega el objeto— se llama **Repositorio**. `EventStream<T>` y "Repositorio" son el **mismo objeto** con dos nombres: *event stream* por la historia que envuelve, *repositorio* por cómo la esconde y te entrega la empresa.
 
 > [!NOTE]
 > 🌱 **Semilla — los genéricos no son solo "ahorrar código".** Sin `<T>` tendrías que devolver `object` y andar casteando por todos lados (con riesgo de reventar en ejecución). Con `EventStream<Empresa>`, el compilador **sabe** que `Get()` devuelve una `Empresa`: autocompletado, seguridad de tipos, cero sorpresas. Esta misma firma —genérico con restricción a `AggregateRoot`— es **exactamente** la que usan las librerías que adoptaremos para cargar agregados. La estás construyendo a mano.

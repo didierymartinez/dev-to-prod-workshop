@@ -4,7 +4,7 @@
 
 ## 🎯 El Objetivo
 
-Que cuando la `Empresa` levante un hecho, su estado **cambie al instante** (no solo al recargar), y que cada hecho se aplique con un método **`Apply` por tipo** — la forma que las herramientas esperan para **rehidratar** —reconstruir el estado del agregado reproduciendo sus eventos—.
+Que cuando la `Empresa` levante un hecho, su estado **cambie al instante** (no solo al recargar), y que cada hecho se aplique con un método **`Apply` por tipo**. Rehidratar es reconstruir el estado del agregado reproduciendo sus eventos.
 
 ## El dolor: la empresa que decide pero no se entera
 
@@ -21,7 +21,7 @@ Console.WriteLine(emp.Plan);         // 👉 imprime "Básico" 😕
 1. **Es contraintuitivo.** Un objeto que "decide algo sobre sí mismo" debería reflejarlo.
 2. **Rompe una segunda decisión.** Si en un mismo comando suspendieras y luego intentaras cambiar el plan, la validación `if (Suspendida)` miraría el estado **viejo** (no suspendido) y dejaría pasar algo que debió rechazar.
 
-Ya tienes la pieza que aplica un hecho al estado: el `Aplicar` del replay. La idea es simple: que `Raise`, además de encolar, **lo aplique**.
+Ya tienes un método que aplica un hecho al estado: `Aplicar`. La idea es simple: que `Raise`, además de encolar, **lo aplique**.
 
 ## 🔧 Refactor 1: `Raise` también aplica
 
@@ -46,7 +46,7 @@ Eso es todo. Ahora `emp.CambiarPlan("Premium")` deja `emp.Plan == "Premium"` al 
 
 ## 🔧 Refactor 2: un `Apply` por tipo
 
-En [Refactorizando el motor](refactorizando-el-motor.md) viste —y dejamos guardada— "otra forma" de aplicar: en vez de un `switch` con la mutación **incrustada** en cada `case`, un método **`Apply` por tipo de hecho**. La descartamos entonces porque la versión con `(dynamic)` perdía el chequeo de tipos. Ahora la adoptamos **bien** (con un `switch` tipado que enruta, sin `dynamic`) — porque es la forma con la que la herramienta que adoptaremos **rehidrata por convención** —el framework lo detecta por una regla (p. ej. que el método se llame `Apply`), sin que tú lo registres—: busca métodos `Apply(TipoDeEvento)` en tu agregado. Si dejas la mutación incrustada en el `switch`, la herramienta no la ve.
+En [Refactorizando el motor](refactorizando-el-motor.md) viste otra forma de aplicar: en vez de un `switch` con la mutación **incrustada** en cada `case`, un método **`Apply` por tipo de hecho**. La descartamos entonces porque la versión con `(dynamic)` perdía el chequeo de tipos. Ahora la adoptamos **bien**: un `switch` tipado que enruta, sin `dynamic`. Es la forma que la herramienta que adoptaremos busca: métodos `Apply(TipoDeEvento)` en tu agregado, sin que tú los registres. Si dejas la mutación incrustada en el `switch`, la herramienta no la ve.
 
 > [!NOTE]
 > ⚖️ **Esto es convergencia preventiva, no un dolor de hoy.** Seamos honestos: con tu `Apply` **protected** y la mutación dentro del `switch`, tu código correría **idéntico** — aquí no hay nada roto que arreglar. Reescribes y abres los `Apply` a **públicos** *ahora* solo para que, el día del reveal, la herramienta encuentre tus `Apply(TEvento)` por convención y **no toques ni una línea** del agregado. Es justo la idea de este bloque de convergencia: dejar el motor con la forma **exacta** de la plantilla, por adelantado.

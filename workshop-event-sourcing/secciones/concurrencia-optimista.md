@@ -116,7 +116,7 @@ a.Append(new EmpresaSuspendida("falta de pago"));   // escribe la versión 2 →
 b.Append(new PlanCambiado("Enterprise"));            // también trae la versión 2 → 💥 ya ocupada
 ```
 
-`b.Append` lanza `ConcurrencyException`: *"La versión 2 ya está ocupada"*. B **no** pisa a A en silencio: falla, y el llamador puede recargar (ver que ya está suspendida), redecidir y reintentar.
+`b.Append` lanza `ConcurrencyException`: *"La versión 2 ya está ocupada"*. B **no** pisa a A en silencio: falla, y quien lo llamó puede recargar (ver que ya está suspendida), redecidir y reintentar.
 
 > [!NOTE]
 > Esto que construiste tiene nombre: **control de concurrencia optimista**. **¿Por qué "optimista"?** Asumes que los choques son **raros**, así que **no bloqueas** a nadie mientras trabaja (eso sería *pesimista*, y cuesta caro). Dejas que todos avancen y solo **al guardar** verificas la versión; si chocó, **fallas y reintentas** (recargar → redecidir → reintentar).

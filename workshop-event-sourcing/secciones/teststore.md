@@ -1,6 +1,6 @@
 # Probar sin base de datos: el TestStore
 
-En [Las dos vertientes](dos-vertientes.md) dijimos que una de las razones por las que el equipo construyó su **capa propia** (`IEventStore`) en vez del `FetchForWriting` nativo es poder **testear sin base de datos**. Es hora de cobrar ese cheque. Como tu agregado y tu `decide` son **funciones puras** ([Los primeros hechos](los-primeros-hechos.md), [Decidir el futuro](decidir-el-futuro.md)) y los handlers hablan con la **interfaz** `IEventStore`, puedes probar toda tu lógica con un almacén **en memoria** — sin Postgres, sin Marten, sin mocks.
+En [Las dos vertientes](dos-vertientes.md) dijimos que una de las razones por las que el equipo construyó su **capa propia** (`IEventStore`) en vez del `FetchForWriting` nativo es poder **testear sin base de datos**. Ahora lo vamos a hacer. Tu agregado y tu `decide` son **funciones puras** ([Los primeros hechos](los-primeros-hechos.md), [Decidir el futuro](decidir-el-futuro.md)). Los handlers hablan con la **interfaz** `IEventStore`. Por eso puedes probar toda tu lógica con un almacén **en memoria** — sin Postgres, sin Marten, sin mocks.
 
 ## 🎯 El Objetivo
 

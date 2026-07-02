@@ -43,7 +43,7 @@ public class TestPublicEventSender : IPublicEventSender
 > [!NOTE]
 > **¿Por qué DOS enviadores y no uno?** Porque van por **caminos distintos**: los públicos salen a un **broker externo** (RabbitMQ, Azure Service Bus) para que otros servicios los oigan; los privados viajan por un **bus interno** del mismo servicio. Separarlos en `GetPublicEvents`/`GetPrivateEvents` ([Público vs privado](publico-vs-privado.md)) y en dos senders deja esa decisión explícita. Y el `groupId` pide **orden FIFO** —*first in, first out*: se entregan en el orden en que se enviaron— dentro de un grupo (p. ej. todos los hechos de `emp-7` en orden), cuando importa.
 >
-> 🌱 Por ahora el `groupId` **no hace nada todavía**: tu `TestPublicEventSender` lo ignora y solo acumula. El orden FIFO por grupo lo respeta el **broker** (Azure Service Bus con *sessions*, RabbitMQ con ruteo consistente) a través de los **senders de la plantilla** — **no es algo que coseches a mano** en el taller; la sobrecarga con `groupId` está aquí porque la API real de esos senders la tiene.
+> 🌱 Por ahora el `groupId` **no hace nada todavía**: tu `TestPublicEventSender` lo ignora y solo acumula. El orden FIFO por grupo lo respeta el **broker** (Azure Service Bus, RabbitMQ), no lo haces tú a mano. La sobrecarga con `groupId` está aquí porque la API real de esos senders la tiene.
 
 ## 🔧 El sobre: metadatos sin ensuciar el evento
 
@@ -63,7 +63,7 @@ El evento sigue limpio; el contexto viaja en el sobre. Al publicar, se **estampa
 > 📐 Aquí **solo MODELAS la forma** del sobre: el `record` que dice *qué metadatos* lo acompañan. Ninguna firma lo recibe todavía y la comprobación de abajo no lo toca. El cableado **evento→sobre** (quién lo estampa al publicar) **no lo construyes tú**: lo hace el `WolverinePublicEventSender` de la plantilla, y lo verás —como nota, con el `DeliveryOptions` de Wolverine— en [El tenant viaja con el mensaje](tenant-viaja-con-el-mensaje.md), cuando ya tengas de dónde sacar el tenant.
 
 > [!NOTE]
-> 🌱 **Semilla — tu `Sobre` es el `DeliveryOptions` de Wolverine.** No construirás el sobre a mano: Wolverine trae `DeliveryOptions { TenantId, GroupId }` y un `.WithHeader("user_id", …)`. La capa del equipo centraliza eso en un helper (`TenancyDelivery.Build`) y sus enviadores reales —`WolverinePublicEventSender`/`WolverinePrivateEventSender`, que **no escribes tú**— publican con `IMessageBus.PublishAsync(evento, sobre)`. *De dónde sale el tenant/usuario* lo **resuelve** un `ITenantResolver` (que esos senders reciben inyectado); eso **sí** lo construyes, en [Resolver el tenant](resolver-el-tenant.md) a [El tenant viaja con el mensaje](tenant-viaja-con-el-mensaje.md) — y ahí verás el estampado del sobre al publicar.
+> 🌱 **Semilla — tu `Sobre` es el `DeliveryOptions` de Wolverine.** No construirás el sobre a mano: Wolverine trae `DeliveryOptions { TenantId, GroupId }` y un `.WithHeader("user_id", …)`. La capa del equipo centraliza eso en un helper (`TenancyDelivery.Build`). Sus enviadores reales —`WolverinePublicEventSender`/`WolverinePrivateEventSender`, que **no escribes tú**— publican con `IMessageBus.PublishAsync(evento, sobre)`. *De dónde sale el tenant/usuario* lo **resuelve** un `ITenantResolver`. Eso **sí** lo construyes, en [Resolver el tenant](resolver-el-tenant.md) y [El tenant viaja con el mensaje](tenant-viaja-con-el-mensaje.md). Ahí verás el estampado del sobre al publicar.
 
 ---
 

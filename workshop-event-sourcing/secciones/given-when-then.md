@@ -1,6 +1,6 @@
 # Given-When-Then: probar decisiones
 
-Ya tienes un `TestStore` en memoria ([El TestStore](teststore.md)). Falta la parte bonita: una forma **limpia** de escribir los tests. En Event Sourcing un test no mira filas de una tabla — mira los **hechos** que un comando produjo. La gramática que encaja perfecto: **Given** (hechos previos) → **When** (un comando) → **Then** (los hechos emitidos). Es lo que el equipo usa, con xUnit y AwesomeAssertions.
+Ya tienes un `TestStore` en memoria ([El TestStore](teststore.md)). Falta una forma **limpia** de escribir los tests. En Event Sourcing un test no mira filas de una tabla — mira los **hechos** que un comando produjo. La gramática que encaja perfecto: **Given** (hechos previos) → **When** (un comando) → **Then** (los hechos emitidos). Es lo que el equipo usa, con xUnit y AwesomeAssertions.
 
 ## 🎯 El Objetivo
 
@@ -8,7 +8,7 @@ Una clase base de test con **`Given`/`When`/`Then`** (y un `And` para el estado)
 
 ## El dolor: Arrange-Act-Assert crudo es verboso
 
-Escribir cada test "a pelo" —crear el store, sembrar eventos, instanciar el handler, ejecutarlo, sacar los eventos, compararlos— se repite y se ve feo. Y oculta lo esencial. La forma natural en ES es nombrar tres verbos:
+Escribir cada test "a pelo" se repite y se ve feo. Creas el store, siembras eventos, montas el handler, lo ejecutas, sacas los eventos y los comparas. Cada vez. Y oculta lo esencial. La forma natural en ES es nombrar tres verbos:
 
 - **Given** los hechos que ya pasaron (la historia previa).
 - **When** ejecuto un comando.
@@ -27,7 +27,7 @@ using AwesomeAssertions;
 public abstract class CommandHandlerTestBase
 {
     protected string AggregateId = "emp-7";
-    protected readonly TestStore EventStore = new();   // el de «El TestStore»
+        protected readonly TestStore EventStore = new();
 
     protected void Given(params object[] eventos) => EventStore.AppendPreviousEvents(AggregateId, eventos);
 
@@ -40,7 +40,7 @@ public abstract class CommandHandlerTestBase
 
 public abstract class CommandHandlerAsyncTest<TCommand> : CommandHandlerTestBase
 {
-    protected abstract ICommandHandler<TCommand> Handler { get; }   // por eso conservamos ICommandHandler<T> (Revelar Wolverine)
+        protected abstract ICommandHandler<TCommand> Handler { get; }
     protected async Task WhenAsync(TCommand cmd) { await Handler.HandleAsync(cmd); EventStore.SaveChanges(); }
 }
 ```

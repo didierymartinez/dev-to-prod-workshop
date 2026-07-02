@@ -1,10 +1,10 @@
 # La versión es del agregado
 
-En [Concurrencia optimista](concurrencia-optimista.md) le pusiste a cada hecho un número de **versión** (el sobre `EventoAlmacenado`) y el almacén lo usa para rechazar una escritura si la versión no es la que toca: esa es la **concurrencia optimista**. Pero hay una pregunta incómoda: si cargas `emp-7` y te pregunto *"¿en qué versión estás?"*, tu `Empresa` **no sabe responder**. El número vive desperdigado —en el sobre `EventoAlmacenado` y en un `_version` privado, escondido dentro del `EventStream`—. Vamos a darle su hogar natural: el propio agregado.
+En [Concurrencia optimista](concurrencia-optimista.md) le pusiste a cada hecho un número de **versión** (el sobre `EventoAlmacenado`) y el almacén lo usa para rechazar una escritura si la versión no es la que toca: esa es la **concurrencia optimista**. Pero hay una pregunta incómoda: si cargas `emp-7` y te pregunto *"¿en qué versión estás?"*, tu `Empresa` **no sabe responder**. El número está en dos sitios: el sobre `EventoAlmacenado` y un `_version` privado dentro del `EventStream`. Vamos a darle su hogar natural: el propio agregado.
 
 ## 🎯 El Objetivo
 
-Que `empresa.Version` te diga **en qué versión cargó** el agregado — el dato contra el que se valida la concurrencia, y que **sobrevivirá** cuando en [El almacén directo](el-almacen-directo.md) cambiemos el almacén.
+Que `empresa.Version` te diga **en qué versión cargó** el agregado. Ese es el dato contra el que se valida la concurrencia. Y sobrevivirá cuando cambiemos el almacén en [El almacén directo](el-almacen-directo.md).
 
 ## El dolor: el número está atrapado en el `EventStream`
 
@@ -62,7 +62,7 @@ public async Task<T> GetAsync()
 </details>
 
 > [!NOTE]
-> **Por qué `Raise` no sube la versión, y por qué `protected set`.** `Version` es la versión **persistida** —la que cargaste—, no "cuántos hechos toqué en memoria". Por eso `Load` (que reproduce hechos **ya guardados**) la sube —el `Version++` vive solo dentro del `foreach` de `Load`—, pero `Raise` (un hecho **aún sin confirmar**) no: si cargaste en la versión 3 y decides algo, **sigues en la 3** hasta que se guarde. Esa "versión con la que cargué" es justo lo que la concurrencia optimista compara al escribir: *"¿el stream sigue en 3, o alguien más ya escribió?"*. Y el `set` es **`protected`** para que nadie falsee la versión desde fuera: solo el propio agregado la maneja.
+> **Por qué `Raise` no sube la versión, y por qué `protected set`.** `Version` es la versión **persistida**: la que cargaste, no cuántos hechos tocaste en memoria. `Load` reproduce hechos ya guardados, así que sube `Version`. `Raise` mete un hecho aún sin confirmar, así que no la sube. Si cargaste en la versión 3 y decides algo, **sigues en la 3** hasta que se guarde. Esa "versión con la que cargué" es justo lo que la concurrencia optimista compara al escribir: *"¿el stream sigue en 3, o alguien más ya escribió?"*. Y el `set` es **`protected`** para que nadie falsee la versión desde fuera: solo el propio agregado la maneja.
 
 > [!NOTE]
 > 🌱 **Semilla — esto era para que sobreviva a [El almacén directo](el-almacen-directo.md).** En la próxima sección el `EventStream`-ventana **desaparece**: un almacén directo tomará el agregado, leerá sus `UncommittedEvents` para guardarlos y su `Version` para el chequeo de concurrencia — directamente del agregado, sin intermediario. Mover la versión aquí fue el paso que lo hace posible.

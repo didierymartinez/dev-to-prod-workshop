@@ -110,7 +110,7 @@ Eso son **semanas** de plumbing frágil, lleno de errores de principiante — y 
 > [!NOTE]
 > 🌱 **Semilla — ese "muro" tiene nombre.** El problema de guardar un `object` y recuperarlo como su tipo exacto es la **serialización polimórfica** de eventos. La herramienta que adoptaremos lo resuelve por ti (guarda el tipo, lo reconoce al leer) — y también el versionado de esos eventos cuando, dentro de un año, le quieras añadir un campo (*upcasting*, que sembramos en [Los primeros hechos](los-primeros-hechos.md)).
 
-Es hora de dejar de construir y empezar a **adoptar**. En la próxima sección decidimos —con criterio, no por moda— incorporar una herramienta que hace exactamente lo que tú ya entiendes, y la conocemos.
+Es hora de dejar de construir y empezar a **adoptar**. En la próxima sección decidimos, con criterio, incorporar una herramienta que hace exactamente lo que tú ya entiendes.
 
 ---
 

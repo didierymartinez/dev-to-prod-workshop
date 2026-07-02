@@ -22,7 +22,7 @@ La pregunta literal: *¿un topic por cada tipo de evento?* En [Transportes](tran
 Respuesta a la pregunta: **no necesitas un topic por cada tipo** — un exchange **por servicio** + ruteo/suscripción **por tipo** te da lo mismo sin que el número de topics explote. (Trade-off: *por-evento* da topics finos pero proliferan; *por-servicio* agrupa y el consumidor elige — escala mejor en número.)
 
 > [!NOTE]
-> 💡 Esto **no** es la decisión de fondo. La granularidad es táctica; las tres que siguen son las que de verdad muerden.
+> 💡 Esto **no** es la decisión de fondo. La granularidad es táctica; las tres que siguen son las que de verdad importan.
 
 ## Decisión 2 — ¿evento… o lo estás forzando? (la grande)
 
@@ -64,19 +64,19 @@ Las cuatro decisiones de arriba se confunden porque **tres patrones distintos** 
 | **Domain events in-process** | **Notificación dentro del mismo proceso/transacción** | el agregado los **levanta** y se despachan **al commit** (el `UnitOfWorkMiddleware` de [Revelar Wolverine](revelar-wolverine.md)) |
 | **EDA / integration events** | **Comunicación async entre servicios** (cruzan boundaries) | `IPublicEvent` → broker ([Transportes](transportes-rabbitmq-asb.md)) |
 
-La trampa: **es el mismo evento el que cambia de ROL**. Mientras vive en el stream, es **estado** (ES). En el momento en que lo publicas para que **otro** reaccione, pasó a ser un **mensaje** (EDA) — y ahora exige lo que EDA exige: async, durabilidad, idempotencia, consistencia eventual, contexto en el sobre. El error clásico —el que originó esta sección— es **handlearlo fingiendo que sigue siendo ES/in-process** (por una cola en memoria handleada de inmediato), saltándose todo eso.
+La trampa: **es el mismo evento el que cambia de ROL**. Mientras vive en el stream, es **estado** (ES). En el momento en que lo publicas para que **otro** reaccione, pasó a ser un **mensaje** (EDA) — y ahora exige lo que EDA exige: async, durabilidad, idempotencia, consistencia eventual, contexto en el sobre. El error clásico es **tratarlo como si siguiera siendo ES/in-process**: una cola en memoria que se procesa de inmediato. Así te saltas todo eso.
 
 > [!NOTE]
 > 💡 **Los cuatro significados de "event-driven" (Martin Fowler).** "Event-driven" no es **una** cosa: (1) **Event Notification** —avisar de un cambio sin esperar respuesta (tus `IPublicEvent`)—; (2) **Event-carried State Transfer** —el evento lleva **suficientes datos** para que el consumidor no tenga que volver a llamar al emisor (un evento "gordo")—; (3) **Event Sourcing** —el log es la fuente de la verdad (todo este taller)—; (4) **CQRS** —separar lectura de escritura ([CQRS y proyecciones](cqrs-proyecciones.md))—. El taller construye 1, 3 y 4; el **2 (ECST)** es una decisión de diseño: un evento más gordo **desacopla** al consumidor de llamadas síncronas, a costa de **duplicar datos** y versionar un contrato más grande.
 
 > [!NOTE]
-> 💡 **Domain events in-process: el patrón legítimo (Jimmy Bogard).** Levantar domain events y despacharlos **dentro del proceso** es válido y respetado —*si* lo haces bien—: **no despaches al instante**; **registra** los eventos en el agregado y **despáchalos en un punto controlado, justo al commit, en el mismo scope/transacción**. Es justo lo que hace tu `UnitOfWorkMiddleware` ([Revelar Wolverine](revelar-wolverine.md)). El **anti-patrón** es una **cola en memoria handleada de inmediato en otro scope**: ahí no hay misma transacción (el efecto se **pierde** si el proceso cae) ni contexto (`local://` no rehidrata el tenant, [El tenant viaja con el mensaje](tenant-viaja-con-el-mensaje.md)). Para un efecto **intra-proceso**, un broker real sería *overkill*; el broker es para los **integration events** que cruzan servicios.
+> 💡 **Domain events in-process: el patrón legítimo (Jimmy Bogard).** Levantar domain events y despacharlos **dentro del proceso** es válido y respetado —*si* lo haces bien—: **no despaches al instante**; **registra** los eventos en el agregado y **despáchalos en un punto controlado, justo al commit, en el mismo scope/transacción**. Es justo lo que hace tu `UnitOfWorkMiddleware` ([Revelar Wolverine](revelar-wolverine.md)). El **anti-patrón** es una cola en memoria que se procesa de inmediato en otro scope. Ahí no hay misma transacción: el efecto se **pierde** si el proceso cae. Y no hay contexto: `local://` no rehidrata el tenant ([El tenant viaja con el mensaje](tenant-viaja-con-el-mensaje.md)). Para un efecto **intra-proceso**, un broker real sería *overkill*; el broker es para los **integration events** que cruzan servicios.
 
 ## 📋 La regla, en cuatro líneas
 
 Para decidir **qué hacer con un hecho** que tu comando produce:
 
-1. **Es estado (ES)** → va al **event store**. No se "publica para handlear".
+1. **Es estado (ES)** → va al **event store**. No se "publica para procesar".
 2. **Es efecto de la *misma* decisión de negocio** (mismo comando; mismo agregado o efecto acotado) → **flujo explícito** o **domain event diferido al commit**, en el **mismo scope** — **no una cola**.
 3. **Es una reacción *cross-cutting*** (otro agregado / otro proceso / otro servicio) → **EDA real**: outbox + async + idempotencia + el contexto (tenant) viajando en el sobre.
 4. **Un handler de evento NUNCA ejecuta lógica de dominio que pueda ser *rechazada*.** Si puede fallar/validar, no estás reaccionando a un hecho: es un **comando** — hazlo explícito.

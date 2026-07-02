@@ -15,7 +15,7 @@ store.StartStream(empresaDeAcme);    // id "emp-7" también
 // 💥 al cargar "emp-7", ¿de quién es? Se pisaron: la llave (el id) no es única entre tenants
 ```
 
-El `id` del agregado es único **dentro** de un cliente, pero **no** entre clientes. El aislamiento multi-tenant es una dimensión **ortogonal** al id: la llave real es **`(tenant, id)`**.
+El `id` del agregado es único **dentro** de un cliente, pero **no** entre clientes. El tenant es una segunda parte de la llave, aparte del id: la llave real es **`(tenant, id)`**.
 
 ## 🔧 Refactor: la llave es (tenant, id)
 
@@ -95,7 +95,7 @@ git push
 
 ## 🧠 En una frase
 
-Un sistema multi-cliente necesita una dimensión de aislamiento **ortogonal** al id: la llave real del stream es **`(tenant, id)`** (el id solo es único dentro de un tenant) — justo lo que Marten ofrece como `TenancyStyle.Conjoined` (tablas compartidas con columna `tenant_id`), fijando el tenant al abrir la sesión.
+Un sistema multi-cliente necesita el tenant como segunda parte de la llave, aparte del id: la llave real del stream es **`(tenant, id)`** (el id solo es único dentro de un tenant) — justo lo que Marten ofrece como `TenancyStyle.Conjoined` (tablas compartidas con columna `tenant_id`), fijando el tenant al abrir la sesión.
 
 ---
 

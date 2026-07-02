@@ -1,6 +1,6 @@
 # Las dos vertientes de persistencia
 
-Construiste una **capa propia** sobre Marten: `IEventStore`, `MartenEventStore`, la Unit of Work, el middleware. Funciona y es la forma del equipo. Pero Marten y Wolverine **recomiendan otro camino**, más automático, para cargar y guardar un agregado. Son **dos vertientes** para el mismo trabajo — y como tú vas a **mantener** la capa del equipo, necesitas dominar las dos: en qué se diferencian, por qué el equipo eligió la suya, qué cuesta, y cuándo reconsiderarlo.
+Construiste una **capa propia** sobre Marten: `IEventStore`, `MartenEventStore`, la Unit of Work, el middleware. Funciona y es la forma del equipo. Pero Marten y Wolverine **recomiendan otro camino**, más automático, para cargar y guardar un agregado. Son **dos vertientes** para el mismo trabajo. Como tú vas a **mantener** la capa del equipo, necesitas dominar las dos: en qué se diferencian, por qué el equipo eligió la suya, qué cuesta y cuándo reconsiderarlo.
 
 ## 🎯 El Objetivo
 
@@ -8,7 +8,7 @@ Entender las **dos formas** de cargar/guardar un agregado con la Critter Stack, 
 
 ## Vertiente 1 — La nativa (lo que recomienda el creador)
 
-Marten trae `FetchForWriting<T>(id)`: en **una** llamada **carga** el agregado y deja la sesión **lista para anexar**, con **concurrencia optimista incluida** (si dos procesos editan la misma empresa a la vez, el segundo **falla** en vez de pisar al primero — lo hiciste a mano con `ar.Version` en [El almacén directo](el-almacen-directo.md)). Y Wolverine la envuelve en su *Aggregate Handler Workflow* (el atributo `[Aggregate]`), que carga, te pasa el agregado y persiste por ti. El handler queda mínimo:
+Marten trae `FetchForWriting<T>(id)`: en **una** llamada **carga** el agregado y deja la sesión **lista para anexar**, con **concurrencia optimista incluida**: si dos procesos editan la misma empresa a la vez, el segundo **falla** en vez de pisar al primero. Tú hiciste eso a mano con `ar.Version` en [El almacén directo](el-almacen-directo.md). Y Wolverine la envuelve en su *Aggregate Handler Workflow* (el atributo `[Aggregate]`), que carga, te pasa el agregado y persiste por ti. El handler queda mínimo:
 
 ```csharp
 // el camino NATIVO (no es lo que usa el equipo; es el de la doc de Marten/Wolverine)
@@ -22,7 +22,7 @@ public async Task Handle(CambiarPlanDeEmpresa cmd, IDocumentSession session, Can
 }
 ```
 
-Fíjate: **devuelve/anexa los hechos** y Marten controla la versión. Se parece a tu **[Decidir el futuro](decidir-el-futuro.md)** (decidir y devolver el hecho), no a tu [El agregado que acumula](el-agregado-acumula.md) (acumular). Menos código, concurrencia gratis.
+Fíjate: **anexas los hechos** y Marten controla la versión. Se parece a tu [Decidir el futuro](decidir-el-futuro.md) (decidir y devolver el hecho), no a [El agregado que acumula](el-agregado-acumula.md). Menos código, concurrencia gratis.
 
 Wolverine lleva esto un paso más allá con el atributo **`[Aggregate]`** —su *Aggregate Handler Workflow*—: él hace el `FetchForWriting` por ti, te **inyecta el agregado ya cargado** como parámetro, y **persiste lo que devuelvas** sin que llames a `SaveChangesAsync`. El mismo caso queda así:
 
@@ -37,7 +37,7 @@ public static PlanCambiado Handle(CambiarPlanDeEmpresa cmd, Empresa empresa)
 }
 ```
 
-Compáralo con tu camino: ahí **tu** `UnitOfWorkMiddleware` es quien envuelve el handler para guardar al final. Con `[Aggregate]`, ese pegamento lo **genera Wolverine** y no se ve. Más automático todavía — y más caja negra.
+Compáralo con tu camino: ahí **tu** `UnitOfWorkMiddleware` es quien envuelve el handler para guardar al final. Con `[Aggregate]`, ese código de guardado lo **genera Wolverine** y no se ve. Más automático todavía y más caja negra.
 
 > [!NOTE]
 > 🆕 **Idioma de C#: handler estático.** El `[Aggregate]` permite que el método sea `static` y devuelva el evento directo: Wolverine descubre el handler por convención (no necesita una instancia) y trata el valor devuelto como "esto va al stream". Es la misma idea de tu `decide` (devolver el hecho), pero cableada por el framework.

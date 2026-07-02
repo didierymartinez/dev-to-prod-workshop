@@ -1,6 +1,6 @@
 # El tenant viaja con el mensaje
 
-En [Resolver el tenant](resolver-el-tenant.md) resolviste el tenant de un **header HTTP**. Pero no todo corre dentro de una petición HTTP: cuando Wolverine procesa un mensaje en **segundo plano** (un handler disparado por la cola — el worker del bus/outbox de [Outbox e Inbox](outbox-inbox.md)), **no hay `HttpContext`** ni headers que leer. Y ese handler igual necesita saber de qué tenant es. ¿De dónde lo saca?
+En [Resolver el tenant](resolver-el-tenant.md) resolviste el tenant de un **header HTTP**. Pero no todo corre dentro de una petición HTTP: cuando Wolverine procesa un mensaje en **segundo plano** (un handler disparado por la cola), **no hay `HttpContext`** ni headers que leer. Y ese handler igual necesita saber de qué tenant es. ¿De dónde lo saca?
 
 ## 🎯 El Objetivo
 
@@ -19,7 +19,7 @@ public async Task Handle(EmpresaSuspendida e, ITenantResolver tenant)
 Pero el tenant **sí** puede llegar: cuando un evento se publica, se estampa en el **sobre** con `DeliveryOptions { TenantId }`, y Wolverine lo **propaga** — del lado receptor, el `IMessageContext` del mensaje **trae** ese `TenantId`. Solo falta un resolver que lo lea **de ahí**.
 
 > [!NOTE]
-> **Cómo se estampa al publicar (el otro extremo del hilo).** Para que el receptor tenga un `TenantId` que leer, quien **publica** debe ponerlo en el sobre. Ojo: en [Transportes](transportes-rabbitmq-asb.md) solo **configuraste el ruteo** (`PublishMessage(...).ToRabbitExchange(...)`), no escribiste ningún `PublishAsync` a mano; los eventos salen **planos** (sin tenant) hasta que alguien estampa el sobre — y eso lo hace el `WolverinePublicEventSender` de la plantilla con `DeliveryOptions`. Si publicas a mano, hazlo así:
+> **Cómo se estampa al publicar (el otro extremo del hilo).** Para que el receptor tenga un `TenantId` que leer, quien **publica** debe ponerlo en el sobre. Ojo: en [Transportes](transportes-rabbitmq-asb.md) solo **configuraste el ruteo** (`PublishMessage(...).ToRabbitExchange(...)`), no escribiste ningún `PublishAsync` a mano; los eventos salen **planos** (sin tenant). Quien los estampa es el `WolverinePublicEventSender` de la plantilla, con `DeliveryOptions`. Si publicas a mano, hazlo así:
 > ```csharp
 > await bus.PublishAsync(evento, new DeliveryOptions { TenantId = tenant.TenantId }.WithHeader("user_id", tenant.UserId));
 > ```
@@ -64,7 +64,7 @@ services.AddScoped<ITenantResolver, ProxyTenantResolver>();
 ```
 </details>
 
-Ahora **el mismo** código de dominio resuelve el tenant tanto en un endpoint HTTP como dentro del daemon — sin saber cuál es. El proxy decide **por presencia de `HttpContext`** (no con `try/catch`, para no ensuciar el log de observabilidad).
+Ahora **el mismo** código de dominio resuelve el tenant tanto en un endpoint HTTP como dentro del daemon — sin saber cuál es. El proxy decide **por presencia de `HttpContext`**, no con `try/catch`.
 
 > [!NOTE]
 > **El hilo del tenant, completo:** al **publicar** se mete el `TenantId` en el sobre (`DeliveryOptions`, como en la nota de arriba); Wolverine lo **propaga** al `IMessageContext` del receptor; el `WolverineMessageContextTenantResolver` lo **lee**; y de ahí va a Marten al abrir la sesión por tenant ([Multi-tenancy](multitenancy-aislamiento.md)). El `UserId` viaja como un **header** del sobre (`user_id`), porque Wolverine propaga el `TenantId` de forma nativa pero el usuario no — es una extensión del equipo.

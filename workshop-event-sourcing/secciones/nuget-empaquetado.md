@@ -31,11 +31,11 @@ Fíjate qué **NO** está aquí: ni `Version` ni `PackageId` horneados. El `Pack
 <!-- PrivateAssets=all: tu paquete USA Marten, pero NO se lo impone como dependencia al consumidor -->
 ```
 
-`PrivateAssets="all"` es lo que viste en [Extension members](extension-members.md): la `Linq.Extensions` delega en Marten, pero quien instala tu paquete **no** hereda Marten. Sin ese atributo, Marten le llegaría al consumidor como **dependencia transitiva** —una dependencia que te llega indirecta, porque algo de lo que dependes a su vez depende de ella—; con `PrivateAssets="all"` cortas esa cadena: usas Marten puertas adentro sin filtrarlo.
+La `Linq.Extensions` delega en Marten, pero quien instala tu paquete **no** hereda Marten (lo viste en [Extension members](extension-members.md)). Una **dependencia transitiva** es la que te llega indirecta: algo de lo que dependes a su vez depende de ella. Sin ese atributo, Marten le llegaría así al consumidor. Con `PrivateAssets="all"` cortas esa cadena: usas Marten puertas adentro sin filtrarlo.
 
 ## El workflow de publicación
 
-La publicación es **manual** (por `workflow_dispatch`), versionado LOCKSTEP, y delegada a un workflow **reusable de la organización** —un workflow que vive en otro repositorio y que el tuyo invoca con `uses:`, en lugar de copiar los pasos—:
+La publicación es **manual** (por `workflow_dispatch`), con versionado LOCKSTEP. La delega a un workflow **reusable de la organización**: un workflow que vive en otro repositorio y que el tuyo invoca con `uses:`, sin copiar los pasos.
 
 ```yaml
 # release-nuget.yml — disparo manual
@@ -50,7 +50,7 @@ jobs:
     secrets: inherit   # la NUGET_API_KEY viaja por secrets:inherit
 ```
 
-Y un manifiesto, `paquetes-nuget.yml` —que vive en la **raíz de `.github/`** (es un manifiesto, **no** un workflow: no lo busques dentro de `.github/workflows/`)—, es la **única fuente de verdad** de qué se publica (lista `package_id` + `project_path` por paquete; los proyectos de test **no** se listan).
+Y hay un manifiesto, `paquetes-nuget.yml`, que es la **única fuente de verdad** de qué se publica. Lista `package_id` + `project_path` por paquete; los proyectos de test **no** se listan. Vive en la **raíz de `.github/`**, no dentro de `.github/workflows/`, porque es un manifiesto y no un workflow.
 
 > [!NOTE]
 > 🌱 **Semilla — esto es el puente al taller de DevOps.** Empaquetar y publicar es **CI/CD**: workflows de GitHub Actions, secretos, versionado, releases. El taller de DevOps lo cubre a fondo (pipelines reutilizables, `secrets: inherit`, entornos con aprobación). Aquí solo necesitas saber **cómo está empaquetada la plantilla** que mantienes: LOCKSTEP + `Directory.Build.props` + `release-nuget.yml`.
