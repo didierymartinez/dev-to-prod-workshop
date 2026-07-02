@@ -1,13 +1,13 @@
 # El tiempo de espera (async/await)
 
-En [Docker y PostgreSQL](docker-postgres.md) levantaste Postgres y viste el **muro** de meter tus hechos ahí a mano. Lo cruzarás con Marten en las próximas secciones. Pero una base de datos real trae un costo que tu almacén en RAM nunca tuvo: **hablarle tarda**. Prepara el motor para esa espera antes de conectarlo.
+Tienes el flujo completo de event sourcing… pero vive en RAM. Cuando el programa se apaga, el `EventStore` se va a la basura con toda su historia. Para que las empresas sobrevivan a un reinicio habrá que enviar los hechos **fuera del proceso**, a una base de datos real — y eso trae un costo nuevo: **el tiempo de espera**.
 
 > [!NOTE]
-> Todavía **no** conectas Marten (llega enseguida); aquí preparas la **forma `async`** para que, cuando el almacén hable con Postgres, el resto del código —handlers, despachador, API— ya **no tenga que cambiar**.
+> Aún **no** persistimos en esta sección (Postgres llega en unas secciones, en [Docker y PostgreSQL](docker-postgres.md)); aquí **preparamos la forma `async`** para que, cuando aparezca la espera real, el código ya **no tenga que cambiar**. Hoy el almacén sigue en RAM — pero con firmas asíncronas.
 
 ## 🎯 El Objetivo
 
-Preparar el motor —de la base de datos hasta el endpoint HTTP— para hablar con algo que **tarda**, sin congelar la aplicación mientras espera.
+Preparar el motor para hablar con algo que **tarda** (una base de datos), sin congelar la aplicación mientras espera.
 
 ## CPU vs I/O: por qué esperar bloqueando es un desastre
 
@@ -16,10 +16,10 @@ Hay dos tipos de operación:
 - **CPU** (sumar, el `switch Aplicar`): la CPU tiene los datos ahí mismo. Ocurre en **nanosegundos**.
 - **I/O** (escribir en disco, llamar a PostgreSQL en otra máquina): hay que **salir al mundo exterior**. Toma **milisegundos** — para la CPU, una eternidad.
 
-Tu servidor atiende peticiones con un número **limitado** de **hilos** (*threads*) — piensa en cada hilo como un **trabajador**, y en el conjunto como una **bolsa** (*pool*). Cuando se acaban, las peticiones nuevas esperan en fila.
+Una palabra antes de seguir: tu servidor atiende peticiones con un número **limitado** de **hilos** (*threads*) — piensa en cada hilo como un **trabajador**, y en el conjunto como una **bolsa** (*pool*) de trabajadores. Cuando se acaban, las peticiones nuevas **esperan en fila**. Con eso en mente:
 
 > [!WARNING]
-> Si le dices al procesador *"guarda estos hechos en la base de datos"* y lo obligas a quedarse **congelado** esperando, desperdicias un recurso carísimo: ese hilo no atiende a nadie más mientras tanto. Con 100 peticiones a la vez, congelas 100 hilos esperando al disco y la aplicación se cae. **Esperar bloqueando no escala.**
+> Si le dices al procesador *"guarda estos hechos en la base de datos"* y lo obligas a quedarse **congelado** esperando la respuesta, desperdicias un recurso carísimo: ese hilo no puede atender a nadie más mientras tanto. Con 100 peticiones a la vez, congelas 100 hilos esperando al disco y la aplicación se cae. **Esperar bloqueando no escala.**
 
 ## La solución de C#: `Task`, `async`, `await`
 
@@ -27,11 +27,16 @@ Tu servidor atiende peticiones con un número **limitado** de **hilos** (*thread
 - **`async`**: marca un método que contiene esperas largas hacia afuera.
 - **`await`**: "ve y haz el viaje; mientras tanto **me libero** para atender a otro; avísame al volver y sigo justo aquí".
 
-La regla del event sourcing real (y de la plantilla del equipo): **todo acceso al almacén es asíncrono**, y el `async` se propaga **de abajo hacia arriba** — del almacén hasta el endpoint HTTP. Vamos a subir esa cascada.
+La regla del event sourcing real (y de la plantilla del equipo): **todo acceso al almacén es asíncrono**. Absolutamente todo. Vamos a propagar el `async` de abajo hacia arriba.
 
-## 🔁 Peldaño 1 — el almacén
+## 🔁 El almacén, ahora asíncrono
 
-Los métodos del `EventStore` devuelven una **`Task`** y reciben un `CancellationToken`. Como todo está en RAM, no espera de verdad: envolvemos el resultado en una `Task` ya cumplida.
+Los métodos del `EventStore` cambian de firma: en vez de devolver una lista al instante, devuelven una **`Task`**, y reciben un parámetro nuevo, el **`CancellationToken`**.
+
+> [!NOTE]
+> **¿Qué es ese `CancellationToken ct = default`?** Es una señal de *"ya no necesito esto, abandona"*: si el cliente cierra la página o se cumple un *timeout*, la operación se corta en vez de seguir gastando. Toda API real de base de datos lo recibe (y las de la plantilla, también). Lo dejamos con `= default` para no tener que pasarlo en cada llamada todavía. **Por ahora el `ct` es un hueco reservado: lo recibimos en las firmas, pero aún no lo encadenamos** (los handlers todavía llaman a `GetAsync()`/`AppendAsync()` sin pasarlo). Eso lo haremos cuando importe —cuando detrás haya una base de datos real que pueda cancelarse—. Lo que queremos dejar grabado hoy es el **hábito de la firma**: cuando un método sea `async`, déjale su `CancellationToken` listo.
+
+El `EventStore` no habla con ninguna red — todo está en RAM, así que **no espera de verdad**. Como no hay espera, envolvemos sus resultados en una `Task` ya completada:
 
 ```csharp
 // 🔁 Reemplaza tu EventStore (el de «Concurrencia optimista») por esta versión asíncrona
@@ -39,6 +44,7 @@ public class EventStore
 {
     private readonly Dictionary<string, List<EventoAlmacenado>> _cajones = new();
 
+    // sin cambios de fondo: sigue entregándote el stream ya conectado
     public EventStream<T> AbrirStream<T>(string aggregateId) where T : AggregateRoot, new()
         => new(this, aggregateId);
 
@@ -47,10 +53,14 @@ public class EventStore
 
     public Task AppendEventAsync(string aggregateId, EventoAlmacenado sobre, CancellationToken ct = default)
     {
-        if (!_cajones.ContainsKey(aggregateId)) _cajones[aggregateId] = new();
+        if (!_cajones.ContainsKey(aggregateId))
+            _cajones[aggregateId] = new();
         var cajon = _cajones[aggregateId];
-        if (sobre.Version <= cajon.Count)
-            throw new ConcurrencyException($"La versión {sobre.Version} ya está ocupada (el cajón va en {cajon.Count}). Recarga y reintenta.");
+
+        if (sobre.Version <= cajon.Count)   // esa posición ya está ocupada → alguien escribió primero
+            throw new ConcurrencyException(
+                $"La versión {sobre.Version} ya está ocupada (el cajón va en {cajon.Count}). Recarga y reintenta.");
+
         cajon.Add(sobre);
         return Task.CompletedTask;   // no hubo espera real: la "promesa" ya está cumplida
     }
@@ -58,18 +68,18 @@ public class EventStore
 ```
 
 > [!NOTE]
-> **¿Ese `CancellationToken ct = default`?** Una señal de *"ya no necesito esto, abandona"* (el cliente cerró la página, venció un *timeout*). Toda API de base de datos real lo recibe. Lo dejamos con `= default` como **hueco reservado**: está en la firma, pero aún no lo encadenamos. `Task.FromResult`/`Task.CompletedTask` son "promesas ya cumplidas" — cumplen el contrato `async` sin I/O real; cuando llegue Marten, el `await` cobrará sentido de verdad.
+> `Task.FromResult(...)` y `Task.CompletedTask` son "promesas ya cumplidas": cumplen el contrato `async` sin que haya I/O de verdad. Es lo correcto en memoria. Cuando en unas secciones cambiemos esto por PostgreSQL, ahí sí habrá una espera real — y el `await` cobrará todo su sentido.
 
-## 🔁 Peldaño 2 — el stream y los handlers
+## 🔁 El `EventStream` y el handler, asíncronos de cabo a rabo
 
-Si el almacén espera, el stream que lo llama también, y el handler que llama al stream, también. El contrato `ICommandHandler<T>` sube con ellos.
+La asincronía sube como una cascada: si el almacén espera, el stream que lo llama también, y el handler que llama al stream, también.
 
 ```csharp
-// 🔁 EventStream: Get → GetAsync, Append → AppendAsync (lo demás de la clase no cambia)
+// 🔁 EventStream: Get → GetAsync, Append → AppendAsync
 public async Task<T> GetAsync()
 {
     var entidad = new T();
-    var sobres  = await _store.GetEventsAsync(_aggregateId);   // ← await: libera el hilo mientras llega
+    var sobres = (await _store.GetEventsAsync(_aggregateId)).ToList();   // ← await: libera el hilo mientras llega
     entidad.Load(sobres.Select(s => s.EventData));
     _version = sobres.Count;
     return entidad;
@@ -82,87 +92,110 @@ public async Task AppendAsync(object hecho)
 }
 ```
 
+> 📦 **Cómo queda tu `EventStream<T>`, completo** (esos dos métodos van dentro de la clase; lo demás no cambia):
+>
+> ```csharp
+> public class EventStream<T> where T : AggregateRoot, new()
+> {
+>     private readonly EventStore _store;
+>     private readonly string _aggregateId;
+>     private int _version;
+>
+>     public EventStream(EventStore store, string aggregateId)
+>     {
+>         _store = store;
+>         _aggregateId = aggregateId;
+>     }
+>
+>     public async Task<T> GetAsync()
+>     {
+>         var entidad = new T();
+>         var sobres = (await _store.GetEventsAsync(_aggregateId)).ToList();
+>         entidad.Load(sobres.Select(s => s.EventData));
+>         _version = sobres.Count;
+>         return entidad;
+>     }
+>
+>     public async Task AppendAsync(object hecho)
+>     {
+>         _version++;
+>         await _store.AppendEventAsync(_aggregateId, new(_version, DateTime.UtcNow, hecho));
+>     }
+> }
+> ```
+
+Primero, el **contrato** también se vuelve async:
+
 ```csharp
-// 🔁 El contrato y los handlers, ahora async
+// 🔁 El contrato ICommandHandler<T> de «El Command Handler», ahora async
 public interface ICommandHandler<TCommand>
 {
     Task HandleAsync(TCommand comando, CancellationToken ct = default);
 }
+```
 
+Y **ambos** handlers (`SuspenderHandler` y `CambiarPlanHandler`) pasan a `HandleAsync` con `await` en cada espera de I/O:
+
+```csharp
+// 🔁 Handle → HandleAsync (y recibe su CancellationToken)
 public class SuspenderHandler(EventStore store) : ICommandHandler<SuspenderEmpresa>
 {
     public async Task HandleAsync(SuspenderEmpresa cmd, CancellationToken ct = default)
     {
         var stream  = store.AbrirStream<Empresa>(cmd.EmpresaId);
-        var empresa = await stream.GetAsync();                    // 1. cargar (espera I/O)
-        var hecho   = empresa.Suspender(cmd.Motivo);              // 2. decidir (CPU, instantáneo)
-        if (hecho is not null) await stream.AppendAsync(hecho);   // 3. guardar (espera I/O)
+        var empresa = await stream.GetAsync();             // 1. cargar (espera I/O)
+        var hecho   = empresa.Suspender(cmd.Motivo);       // 2. actuar (CPU, instantáneo)
+        if (hecho is not null) await stream.AppendAsync(hecho);  // 3. guardar (espera I/O)
+    }
+}
+
+public class CambiarPlanHandler(EventStore store) : ICommandHandler<CambiarPlanDeEmpresa>
+{
+    public async Task HandleAsync(CambiarPlanDeEmpresa cmd, CancellationToken ct = default)
+    {
+        var stream  = store.AbrirStream<Empresa>(cmd.EmpresaId);
+        var empresa = await stream.GetAsync();
+        await stream.AppendAsync(empresa.CambiarPlan(cmd.NuevoPlan));
     }
 }
 ```
 
-*(`CambiarPlanHandler` y `RegistrarEmpresaHandler` suben igual: `Handle` → `async Task HandleAsync`, con `await` en cargar y guardar.)* Fíjate en el patrón: la **espera** está en cargar y guardar; la **decisión** (CPU pura) en medio no espera nada.
-
-## 🔁 Peldaño 3 — el despachador y la API
-
-El despachador ruteaba llamando `handler.Handle`; ahora ese `Handle` es `HandleAsync`, así que el despachador también devuelve una `Task`. Y la API, que llama al despachador, `await`ea esa `Task`:
+Y en el `Program.cs`, como los *top-level statements* ya son `async`, simplemente usas `await` (siembra `emp-7` primero, para que tenga historia que cargar):
 
 ```csharp
-// 🔁 Despachador: la tabla guarda funciones que devuelven Task; Enviar → EnviarAsync
-public class Despachador
-{
-    private readonly Dictionary<Type, Func<object, Task>> _handlers = new();
+var store = new EventStore();
+await store.AbrirStream<Empresa>("emp-7").AppendAsync(new EmpresaRegistrada("Constructora Andes", "Básico"));  // siembra
 
-    public void Registrar<T>(ICommandHandler<T> handler)
-        => _handlers[typeof(T)] = comando => handler.HandleAsync((T)comando);
+await new SuspenderHandler(store).HandleAsync(new SuspenderEmpresa("emp-7", "falta de pago"));   // top-level async: solo await
 
-    public Task EnviarAsync(object comando) => _handlers[comando.GetType()](comando);
-}
+var emp = await store.AbrirStream<Empresa>("emp-7").GetAsync();
+Console.WriteLine(emp.Suspendida ? "suspendida" : "activa");   // 👉 suspendida
 ```
 
-```csharp
-// 🔁 Los endpoints de «La API HTTP» pasan a async + await — la cascada llega hasta arriba
-app.MapPost("/api/empresas", async (RegistrarEmpresa cmd, Despachador despachador) =>
-{
-    await despachador.EnviarAsync(cmd);
-    return Results.Accepted($"/api/empresas/{cmd.EmpresaId}");
-});
-
-app.MapGet("/api/empresas/{id}", async (string id, EventStore store) =>
-{
-    var empresa = await store.AbrirStream<Empresa>(id).GetAsync();
-    return Results.Ok(new { empresa.Nombre, empresa.Plan, empresa.Suspendida });
-});
-```
-
-*(El endpoint de suspender sube igual: `async (…) => { await despachador.EnviarAsync(...); return Results.Accepted(); }`.)* ASP.NET Core estaba hecho para esto: un endpoint `async` libera su hilo mientras la base de datos responde, y con eso atiende muchas más peticiones con los mismos trabajadores.
-
-> 🛠️ **Inténtalo tú.** Tus tests también suben la cascada. En la base `HandlerTest<TCommand>` de [Given-When-Then](given-when-then.md): `Given` y `Then` `await`ean el almacén (`AppendAsync`/`GetEventsAsync`), y `When` se vuelve `WhenAsync` (`await Handler.HandleAsync(comando)`). Cada `[Fact]` pasa a `async Task` con `await WhenAsync(...)`. Corre `dotnet test`: deben seguir en verde.
-
-## 🔍 ¿Lo lograste?
-
-`dotnet run` levanta la API y los tres `curl` de [La API HTTP](la-api-http.md) responden igual (202 / 202 / el JSON) — pero ahora cada endpoint libera su hilo mientras el almacén trabaja. Y `dotnet test` sigue en **verde** con la gramática async. Nada cambió de comportamiento; cambió que ya **no se congela** al esperar.
+Fíjate en el patrón del handler: la **espera** (I/O) está en cargar y guardar; la **decisión** (CPU pura) en medio no espera nada. Eso es exactamente lo que el `await` te deja hacer bien.
 
 ---
 
 ### El Descubrimiento
 
-La arquitectura real **nunca** asume que la base de datos es instantánea. En .NET se modela con `Task` + `async`/`await`, propagados **de punta a punta** —almacén → stream → handler → despachador → endpoint HTTP—: todos esperan **sin congelar el hilo**, que queda libre para atender a otros.
+La arquitectura real **nunca** asume que la base de datos es instantánea. En .NET se modela con `Task` + `async`/`await`, propagados de punta a punta: el almacén espera, el stream espera, el handler espera — todos **sin congelar el hilo**, que queda libre para atender a otros.
 
 > [!WARNING]
 > 🌱 **Semilla — tres reglas de producción (adóptalas desde ya):**
-> 1. **Nunca `.Result` ni `.Wait()`** sobre un `Task`: en ASP.NET Core bloquean un hilo del pool; bajo carga agotas los hilos y la app se cae. **Async hasta arriba.**
-> 2. **Deja siempre el `CancellationToken` en la firma async.** Hoy es un hueco reservado; con una base de datos real lo propagarás por toda la cadena para cancelar de verdad.
-> 3. **`async` no es "más rápido" ni "otro hilo".** `await` compila a una **máquina de estados**: no hay un hilo esperando a la base de datos. No ganas velocidad, ganas **escalabilidad**.
+> 1. **Nunca `.Result` ni `.Wait()`** sobre un `Task`. En ASP.NET Core / Azure Functions (como la plantilla) esto **bloquea un hilo del pool** mientras espera; bajo carga agotas los hilos y la app se cae. La regla: **async hasta arriba**.
+> 2. **Deja siempre el `CancellationToken` en la firma async.** Hoy lo recibimos pero todavía no lo encadenamos (es un hueco reservado); cuando detrás haya una base de datos real lo propagaremos por toda la cadena para poder cancelar de verdad.
+> 3. **`async` no es "más rápido" ni "otro hilo".** Bajo el capó, `await` compila a una **máquina de estados**: no hay un hilo "esperando" a la base de datos. Lo que ganas no es velocidad, es **escalabilidad** (más peticiones con los mismos hilos).
+
+Ahora las interfaces ya no mienten: dicen la verdad sobre la espera. Pero queda una pregunta — ¿quién va a *armar* el handler y darle el almacén (`new SuspenderHandler(store)`), y de dónde sale ese `store`? Hasta ahora lo hacemos a mano con `new()` por todos lados. En la próxima sección despedimos a ese intermediario manual.
 
 ---
 
 ## ✅ Compruébalo
 
-- [ ] El `EventStore`, el `EventStream`, los handlers, el `Despachador` y los endpoints son **todos** `async`.
-- [ ] `dotnet run` + los tres `curl` responden igual que antes (202 / 202 / JSON), ahora sin bloquear hilos.
-- [ ] Tu base `HandlerTest` y sus `[Fact]` son `async` y `dotnet test` sigue en verde.
-- [ ] Explicas por qué el almacén en memoria usa `Task.FromResult`/`Task.CompletedTask`, y por qué evitamos `.Result`/`.Wait()`.
+- [ ] El `EventStore`, el `EventStream` y los handlers son **todos** `async` (devuelven `Task`/`Task<T>`).
+- [ ] `dotnet run` sigue funcionando con `await` en el `Program.cs`.
+- [ ] Sabes explicar por qué el almacén en memoria usa `Task.FromResult`/`Task.CompletedTask` (no hay espera real, pero cumple el contrato).
+- [ ] Sabes, a grandes rasgos, por qué evitamos `.Result`/`.Wait()` (bloquean un hilo en vez de liberarlo) y qué significa "async hasta arriba".
 
 ---
 
@@ -184,10 +217,10 @@ git push
 
 ## 🧠 En una frase
 
-Hablar con una base de datos es **I/O que tarda**; con `Task` + `async`/`await` propagados de abajo hacia arriba —almacén, stream, handler, despachador, endpoint— el hilo se **libera** mientras espera en vez de congelarse, lo que da **escalabilidad**; y nunca se bloquea con `.Result`/`.Wait()`.
+Hablar con una base de datos es **I/O que tarda**; con `Task` + `async`/`await` propagados de abajo hacia arriba, el hilo se **libera** mientras espera (no se congela), lo que da **escalabilidad** — y nunca se bloquea con `.Result`/`.Wait()`.
 
 ---
 
-[⬅️ Volver: Persistencia real (Docker y PostgreSQL)](./docker-postgres.md)
+[⬅️ Volver: Cuando dos escriben a la vez (concurrencia optimista)](./concurrencia-optimista.md)
 
-[➡️ Siguiente: Conocer Marten (el sandbox)](./conocer-marten.md)
+[➡️ Siguiente: De `new` al contenedor (Inyección de Dependencias)](./inyeccion-de-dependencias.md)

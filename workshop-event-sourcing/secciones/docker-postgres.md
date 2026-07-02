@@ -145,6 +145,6 @@ Los eventos no caben en tablas rígidas pero **son documentos**; **PostgreSQL + 
 
 ---
 
-[⬅️ Volver: La API HTTP](./la-api-http.md)
+[⬅️ Volver: De `new` al contenedor (Inyección de Dependencias)](./inyeccion-de-dependencias.md)
 
-[➡️ Siguiente: El tiempo de espera (async/await)](./el-tiempo-de-espera.md)
+[➡️ Siguiente: El momento de adoptar una herramienta](./por-que-adoptar-herramientas.md)
