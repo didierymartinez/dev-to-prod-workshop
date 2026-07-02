@@ -16,6 +16,26 @@ Escribir cada test "a pelo" se repite y se ve feo. Creas el store, siembras even
 
 ## 🔧 Una base de test
 
+El test que quieres poder escribir se lee como la especificación del comportamiento —**Given → When → Then**—, sin BD:
+
+```csharp
+public class CambiarPlanTests : CommandHandlerAsyncTest<CambiarPlanDeEmpresa>
+{
+    protected override ICommandHandler<CambiarPlanDeEmpresa> Handler => new CambiarPlanHandler(EventStore);
+
+    [Fact]
+    public async Task Cambiar_el_plan_de_una_empresa_activa_emite_PlanCambiado()
+    {
+        Given(new EmpresaRegistrada("Constructora Andes", "Básico"));   // historia previa
+        await WhenAsync(new CambiarPlanDeEmpresa(AggregateId, "Premium"));  // el comando
+        Then(new PlanCambiado("Premium"));                              // el hecho emitido
+        And<Empresa, string>(e => e.Plan, "Premium");                   // …y el estado resultante
+    }
+}
+```
+
+Para que ese test compile y corra en verde, construye la base:
+
 > 🛠️ **Inténtalo tú.** Una `CommandHandlerTestBase` con: `Given(params object[])` (siembra historia en el `TestStore`), `Then(params object[])` (afirma los hechos nuevos con `BeEquivalentTo`), y `And(proyección, esperado)` (afirma el **estado** del agregado rehidratado). Y una `CommandHandlerAsyncTest<TCommand>` con `WhenAsync(comando)` (ejecuta el handler y guarda).
 
 <details>
@@ -48,24 +68,6 @@ public abstract class CommandHandlerAsyncTest<TCommand> : CommandHandlerTestBase
 
 > [!NOTE]
 > **Dos detalles para que compile.** (1) `new CambiarPlanHandler(EventStore)` funciona porque desde [Revelar Marten](revelar-marten.md)/[Revelar Wolverine](revelar-wolverine.md) tu handler recibe **`IEventStore`** (no `InMemoryEventStore`), y el `TestStore` *es* un `IEventStore` — por eso le puedes pasar el doble de test. (2) `[Fact]` es el atributo de **xUnit** que marca un método como un test que el runner ejecuta.
-
-Y un test concreto se lee como la especificación del comportamiento:
-
-```csharp
-public class CambiarPlanTests : CommandHandlerAsyncTest<CambiarPlanDeEmpresa>
-{
-    protected override ICommandHandler<CambiarPlanDeEmpresa> Handler => new CambiarPlanHandler(EventStore);
-
-    [Fact]
-    public async Task Cambiar_el_plan_de_una_empresa_activa_emite_PlanCambiado()
-    {
-        Given(new EmpresaRegistrada("Constructora Andes", "Básico"));   // historia previa
-        await WhenAsync(new CambiarPlanDeEmpresa(AggregateId, "Premium"));  // el comando
-        Then(new PlanCambiado("Premium"));                              // el hecho emitido
-        And<Empresa, string>(e => e.Plan, "Premium");                   // …y el estado resultante
-    }
-}
-```
 
 > [!NOTE]
 > **Pruebas EVENTOS, no filas.** Fíjate que `Then` compara la **lista de hechos producidos** —no el contenido de una tabla—. Eso es lo natural en ES: un comando se juzga por **lo que pasó** (`PlanCambiado`), no por cómo quedó una fila. `And` cubre el otro ángulo: el **estado** derivado, para casos donde quieres afirmar el resultado acumulado. `BeEquivalentTo` (de AwesomeAssertions) compara los `record` **por valor**, sin que escribas comparaciones a mano.

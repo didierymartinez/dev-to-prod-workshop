@@ -58,7 +58,10 @@ public class EventStore
 > Ojo con dos trampas del `Dictionary`: (1) `_cajones[id]` **lanza** `KeyNotFoundException` si la llave no existe (no devuelve `null`), por eso `GetEvents` comprueba con `ContainsKey`. (2) En `AppendEvent`, crea el cajón **dentro** del diccionario antes de añadir; si añadieras a una lista vacía suelta, el hecho se perdería.
 </details>
 
-Fíjate: el **id es siempre un parámetro**. El almacén no sabe de empresas ni de replay: solo guarda y entrega cajones por su rótulo. Es de **bajo nivel** — la app no lo tocará directo; para eso está el stream.
+Fíjate: el **id es siempre un parámetro**. El almacén no sabe de empresas ni de replay: solo guarda y entrega cajones por su rótulo. Es de **bajo nivel**.
+
+> [!WARNING]
+> **No llames al almacén directo desde tu handler.** `GetEvents` y `AppendEvent` son plomería interna: los llama el `EventStream` que construyes enseguida. Tu handler usará `stream.Get()` y `stream.Append(hecho)`; al `store` solo le pides el stream con `AbrirStream`. Llamar `store.AppendEvent(id, hecho)` tú mismo **funciona aquí** (el stream solo reenvía), pero es un hábito que se rompe: en [Concurrencia optimista](concurrencia-optimista.md) `AppendEvent` pasa a recibir un **sobre con versión**, y saltarte el stream te salta ese control.
 
 > [!NOTE]
 > 🌱 **Semilla — este no será tu único almacén.** El de hoy guarda en RAM, perfecto para aprender. Pero más adelante nacerán **hermanos con otros propósitos**: uno contra una **base de datos real** para producción ([Revelar Marten](revelar-marten.md)) y uno **en memoria pensado para tests** ([El TestStore](teststore.md)). El día que existan varios, extraeremos una interfaz `IEventStore` para poder **intercambiarlos sin tocar el resto del código**.
@@ -102,9 +105,16 @@ public class EventStream<T> where T : AggregateRoot, new()
 
 ### Paso 2 · Que el almacén te lo entregue: `AbrirStream`
 
-Para crear un stream ahora, el **handler** tendría que escribir `new EventStream<Empresa>(store, id)` a mano — sabiendo cómo se arma (que hay que pasarle el `store` y el id). Mejor que **el almacén lo cree por ti**: así el handler solo dirá `store.AbrirStream<Empresa>(id)`, sin conocer las piezas del stream.
+Quieres poder pedirle el stream al almacén y usarlo así —sin armarlo a mano—:
 
-> 🛠️ **Inténtalo tú.** Dale al `EventStore` un método **`AbrirStream<T>(string id)`** que **cree y devuelva** el `EventStream<T>` de ese id, guardándole dentro el almacén y el id. *(Pista: `AbrirStream` vive **dentro** del `EventStore`, así que ahí `this` **es el propio almacén**; pásaselo al stream al crearlo —`new(this, id)`— y el stream lo guardará en `_store` para poder llamarlo después.)*
+```csharp
+var store = new EventStore();
+var s = store.AbrirStream<Empresa>("emp-7");
+s.Append(new EmpresaRegistrada("Constructora Andes", "Básico"));
+Console.WriteLine(store.AbrirStream<Empresa>("emp-7").Get().Nombre);   // Constructora Andes
+```
+
+> 🛠️ **Inténtalo tú.** Haz que ese ejemplo funcione: dale al `EventStore` un método **`AbrirStream<T>(string id)`** que **cree y devuelva** el `EventStream<T>` de ese id, guardándole dentro el almacén y el id. *(Pista: `AbrirStream` vive **dentro** del `EventStore`, así que ahí `this` **es el propio almacén**; pásaselo al stream al crearlo —`new(this, id)`— y el stream lo guardará en `_store` para poder llamarlo después.)*
 
 > [!NOTE]
 > 🆕 **Idioma de C# que verás en la solución.**
@@ -121,14 +131,7 @@ public EventStream<T> AbrirStream<T>(string aggregateId) where T : AggregateRoot
 ```
 </details>
 
-> 🔍 **¿Lo lograste?** Antes de encadenar nada más, prueba **una** empresa a través del stream que entrega el almacén:
-> ```csharp
-> var store = new EventStore();
-> var s = store.AbrirStream<Empresa>("emp-7");
-> s.Append(new EmpresaRegistrada("Constructora Andes", "Básico"));
-> Console.WriteLine(store.AbrirStream<Empresa>("emp-7").Get().Nombre);   // Constructora Andes
-> ```
-> Si eso imprime el nombre, la pieza más difícil ya está.
+> 🔍 **¿Lo lograste?** Corre el ejemplo de arriba: si imprime `Constructora Andes`, la pieza más difícil ya está.
 
 ## El handler ya no carga un stream suelto: lo busca por id
 
