@@ -129,7 +129,7 @@ b.Append(new PlanCambiado("Enterprise"));            // también trae la versió
 
 Envolviste cada hecho en un **sobre `EventoAlmacenado`** con su **versión** (su posición en la historia), y el almacén **rechaza** un `Append` cuya posición ya está ocupada. Así, dos escrituras simultáneas sobre la misma empresa ya no se pisan en silencio: la segunda choca con una `ConcurrencyException`. El número que parecía decorativo resultó ser el **detector de conflictos**.
 
-Queda una fragilidad: este almacén vive en RAM —**si el servidor se reinicia, se pierde todo**— y hablar con una base de datos real es **I/O que tarda**. En la próxima sección enfrentamos ese mundo: la espera, y por qué cambia la forma de nuestro código.
+Pero fíjate en algo: todo esto solo corre dentro de `Main`, en la secuencia que tú escribes, y muere al terminar. Nadie más puede pedirle nada. Una empresa real recibe peticiones desde afuera, a toda hora. En la próxima sección le ponemos una puerta de entrada: una **API HTTP**.
 
 ---
 
@@ -165,4 +165,6 @@ Cada hecho se archiva en un **sobre `EventoAlmacenado`** con su **versión** (su
 ---
 
 [⬅️ Volver: El almacén: un cajón por empresa](./el-almacen-por-id.md)
+
+[➡️ Siguiente: La API HTTP](./la-api-http.md)
 
