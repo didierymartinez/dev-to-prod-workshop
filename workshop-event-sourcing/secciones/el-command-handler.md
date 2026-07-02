@@ -14,7 +14,18 @@ La `Empresa` (el agregado) se concentra en **vivir y hacer cumplir sus reglas**:
 
 ## El handler: primer intento (con los parámetros sueltos)
 
-Empecemos por lo **concreto y directo**: una clase que orqueste **cargar → decidir → guardar** para la `Empresa`, recibiendo los parámetros **sueltos**.
+Quieres que el `Program.cs` solo **cree un handler y le pida la operación** —directo, con sus valores—, así:
+
+```csharp
+var stream = new EventStream<Empresa>();
+stream.Append(new EmpresaRegistrada("Constructora Andes", "Básico"));
+
+var handlers = new EmpresaCommandHandlers(stream);
+handlers.CambiarPlan("Premium");
+handlers.Suspender("falta de pago");
+
+Console.WriteLine(stream.Get().Suspendida ? "suspendida" : "activa");   // suspendida
+```
 
 > 🛠️ **Inténtalo tú.** Crea `EmpresaCommandHandlers` que reciba el `EventStream<Empresa>` por **constructor**. Dale **un método por operación, con sus parámetros sueltos** —`CambiarPlan(string nuevoPlan)` y `Suspender(string motivo)`—: cada uno **carga** (`Get`), pide a la empresa que **decida**, y **guarda** (`Append`) el hecho. **Ojo:** `Suspender` puede devolver `null` (idempotencia, [Decidir el futuro](decidir-el-futuro.md)) → en ese caso **no** guardes nada.
 
@@ -44,19 +55,6 @@ public class EmpresaCommandHandlers(EventStream<Empresa> stream)
 > 🆕 **Idioma de C#: el constructor primario.** `public class EmpresaCommandHandlers(EventStream<Empresa> stream)` declara el parámetro `stream` **en la cabecera de la clase** (un *constructor primario*, C# 12+): queda disponible en todos los métodos sin que escribas un campo ni un constructor aparte. Es azúcar para el clásico `private readonly EventStream<Empresa> _stream; public EmpresaCommandHandlers(EventStream<Empresa> stream) { _stream = stream; }`. Es la misma idea posicional del `record`, ahora en una `class` — y la verás en todos los handlers de aquí en adelante.
 
 El `if (hecho is not null)` respeta la idempotencia que decidió el agregado ([Decidir el futuro](decidir-el-futuro.md)): la regla la pone la `Empresa`; el handler solo la **obedece**.
-
-El `Program.cs` ya no orquesta el ciclo: crea el handler y le pide la operación, **directo, con sus valores**:
-
-```csharp
-var stream = new EventStream<Empresa>();
-stream.Append(new EmpresaRegistrada("Constructora Andes", "Básico"));
-
-var handlers = new EmpresaCommandHandlers(stream);
-handlers.CambiarPlan("Premium");
-handlers.Suspender("falta de pago");
-
-Console.WriteLine(stream.Get().Suspendida ? "suspendida" : "activa");   // suspendida
-```
 
 Funciona — pero **todo en una sola clase** no escala.
 

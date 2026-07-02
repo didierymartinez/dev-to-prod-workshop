@@ -32,6 +32,7 @@ Además de las herramientas, revisa estas señales (las que un linter no siempre
 - **GitHub Actions:** acciones con **versión fijada** (`@v4`); **permisos mínimos** (`permissions:`); secretos vía `secrets.*`, nunca en texto; no imprimir secretos en logs.
 - **Bash:** `set -euo pipefail`; variables entre comillas (`"$var"`); rutas robustas.
 - **.NET:** la connection string y secretos por configuración/variables de entorno, no en el código.
+- **Critter Stack (workshop-event-sourcing):** reconstruir el proyecto de la sección en /tmp y compilar contra los paquetes REALES (`dotnet add package Marten` / `WolverineFx`, .NET 10). Señales de criterio: los snippets deben reflejar los **defaults de Marten 9** (`QuickWithServerTimestamps`, `UseIdentityMapForAggregates=true` → el handler NO muta el agregado: devuelve eventos, patrón decider; `UseLightweightSessions` recomendado); `FetchForWriting` como write-path de command handlers (el overload `Append(id, expectedVersion, …)` es legado); `Create`/`Apply` públicos; versiones de paquete **coherentes entre secciones**; si una API te resulta dudosa, verifícala contra la doc oficial (martendb.io / wolverinefx.net) antes de reportar. Los tests xUnit de las secciones deben correr en verde (con Postgres del compose si son de integración).
 
 ## Cómo reportar
 

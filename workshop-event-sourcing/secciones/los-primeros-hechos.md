@@ -100,7 +100,16 @@ Console.WriteLine($"{nombre}: plan {plan}, {(suspendida ? "suspendida" : "activa
 
 ## De variables sueltas a una clase dueña de la empresa
 
-Esas variables sirven para un script de juguete. Pero en un sistema real querrás **muchas** empresas a la vez, y que cada una **proteja su propia coherencia**. El paso natural: agrupar esas variables y su replay en un objeto `Empresa`.
+Quieres agrupar esas variables sueltas en un objeto `Empresa` que **se reconstruya solo** y **proteja su estado**. En concreto, quieres poder escribir esto:
+
+```csharp
+var empresa = new Empresa(historia);
+Console.WriteLine($"{empresa.Nombre}: plan {empresa.Plan}, {(empresa.Suspendida ? "suspendida" : "activa")}, reactivada {empresa.Reactivaciones} vez/veces");
+// Constructora Andes: plan Premium, suspendida, reactivada 1 vez/veces
+
+// …y que esto NI SIQUIERA compile — nadie le cambia el plan desde fuera:
+empresa.Plan = "Enterprise";   // ❌ error de compilación
+```
 
 > 🛠️ **Inténtalo tú.** Crea una clase `Empresa`: mete las cuatro variables como **propiedades** (de solo-lectura desde fuera: `{ get; private set; }`), y en el **constructor** recibe `IEnumerable<object> historia` y corre adentro el mismo `foreach` que acabas de escribir. Luego, arriba, **reemplaza** las variables sueltas por `var empresa = new Empresa(historia);` e imprime su estado. **Ve e inténtalo**, y luego te muestro una forma:
 
@@ -140,10 +149,7 @@ Console.WriteLine($"{empresa.Nombre}: plan {empresa.Plan}, {(empresa.Suspendida 
 ```
 </details>
 
-> 🔍 **¿Lo lograste?** Corre `dotnet run`: la empresa se reconstruye igual (misma salida que el replay suelto), pero ahora el estado vive **dentro** de un objeto que lo protege (nadie le cambia el plan desde fuera).
-> ```
-> Constructora Andes: plan Premium, suspendida, reactivada 1 vez/veces
-> ```
+> 🔍 **¿Lo lograste?** Corre `dotnet run`: la empresa se reconstruye igual (misma salida de arriba), pero ahora el estado vive **dentro** de un objeto que lo protege — y `empresa.Plan = "X"` ni siquiera compila.
 
 Esa clase que es **dueña** de la coherencia de la empresa, y el **único punto autorizado** para tocarla, tiene un nombre en diseño de dominio: **Aggregate Root** (raíz del agregado). Nadie le cambia el plan a `Empresa` por fuera; se lo pide a `Empresa`. (La frontera del agregado se estudia en [El almacén directo](el-almacen-directo.md); por ahora, quédate con el nombre.)
 
