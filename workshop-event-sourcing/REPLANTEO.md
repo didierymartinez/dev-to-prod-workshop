@@ -1,305 +1,134 @@
-# Replanteo del arco — v5 (una sola columna vertebral)
+# Replanteo del arco — v7 (fiel al repo real + momentos-criterio)
 
-> Documento de trabajo (no es una sección del taller). Define el arco de §10 en adelante.
+> Documento de trabajo. Define el arco de §10 en adelante para el **Taller ①** de un programa mayor (ver "El programa" abajo).
 >
-> **Qué cambia respecto a la v4.** La v4 ordenó las secciones por **tema** (bloque de tests, bloque de app, bloque de Marten), y por eso los bloques no se enlazaban entre sí: §10-11 (tests) no le creaba ninguna necesidad a §12 (DI). La v5 reordena todo en **una sola cadena evolutiva**: el final de cada sección crea el dolor **sentido** (no anticipado) de la siguiente. El tema es solo una etiqueta; la espina es continua.
->
-> **De dónde sale el contenido (autoridad).** Los archivos de secciones viejas y los docs de planeación previos son **solo referencia de lo que no funcionó** — no se copian. La autoridad es la **doc oficial** de Marten/Wolverine, las **transcripciones** de los dos cursos, y el **código de la plantilla**. Etiquetas: **[D1]** curso 1 (a mano) · **[D2]** curso 2 (Marten a fondo) · **[M]**/**[W]** doc oficial · **[P]** código de `Cosmos.BuildingBlocks`.
+> **Qué cambia respecto a v6.** Clonamos y mapeamos el repo REAL `Cosmos.BuildingBlocks` (código + 155 commits + tags). Eso corrigió errores factuales de v6 y reenfocó el norte hacia **criterio para operar y mantener** la librería. Fuente de verdad: los **`.cs`** (los README y las notas viejas tienen drift). Versiones reales: **Marten 9.2.1 / Wolverine 6.1.0**, .NET 10 / C#14, **11 paquetes** publicables en **LOCKSTEP v1.2.5**.
 
 ---
 
-## El norte (manda sobre cada objetivo)
+## El norte (expandido) y el programa
 
-Al terminar, el alumno debe poder **dos** cosas. Cada sección se justifica por servir a una o ambas:
+**Norte del Taller ①:** entender la **conexión de cada pieza** de `Cosmos.BuildingBlocks` a fondo — para **usarla, mantenerla, extenderla** y tomar decisiones sobre ella **con criterio** (no por fe en la doc). El caso emblemático: adoptar (o no) `FetchForWriting`.
 
-1. **Administrar la plantilla `Cosmos.BuildingBlocks`** — leerla, mantenerla, extenderla y publicarla. Saber por qué existe cada capa, qué API de Marten/Wolverine envuelve, y cómo evolucionarla sin romper a quien la consume.
-2. **Entender los conceptos a fondo** — haberlos **construido a mano** y reconocerlos luego en la herramienta.
+Este taller es la **llave** de un programa:
 
-El bloque de la plantilla (8) es donde el norte #1 se cobra; todo lo anterior existe para llegar ahí sabiendo juzgar cada decisión.
-
-## El estándar de cada sección (el filtro)
-
-1. **Capacidad tocable** — termina modificando un archivo concreto (se dice cuál y dónde va el código).
-2. **Evidencia observable** — termina con algo que el alumno corre y ve (test verde, respuesta HTTP, fila en `psql`, mensaje en la cola, excepción provocada).
-3. **Título honesto** — promete solo lo que entrega; si solo motiva o razona, produce al menos un artefacto.
-4. **≤ 1 conceptual seguida** — nunca dos secciones sin capacidad tocable.
-5. **Eslabón sentido** — nace de un dolor que el alumno **ya siente** al terminar la anterior, no de uno anticipado. Si el hilo (`Resumen2.md`) hay que forzarlo, la sección está mal orientada.
-
-Resumen operativo de `DEFINICIONES.md` (reglas A/B/C); el contrato completo manda.
-
-## El método (lo que hizo funcionar §1-9)
-
-Descubrimiento: **ingenuo → dolor → refactor → nombre**. La pieza se construye a mano, se siente su fricción, se refactoriza y solo entonces se nombra (y se muestra su equivalente en la herramienta). Retos **example-first**: el reto abre con el código que quieres poder escribir + la salida esperada, "🛠️ hazlo funcionar" con pistas, y la solución en `<details>`. Idioma nuevo de C# en cajas 🆕.
-
-## Dos tipos de hilo (honestidad)
-
-- **§10-19 — cadena de dolor.** Cada sección nace del dolor sentido de la anterior. Es la espina apretada (como §1-9).
-- **§20-41 — impulsada por el producto.** El motor ya corre sobre Marten; cada sección es una **necesidad real del producto** (un reporte, una auditoría que pide el negocio, un cambio de esquema, una notificación externa) que la herramienta te deja satisfacer reutilizando lo anterior. La evolución se siente porque las capacidades se acumulan y se apoyan entre sí — no se finge un "dolor" donde hay una feature.
-
----
-
-## El mapa (41 secciones, 9 bloques)
-
-### Bloque 0 — Fundamentos a mano (§1-9, conservadas) · [D1]
-
-Las que al autor le gustaron: guían los fundamentos y ya cumplen el estándar (cada una corre en consola y muestra estado reconstruido / una excepción). El arco nuevo **construye sobre §9**.
-
-| # | Sección | Concepto que acuña |
+| Fase | Qué | Depende de |
 |---|---|---|
-| 1 | El diario de una empresa | el hecho inmutable *(única conceptual pura: el gancho)* |
-| 2 | Los primeros hechos | replay: estado = f(hechos) |
-| 3 | Refactorizando el motor | `AggregateRoot` / `Aplicar` |
-| 4 | El flujo de vida (`EventStream`) | leer/escribir una historia |
-| 5 | Decidir el futuro | `decide`: validar → emitir |
-| 6 | El Command Handler | cargar → decidir → guardar |
-| 7 | El despachador | rutear por tipo de comando |
-| 8 | El almacén: un cajón por empresa | la llave por id |
-| 9 | Concurrencia optimista | el sobre + la versión |
+| **① ES + Critter Stack (este taller)** | desmitificar BB pieza por pieza | — |
+| ② Usar BB para construir aplicaciones | BB es la base de todas las apps del ERP | ① |
+| ③ Desplegar en Azure (taller aparte, conecta con el DevOps) | operar BB en la nube | ①② |
+| ④ Observabilidad — un "Critter Watch" propio | monitorear apps Critter Stack, con criterio | ① a fondo |
+| ⑤ Control plane | lo que el equipo construye | ①-④ |
 
-### Bloque 1 — La app viva y persistente · [D1][D2]
+El hilo del programa es "entender la conexión de cada pieza": ④ y ⑤ son imposibles con criterio sin ①.
 
-**§10 · La API HTTP** *(nueva; trae el contenedor)*
-- **← nace de:** el motor corre una vez en `Main` y muere; una empresa real **recibe peticiones**.
-- **Objetivo:** exponer el sistema con Minimal API (`POST` comando → despachador → `202`; `GET /api/empresas/{id}` → rehidratar → JSON) y **registrar `EventStore` + handlers en el contenedor incorporado** de ASP.NET, en vez de armarlos con `new`.
-- **Evidencia:** `curl` POST → `202 Accepted`; `curl` GET → el JSON de la empresa. Cero `new` tuyos: el contenedor inyecta.
-- **Acuña → consume:** el sistema vivo por HTTP; el contenedor → §11, §14 (`AddMarten` se enchufa aquí).
+## Fuente de verdad y correcciones aplicadas (v6 → v7)
 
-**§11 · El contenedor por dentro (DI)** *(reforma; motivación por curiosidad, no por `new`)*
-- **← nace de:** la API me dio un contenedor y lo usé — ¿qué es esta "magia"? Y **Marten se enchufará ahí** pidiendo una sesión `Scoped`, así que debo entender los tiempos de vida antes.
-- **Objetivo:** ver que el contenedor no es magia — un mini-contenedor de ~20 líneas (diccionario + reflexión + recursión); distinguir DIP / IoC / DI / contenedor y los tiempos de vida (Singleton/Scoped/Transient).
-- **Evidencia:** `dotnet run` del mini-contenedor resuelve un handler con su store inyectado, sin `new` tuyo; explicas por qué `Scoped` importará con Marten.
-- **Acuña → consume:** el contenedor + lifetimes → §14 (Marten `Scoped`).
+1. **Versiones:** Marten **9.2.1**, Wolverine **6.1.0**, lockstep **v1.2.5** (no 8.23/5.18 del README ni de la memoria vieja).
+2. **La librería nació sobre Critter Stack**, no "a mano". El motor casero es **andamio didáctico**; invertimos el orden **a propósito** y hay que **decírselo al alumno** explícitamente. El historial vale por el **orden de capas** y las **decisiones reales**.
+3. **`AggregateRoot` base NO tiene `Raise`/`Apply`/`Load`** — solo `_uncommittedEvents`, `Id`, `Version` (protected set), `GetPublicEvents`/`GetPrivateEvents` (`OfType<>`). El `Apply` lo define **cada agregado** y lo invoca Marten (fold de `AggregateStreamAsync`) o el `TestStore` (reflexión). → reescribir §36.
+4. **`MartenEventStore` NO usa `FetchForWriting`** — usa `AggregateStreamAsync`+`Append` en dos sesiones (`IDocumentSession`/`IQuerySession`) y delega concurrencia al `AppendMode` del servidor. → el swap sigue esto; `FetchForWriting` es momento-criterio (§20), marcado como "la plantilla NO lo usa".
+5. **NO existe `[AggregateHandler]`** ni interfaz de event handler — es un `Handle()` plano por discovery. → quitar la sección; si se enseña, como capacidad del framework que el equipo no usa.
+6. **`ProxyTenantResolver`** (por presencia de `HttpContext`, sin try/catch), no `CompositeTenantResolver` (drift del README).
+7. **Asimetrías reales:** routers `ICommandRouter.InvokeAsync` vs `IQueryRouter.ResolveAsync`; **dos** clases `TenancyDelivery` homónimas (ES.CritterStack sin groupId, ED.CritterStack con groupId).
+8. **`DurabilityMode`:** comandos = `Balanced`, consultas = `MediatorOnly` (no "Balanced" como decía el título del commit).
+9. **`TestStore` no existe temprano:** los tests §10-11 corren contra el `EventStore` **concreto** en RAM; el `TestStore`/`IEventStore` nacen con la plantilla (§37). Corregir §17 (no decir "rompió el TestStore").
+10. **Outbox no es tabla visible** — solo `UseDurableOutbox*()` (la mecánica vive dentro de Wolverine/Marten). RabbitMQ auto-provisiona; ASB `SystemQueuesAreEnabled(false)` (topología por Terraform, one-way).
 
-**§12 · Persistencia real (Docker y PostgreSQL)** *(reforma — ahora SÍ persiste)*
-- **← nace de:** la app viva vive en RAM: **la apago y pierdo la historia de todas las empresas**.
-- **Objetivo:** levantar Postgres en Docker y **guardar dos hechos a mano en `psql`** como JSONB, consultarlos por dentro del JSON, y verlos sobrevivir a un reinicio. Sentir el **muro**: recuperar un `object` a su tipo exacto desde C#.
-- **Evidencia:** `docker compose up -d`; en `psql`: `CREATE TABLE eventos(... data jsonb)`, `INSERT` de dos hechos, `SELECT data->>'Nombre'`; `docker compose restart` → los hechos **siguen ahí**.
-- **Fuente:** [D2]. **Acuña → consume:** el muro que justifica adoptar → §14.
+## Momentos-criterio (concepto nuevo, transversal)
 
-**§13 · El tiempo de espera (async/await)**
-- **← nace de:** hablarle a esa base es **I/O que tarda**; congelar el hilo esperando agota los hilos y tumba la app.
-- **Objetivo:** convertir handlers y API a `async`, listos para el primer `await` real (su consumidor está en la sección siguiente).
-- **Evidencia:** `dotnet run` y `dotnet test` siguen verdes ya en async; el primer `await` que espera de verdad es `SaveChangesAsync` en §14.
-- **Fuente:** [D1]. **Acuña → consume:** async para I/O → §14.
+Decisiones reales que enfrenta quien mantiene BB — cada una apoyada en el fundamento construido a mano. Son el corazón del norte:
 
-### Bloque 2 — Conocer Marten: el sandbox · [D2][M]
+- **`FetchForWriting` (§20):** la doc lo recomienda; la plantilla usa `Append`. ¿Adoptarlo? (capstone).
+- **Snapshots (§21):** "solo con un problema medible".
+- **El validador de routing añadido (#21) y retirado (#44):** rompía servicios solo-consumidores → regla "nada de EDA in-memory". Enseña *por qué las abstracciones tienen su forma* y cómo se caza un bug distribuido (§26/§31).
+- **`UserId` como header manual (#45/#46):** `WithTenantId` global no servía para el envelope → `TenancyDelivery.Build`. La identidad viaja **partida**: `TenantId` nativo, `UserId` header (§34).
+- **Auto-flush de agregados cargados (breaking f2db91d):** el "por qué se guarda sin que yo llame `SaveChanges`" (§E/§24).
+- **Las dos vertientes / lock-in (§35):** por qué el equipo abstrajo en interfaces en vez de usar lo nativo.
 
-**§14 · Conocer Marten** *(nueva; absorbe el criterio de "por qué adoptar")*
-- **← nace de:** el muro de §12 → adopto una herramienta, **con criterio** (sentí la necesidad, sé qué hace, puedo depurarla).
-- **Objetivo:** en una **consola aparte** (no la app), un event store Marten operativo: `DocumentStore.For` → `LightweightSession` → `StartStream` / `Append` / `SaveChangesAsync`.
-- **Evidencia:** `dotnet run` del sandbox y luego, en `psql`, **ver las filas reales en `mt_streams` y `mt_events`**. El primer `await` real.
-- **Fuente:** [D2 cap.1][M]. **Acuña → consume:** adoptar con criterio; la sesión = unidad de trabajo; la BD como evidencia → §15, §17.
+## El estándar de cada sección
 
-**§15 · Rehidratar con Marten**
-- **← nace de:** el sandbox ya escribe; ahora necesito **leer** de vuelta.
-- **Objetivo:** reconstruir la `Empresa` con `Create`/`Apply` por convención + `AggregateStreamAsync`; **viajar en el tiempo** por versión y fecha; provocar la excepción de convención de identidad y arreglarla.
-- **Evidencia:** la consola imprime el estado **en la versión 2** frente al actual; la excepción salta y la corriges.
-- **Fuente:** [D2][M]. **Acuña → consume:** convención sobre configuración; tu `Get()` ≈ `AggregateStreamAsync` → §17.
+1. Capacidad tocable · 2. Evidencia observable · 3. Título honesto · 4. ≤1 conceptual seguida · 5. **Eslabón constructivo** (nace del código de la anterior) · 6. donde aplique, un **momento-criterio** (la decisión real que el fundamento te deja juzgar).
 
-### Bloque 3 — El salto · [D2][M]
+## El método
 
-**§16 · Given-When-Then: blinda el motor** *(reforma; fusiona "probar el motor" + la gramática)*
-- **← nace de:** estoy a punto de **arrancar mi motor casero entero** y meter Marten; necesito una **red de seguridad** que me diga si cambié el comportamiento.
-- **Objetivo:** como el `EventStore` casero aún vive en memoria (es su propio doble), escribir tests que fijan el comportamiento de hoy; el primero a pelo (verboso) → destilar la gramática `Given / When / Then`.
-- **Evidencia:** `dotnet test` verde; el test se lee como especificación.
-- **Fuente:** [D1]. **Acuña → consume:** GWT sin BD → §18 (integración), §38 (TestStore lo restaura).
-
-**§17 · El swap (con `FetchForWriting`)** *(el clímax)*
-- **← nace de:** protegido por los tests, hago el salto.
-- **Objetivo:** que los handlers reales pasen a `IDocumentSession` nativo usando **`FetchForWriting`** (el camino canónico de Marten, que **conserva la concurrencia optimista de §9**: da el agregado con su versión esperada y verifica el choque al guardar); borrar el `EventStore` casero **nombrando su reemplazo**.
-- **Evidencia:** `curl` POST → una **fila nueva en `mt_events`**; los tests en memoria **fallan** (ya no hay store casero). Nota de criterio: el **elefante** (Marten entró al dominio; lock-in consciente; "si dudas, abstrae" — semilla de la plantilla).
-- **Fuente:** [D2][M]. **Acuña → consume:** el mapeo casero→framework; `FetchForWriting` → §37 (la plantilla decide **no** usarlo), §26 (`[AggregateHandler]` lo automatiza).
-
-**§18 · Tests de integración**
-- **← nace de:** el swap **rompió** los tests: dependían del store en memoria.
-- **Objetivo:** migrar los GWT a **integración** contra Postgres real (schema por corrida, `IAsyncLifetime`, `CollectionFixture`). La gramática sobrevive; cambia el motor debajo.
-- **Evidencia:** `dotnet test` verde **contra la base**; un test tumbado a propósito por un error de esquema demuestra que ahora atrapa fallas de infraestructura. *(Costo sentido: de milisegundos a segundos — deuda que §38 salda.)*
-- **Fuente:** [D2] (integración sobre mocks). **Acuña → consume:** integración → §38 (TestStore).
-
-**§19 · La primera proyección**
-- **← nace de:** con la escritura resuelta, llega la primera necesidad de **lectura**: `GET /api/empresas?estado=suspendida` — y no hay LINQ sobre el replay.
-- **Objetivo:** `SingleStreamProjection` **Inline** + `Query<T>`.
-- **Evidencia:** `curl` devuelve solo las suspendidas; **ver el documento de proyección** en `psql`. Gotcha: lightweight vs. identity session.
-- **Fuente:** [D2][M]. **Acuña → consume:** proyección = otra vista; CQRS → §20.
-
-### Bloque 4 — Marten a fondo: necesidades del producto · [D2][M]
-
-**§20 · Lifecycles y el daemon**
-- **← necesidad:** un reporte que cruza muchas empresas (suspensiones por mes); recalcularlo inline en cada escritura sería caro.
-- **Objetivo:** `MultiStreamProjection` **async** + `AddAsyncDaemon`. Inline vs. Async vs. Live situados.
-- **Evidencia:** el reporte se puebla **tras un instante** (consistencia eventual); **checkpoints/high-watermark en la BD**; el test espera con `WaitForNonStaleProjectionDataAsync`.
-- **Acuña → consume:** consistencia eventual, elegida por vista.
-
-**§21 · `FetchLatest` y snapshots**
-- **← necesidad:** cerrar los rincones del write-path del swap: leer el estado justo tras escribir, y acelerar rehidrataciones largas.
-- **Objetivo:** `FetchLatest` (leer tras escribir en la misma sesión); snapshots built-in (`Projections.Snapshot`) con la trampa demostrada (`AggregateStreamAsync` los ignora). Criterio: no snapshotees sin un problema **medible**.
-- **Evidencia:** un test que muestra `FetchLatest` devolviendo el estado ya con el evento recién escrito; el snapshot en `psql`.
-- **Acuña → consume:** el write-path a fondo.
-
-**§22 · Auditoría: el log no viene gratis**
-- **← necesidad:** el negocio pregunta "¿quién suspendió esta empresa y por qué?" — el stream guarda el *qué*, no el *quién/por qué*.
-- **Objetivo:** registrar cada comando (`LoggedCommand` como documento) y coser evento↔comando con **correlation / causation / headers**; la sesión sube del handler a un punto central (una transacción). Idempotencia por command id.
-- **Evidencia:** **ver el documento del comando y sus headers en `psql`**, ligados al evento que produjeron.
-- **Acuña → consume:** metadata que cose la historia; cross-cutting central → §25 (middleware), §34 (headers de tenant).
-
-**§23 · Versionado y upcasting**
-- **← necesidad:** un año después toca añadir un campo a un evento **ya persistido**; los viejos ya no casan.
-- **Objetivo:** la **escalera**: ¿es en realidad otro evento de negocio? → cambio no-rompedor (nullable/default/`JsonPropertyName`) → `MapEventType`/upcaster → copiar-y-transformar (último recurso). Regla marco: jamás reescribas la historia.
-- **Evidencia:** eventos v1 que ya están en `mt_events` se leen como v2; reto sobre **tu** historia real.
-- **Acuña → consume:** la escalera de esfuerzo.
-
-**§24 · Suscripciones**
-- **← necesidad:** otro sistema debe enterarse de una suspensión; llamarlo dentro del handler acopla y pierde el aviso si falla.
-- **Objetivo:** `ISubscription` reacciona a los eventos del store con retries y catch-up.
-- **Evidencia:** lanzas una excepción en la suscripción → **la progresión no avanza** (checkpoint detenido, se ve) → reinicias → repone.
-- **Acuña → consume:** reaccionar a hechos → §31 (UI en vivo).
-
-### Bloque 5 — Wolverine · [W][P] *(D2 no usa Wolverine → doc + plantilla)*
-
-**§25 · Revelar Wolverine**
-- **← nace de:** mi despachador (§7) + el guardado central de la auditoría (§22) **son** middleware hecho a mano.
-- **Objetivo:** Wolverine lo industrializa: discovery por convención, `AutoApplyTransactions`, la API pasa a `bus.InvokeAsync`. Nota 💡: el código que genera es legible.
-- **Evidencia:** `curl` sigue respondiendo; los tests de integración **siguen verdes**; **ver el código generado** en `Internal/Generated`.
-- **Acuña → consume:** el despacho industrializado.
-
-**§26 · El Aggregate Handler Workflow**
-- **← nace de:** el handler todavía carga-decide-guarda.
-- **Objetivo:** `[AggregateHandler]` — Wolverine hace el `FetchForWriting`; el handler queda `(comando, agregado) → eventos`: decider puro.
-- **Evidencia:** la misma feature con el handler **más corto del taller**; test verde.
-- **Acuña → consume:** el handler como función pura.
-
-### Bloque 6 — EDA: los hechos salen al mundo · [W][P]
-
-**§27 · Diseñar con eventos: público vs privado** *(fusión de dos secciones que se solapaban)*
-- **← nace de:** los hechos empiezan a salir al mundo, y no todos deben salir.
-- **Objetivo:** distinguir evento **público** (contrato hacia afuera) de **privado** (interno, libre de cambiar) con tres interfaces marcadoras + filtro en el agregado; y las decisiones que el broker **no** toma por ti (granularidad de topics por servicio, evento vs. comando que espera respuesta). Escribir los contratos públicos de un flujo real.
-- **Evidencia:** un test afirma que **solo los públicos** cruzan la frontera; los `record` del flujo compilan.
-- **Acuña → consume:** el contrato hacia afuera → §28, §39.
-
-**§28 · El sobre del mensaje**
-- **← nace de:** al publicar un evento público, el destino necesita tenant y usuario, que **no** van en el cuerpo (es contrato).
-- **Objetivo:** publicar con Wolverine nativo + `DeliveryOptions` / headers.
-- **Evidencia:** publicas y **ves el evento con sus headers** (spy en test o log).
-- **Acuña → consume:** el sobre viaja → §35.
-
-**§29 · Outbox e Inbox** *(juguete adelgazado)*
-- **← nace de:** guardar el evento y publicarlo son dos escrituras; si el proceso muere en medio, el hecho queda y el aviso se pierde.
-- **Objetivo:** outbox casero mínimo → `UseDurableOutbox`.
-- **Evidencia:** **matas el proceso** entre append y envío → al reiniciar, **el mensaje sale igual** (se ve en la cola). Kill-test.
-- **Acuña → consume:** exactly-once de efecto.
-
-**§30 · Transportes: RabbitMQ y Azure Service Bus**
-- **← nace de:** el bus era casero; hay que enchufarlo a un broker real.
-- **Objetivo:** RabbitMQ con AutoProvision; contraste con ASB.
-- **Evidencia:** publicas y **lo ves llegar en la management UI de RabbitMQ**.
-- **Acuña → consume:** el broker real.
-
-**§31 · La UI en vivo ★** *(opcional)*
-- **← nace de:** quiero ver los eventos de una empresa en pantalla, en vivo.
-- **Objetivo:** SignalR + el `ISubscription` de §24 (misma pieza, nuevo consumidor).
-- **Evidencia:** abres el navegador, disparas un comando por `curl`, y **ves el evento aparecer** en la página.
-- **Acuña → consume:** la UI también es un suscriptor.
-
-**§32 · Serverless: Azure Functions** *(tema de host, no de EDA — se ubica al cierre del bloque)*
-- **← nace de:** el equipo despliega en Functions; al llevar la app allá, **se rompe**.
-- **Objetivo:** diagnosticar (no hay proceso largo que drene el outbox durable) y aplicar las 3 variantes (`AddWolverine(ManualOnly)`, `DurabilityMode.Solo`, `SendInline`).
-- **Evidencia:** la function **corre y publica** (host local de Functions o Azure); antes fallaba.
-- **Acuña → consume:** el host efímero cambia las reglas.
-
-### Bloque 7 — Multi-tenancy · [M][P] *(D2 apenas lo menciona → doc + plantilla)*
-
-**§33 · De un cliente a muchos**
-- **← nace de:** dos empresas de distintos clientes con el mismo aggregate id se **pisan** (sobre tu app Marten real).
-- **Objetivo:** `TenancyStyle.Conjoined` + sesión por tenant.
-- **Evidencia:** mismo id, distinto tenant, **no se pisan**; **ver `tenant_id` por fila** en `mt_events`.
-- **Acuña → consume:** el tenant parte la base.
-
-**§34 · ¿De dónde sale el tenant? Resuélvelo, no lo pidas**
-- **← nace de:** pasar el `tenantId` a mano por todos lados ensucia todo.
-- **Objetivo:** resolverlo de un header confiable `X-Tenant-Id` (reusando los headers de §22).
-- **Evidencia:** `curl` con `X-Tenant-Id` enruta al tenant correcto; **sin el header → excepción fuerte**.
-- **Acuña → consume:** resolver del contexto.
-
-**§35 · El tenant viaja con el mensaje**
-- **← nace de:** un worker de segundo plano no tiene `HttpContext` y también necesita el tenant.
-- **Objetivo:** resolverlo del **sobre** del mensaje (§28); proxy que elige la fuente según haya request.
-- **Evidencia:** un handler en background **escribe en el tenant correcto** (se ve la fila con su `tenant_id`).
-- **Acuña → consume:** el contexto cruza fronteras async.
-
-### Bloque 8 — La plantilla: administrarla (EL NORTE) · [P]
-
-**§36 · Las dos vertientes** *(criterio + artefacto)*
-- **← nace de:** ya viviste el camino nativo entero; la pregunta del elefante (§17) vuelve **con datos**.
-- **Objetivo:** comparar lo nativo contra la capa del equipo y **decidir**; el equipo eligió abstraer.
-- **Evidencia:** **llenas la tabla de trade-offs** (tests sin BD, público/privado, control del UoW, portabilidad, costo) **contra tu propio código**.
-- **Acuña → consume:** la abstracción como decisión, no reflejo.
-
-**§37 · El agregado de la plantilla** *(re-propósito)*
-- **← nace de:** para abstraer, primero la forma del agregado del equipo.
-- **Objetivo:** construir **sobre** Marten: `Raise` acumula y aplica, `Apply(T)` público, `Version`. Cada pieza mapeada a la API nativa que envuelve.
-- **Evidencia:** un test GWT **verde** con el agregado acumulador; el mapeo escrito.
-- **Acuña → consume (norte):** el agregado acumulador.
-
-**§38 · El almacén de la plantilla (+ el `TestStore`)** *(re-propósito)*
-- **← nace de:** la integración (§18) es lenta; el equipo quiere tests rápidos de vuelta y control del Unit of Work.
-- **Objetivo:** `IEventStore` + `MartenEventStore` + Unit of Work + middleware; y el **`TestStore`** → recuperar los GWT **sin base de datos**.
-- **Evidencia:** los tests corren **en milisegundos, sin Postgres**, y pasan — la deuda de §18 saldada.
-- **Acuña → consume (norte):** la capa = control + tests sin BD.
-
-**§39 · Consumir la plantilla** *(nueva; + caja 🆕 extension members C#14)*
-- **← nace de:** todo lo construido tiene nombre y ya es un paquete.
-- **Objetivo:** `Cosmos.BuildingBlocks`; `dotnet add package` (NuGets reales); tour mapeando cada pieza a lo que construiste — incluidos los **senders** (`IPublicEventSender`) sobre la publicación nativa de §28.
-- **Evidencia:** tu app **compila contra el paquete real** y corre igual.
-- **Acuña → consume (norte):** la plantilla no es magia: la conoces por dentro.
-
-**§40 · Empaquetar y publicar como NuGet** *(corta — administrar = mantener)*
-- **← nace de:** ahora te toca el sombrero de **mantenedor**.
-- **Objetivo:** empaquetar la plantilla y entender su release: versionado **LOCKSTEP**, `Directory.Build.props`, `PrivateAssets=all`, el manifiesto de versiones.
-- **Evidencia:** `dotnet pack` produce el `.nupkg`; ves el manifiesto y el workflow.
-- **Acuña → consume (norte directo):** mantener ≠ consumir.
-
-**§41 · Capstone**
-- **← nace de:** la prueba final: ¿dominas la plantilla?
-- **Objetivo:** un bounded context **nuevo** (p. ej. facturación) de punta a punta: comando → evento → proyección → endpoint → test → evento público con outbox.
-- **Evidencia:** el flujo completo **verde y respondiendo a `curl`**, construido por el alumno.
-- **Acuña → consume (norte):** la prueba real de adopción.
+Descubrimiento (ingenuo→dolor→refactor→nombre); retos example-first; idioma C#14 en cajas 🆕. **Nota explícita al alumno:** construimos a mano lo que la librería ya trae hecho, a propósito, para ganar el criterio de mantenerla.
 
 ---
 
-## La espina (concepto → dónde se reutiliza)
+## El mapa (≈40 secciones) — con convergencia al tipo REAL
 
-sobre+versión (9) → **conservado por `FetchForWriting` en el swap** (17) · despachador (7) + sesión central (22) → middleware Wolverine (25) · `decide`-devuelve (5) → decider `[AggregateHandler]` (26) · suscripción (24) → UI en vivo (31) · headers de sesión (22) → resolver del tenant (34) · el sobre (28) → tenant-viaja (35) · **tests rápidos (16) → integración lenta forzada por el swap (18) → `TestStore` los restaura (38)** · elefante del lock-in (17) → dos vertientes (36) → plantilla (37-40) → capstone (41) · async (13) → primer `await` real en el sandbox (14). **Ningún concepto se enseña sin reutilizarse; y el swap ya no regresa ninguna capacidad en silencio.**
+### Bloque 0 — Motor a mano (§1-9, conservado) · [C1]
+Converge a los **contratos** de `Cosmos.EventSourcing.Abstractions` (que la librería tiene 1:1: `AggregateRoot`, `IEventStore`/`IAggregateRootReader`, `ICommandHandler<T>`, `ICommandRouter`). *Nota: son contratos que la lib nació teniendo; el motor casero es el andamio para entenderlos.*
 
-## Disposiciones (resumen)
+### Bloque A — Blindar con tests (§10-11) · [C1]
+- **§10 Probar el motor** — el `EventStore` concreto en RAM es su propio doble; siembra/ejecuta/inspecciona. *Nace de:* los handlers de §6-8 probados a ojo, antes del refactor.
+- **§11 Given-When-Then** — destilar la gramática. *Nace de:* el test crudo de §10.
+- Converge a `TestStore`/`CommandHandlerTestBase` (que aplican por **reflexión** buscando `Apply`, no por switch) — se recupera en §37.
 
-- **Conservadas (§1-9):** las 9 primeras.
-- **Reordenadas para continuidad:** API (10) y DI (11) suben antes de docker; async (13) queda pegado a su primer `await`; los tests (16) bajan a ser la red de seguridad **justo antes** del swap.
-- **`FetchForWriting` sube al swap (17):** ya no se difiere — conserva la concurrencia de §9. §21 se queda con `FetchLatest` + snapshots.
-- **Fusiones:** "probar el motor" + GWT → §16; "diseñar con eventos" + "público/privado" → §27.
-- **Reubicada:** serverless (32) al cierre de EDA, marcada como tema de host.
-- **Nuevas:** API (10), conocer-marten (14), rehidratar (15), integración (18), primera-proyección (19), lifecycles-daemon (20), fetchlatest-snapshots (21), auditoría (22), suscripciones (24), aggregate-handler (26), ui-en-vivo (31★), consumir-la-plantilla (39).
-- **Cortadas/fusionadas:** "por qué adoptar" → abre §14; "reflexión vs codegen" → nota en §25; "extension members" → caja en §39.
+### Bloque B — Conocer Marten en el `Main` (§12-15) · [C2]
+- **§12 El muro (Docker+Postgres), TOCABLE** — el alumno intenta el puente a mano (INSERT del hecho serializado con columna `data jsonb` + columna `type`, y al leer necesita `switch(type)` para reconstruir el `object`). *Evidencia:* esa fila fea en `psql` + el switch. *Nace de:* el test de §11 ("¿dónde viven esos hechos? en RAM; cierra el proceso y parten de cero").
+- **§13 Escribir eventos con Marten** — `DocumentStore.For` → sesión → `StartStream`/`Append` → `SaveChangesAsync`; ver `mt_events` + versión.
+- **§14 Rehidratar** — `Create`/`Apply` por convención → `AggregateStreamAsync` (+ time travel por versión/fecha). *Nace de:* tu `Get()` casero.
+- **§15 Proyecciones** — `Inline` + `Query`; gotcha lightweight-vs-identity.
+- Converge a la superficie de `MartenEventStore`/`MartenProjectionStore`.
 
-Total: **41 secciones** (una ★ opcional).
+### Bloque C — El swap (§16-17) · [C2]
+- **§16 El swap** — los dominios (juguete + real) **se unen**: el `Create`/`Apply` de §14 se le da a **tu** `Empresa`, y el `DocumentStore` vive donde los handlers. Reemplazas el `EventStore` casero por la sesión de Marten (`StartStream` / `AggregateStreamAsync`+`Append`); async; el **elefante** (lock-in). **NOMBRA la deuda:** el swap con `Append` deja fuera el check de §9 — no lo perdiste, Marten lo hace distinto; vuelve en §20. *(Fiel al repo: NO `FetchForWriting`.)*
+- **§17 Tests tras el swap** — el swap rompió tus tests (dependían del `EventStore` casero **que borraste**, no de un "TestStore"). Renacen como **integración** contra Postgres real. Deuda de velocidad **a propósito** (el `TestStore` sin BD llega en §37).
+- Converge a `MartenEventStore : MartenUnitOfWork, IEventStore` (dos sesiones).
 
-## Efectos colaterales al construir
+### Bloque D — Hacerlo un servicio (§18) · [C1]
+- **§18 API + DI** — *Nace de:* el cableado a mano que §17 dejó ("un cliente real no va a instanciar tu `DocumentStore` en cada test → contenedor + HTTP"). Registra Marten `Scoped`; el `async` cobra sentido real (servidor que agota hilos). Cura el "infierno de los `new`" sembrado en §7.
 
-1. La semilla de `el-almacen-por-id` ("extraeremos `IEventStore`") se re-apunta a §38.
-2. `concurrencia-optimista` (9) gana una semilla: "la herramienta lo hará con `FetchForWriting`" (→ §17).
-3. Marten 9: `UseLightweightSessions`, `StreamIdentity.AsString`; `StreamIdentity` vive en `JasperFx.Events`; `SnapshotLifecycle` en `JasperFx.Events.Projections`; fixtures con `IAsyncLifetime` (xUnit no llama `DisposeAsync` sobre solo-`IAsyncDisposable`). La advertencia decider: no mutar el agregado en el handler nativo.
-4. `MAPA.md`, `NARRATIVA.md` y `taller.md` se reconstruyen al final, ya con las secciones escritas.
+### Bloque E — Marten a fondo (§19-23) · [C2][M]
+- **§19 Lifecycles + daemon** — `MultiStreamProjection` async + `AddAsyncDaemon(HotCold)`; checkpoints.
+- **§19b `MartenUnitOfWork` y los dos caminos de flush** *(NUEVO, era hueco)* — `_startedAggregateRoots` vs `_modifiedAggregateRoots`; `SaveChangesAsync` directo vs `UnitOfWorkMiddleware.After`+`AutoApplyTransactions`. El "por qué se guarda sin que yo llame `SaveChanges`" (breaking real f2db91d).
+- **§20 `FetchForWriting` — MOMENTO-CRITERIO** — el write-path canónico que la doc recomienda y devuelve la concurrencia de §9; **la plantilla NO lo usa** (usa `Append`). Aquí decides si adoptarlo. `FetchLatest`; snapshots con su trampa ("solo con problema medible").
+- **§21 Versionado y upcasting** — la escalera; jamás reescribir la historia.
+- **§22 Auditoría** — metadata/correlation; la sesión sube a un punto central → semilla del middleware.
+- **§23 Suscripciones** — reaccionar a hechos (retries/catch-up).
+
+### Bloque F — Revelar Wolverine (§24-25) · [W][P]
+- **§24 Revelar Wolverine** — el despachador de §7 + el guardado central son middleware a mano → discovery por assembly, `IntegrateWithWolverine`, `AddMiddleware<UnitOfWorkMiddleware>`, `AutoApplyTransactions`, `bus.InvokeAsync`. **Asimetría:** `ICommandRouter.InvokeAsync` vs `IQueryRouter.ResolveAsync`. `DurabilityMode`: comandos `Balanced`, consultas `MediatorOnly`.
+- **§25 El handler por convención** *(reemplaza "Aggregate Handler Workflow")* — el handler de evento es un `Handle()` plano hallado por discovery, **sin interfaz**; el salto conceptual es "de suscriptor-que-implementa-interfaz a discovery por reflexión". *(NO existe `[AggregateHandler]` en el repo; si se muestra el patrón nativo de Marten, marcarlo como capacidad del framework que el equipo NO usa.)*
+
+### Bloque G — EDA (§26-31) · [W][P]
+- **§26 Público vs privado** — marcadores **vacíos** `IPublicEvent`/`IPrivateEvent`; **el ruteo NO está en el sender** (código idéntico) sino en la **config de arranque por reflexión** sobre el marcador. Punto duro: el alumno busca la diferencia en las clases y no la encuentra.
+- **§27 El sobre** — `TenancyDelivery.Build` (TenantId + user_id + groupId); **dos** clases homónimas (con/sin groupId). Converge la versión-sobre de §9 con el sobre de mensajería.
+- **§28 Outbox e inbox** — `UseDurableOutbox*` (no hay tabla visible); matar el proceso, el mensaje sobrevive.
+- **§29 Transportes** — RabbitMQ (AutoProvision, dev-friendly) vs ASB (`SystemQueuesAreEnabled(false)`, topología por Terraform, one-way). **Momento-criterio:** el validador de routing añadido-y-retirado (#21/#44).
+- **§30 UI en vivo ★** — SignalR + la suscripción de §23.
+- **§31 Serverless** — `Solo` + `ExtensionDiscovery.ManualOnly` + `SendInline`.
+
+### Bloque H — Multi-tenancy (§32-34) · [M][P]
+- **§32 De un cliente a muchos** — `TenancyStyle.Conjoined` + sesión por tenant; ver `tenant_id`.
+- **§33 ¿De dónde sale el tenant?** — `TrustedHeadersTenantResolver` (`X-Tenant-Id`, falla ruidoso).
+- **§34 El tenant viaja** — `WolverineMessageContextTenantResolver` + `ProxyTenantResolver` (por presencia de `HttpContext`). **Momento-criterio:** `TenantId` viaja **nativo**, `UserId` como **header manual** (nació de bugs #45/#46).
+
+### Bloque I — La plantilla: el norte (§35-40) · [P]
+- **§35 Las dos vertientes** — con lo nativo vivido, la pregunta del elefante con datos; por qué el equipo abstrajo y por qué **no** usa `FetchForWriting`.
+- **§36 El agregado de la plantilla** — la forma REAL: `_uncommittedEvents`, `Id`, `Version`, `GetPublicEvents/GetPrivateEvents`; **el `Apply` NO está en la base** — lo define cada agregado y lo invoca Marten (fold) o el `TestStore` (reflexión). Desmitificar "¿dónde está `Apply`?" (punto duro #1).
+- **§37 El almacén de la plantilla + `TestStore`** — `IEventStore`+`MartenEventStore`+`MartenUnitOfWork`; recuperar tests **sin BD** (la velocidad que §17 perdió), aplicando por reflexión.
+- **§38 Consumir `Cosmos.BuildingBlocks`** — 11 paquetes como NuGet; los 3 `.sln` (las sub-soluciones omiten `MultiTenancy.AspNetCore`/`.CritterStack`); extension members C#14; idioma dual (código en inglés, extensiones en español: `Agregar`/`Usar`/`Habilitar`/`Suscribirse`).
+- **§39 Empaquetar y publicar** — LOCKSTEP (un tag `v<X.Y.Z>` para los 11), `Directory.Build.props` con `AssemblyVersion=0.0.0.0` (evita dotnet/sdk#12322), `.csproj` sin `<Version>`, la regla del `CLAUDE.md` (no asumir minor; clasificar el cambio más significativo y confirmar).
+- **§40 Capstone — la decisión con criterio** — tú, como mantenedor, evalúas y aplicas un cambio real a la librería (p. ej. **adoptar `FetchForWriting`**): reconoces qué te da, qué cuesta, y por qué la plantilla eligió lo que eligió. La prueba de que ganaste el criterio.
+
+---
+
+## La espina
+
+dominio §1-9 → tests (§10-11) → conocer Marten (§12-15) → **swap** (§16, Append) → integración (§17) → servicio (§18) · el sobre+versión de §9 → `FetchForWriting` como **decisión** (§20) → capstone (§40) · despachador §7 + guardado central §22 → Wolverine (§24) · marcadores GetPublic/Private (§36) → EDA (§26) · validador añadido-y-retirado → criterio de mantenimiento (§29) · tests rápidos §10 → integración §17 → `TestStore` §37. **Cada sección construye sobre la anterior; los momentos-criterio son las decisiones reales del historial.**
 
 ## Orden de trabajo
 
-> **Contrato de escritura:** toda sección se crea y valida contra `DEFINICIONES.md`.
+1. ✅ Aprobar `Resumen2.md` + este mapa (v7).
+2. Bloque A (§10-11) → B (§12-15) → C (§16-17) → D (§18): el corazón.
+3. Bloques E-H (§19-34).
+4. Bloque I (§35-40): el norte.
+5. Reconstruir MAPA/NARRATIVA/taller.md.
 
-1. ✅ Aprobar este mapa (v5) y el hilo de `Resumen2.md`.
-2. **Escribir §12 (docker-postgres) como sección de muestra** — la que el autor marcó como "no enseña"; si pasa el estándar, se aprueba sobre esa muestra.
-3. Bloque 1 (§10-13): la app viva y persistente.
-4. Bloque 2-3 (§14-19): sandbox + swap + integración + primera proyección — el corazón.
-5. Bloque 4 (§20-24): Marten a fondo.
-6. Bloque 5-7 (§25-35): Wolverine, EDA, tenancy.
-7. Bloque 8 (§36-41): la plantilla — el norte.
-8. Reconstruir MAPA/NARRATIVA/taller.md y validar todo.
+**Pipeline** (`DEFINICIONES §E`): validador 0 err + `revisor-estilo` por sección; + `revisor-coherencia` + `verificador-tecnico` (contra el repo real clonado) por bloque; `verificador-e2e` en hitos (C, D, I).
 
-**Pipeline** (`DEFINICIONES.md` §E): por sección → validador 0 errores + `revisor-estilo`; por bloque → + `revisor-coherencia` + `verificador-tecnico`; hitos (bloques 3, 6, 8) → + `verificador-e2e`.
+## Pendiente de memoria
+Corregir la memoria del usuario: versiones Marten 9.2.1/Wolverine 6.1.0 (no 8.23/5.18), el arco replanteado v7, el repo clonado/mapeado, el norte de criterio, y el programa (②-⑤).

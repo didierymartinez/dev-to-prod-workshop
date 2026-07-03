@@ -129,7 +129,7 @@ b.Append(new PlanCambiado("Enterprise"));            // también trae la versió
 
 Envolviste cada hecho en un **sobre `EventoAlmacenado`** con su **versión** (su posición en la historia), y el almacén **rechaza** un `Append` cuya posición ya está ocupada. Así, dos escrituras simultáneas sobre la misma empresa ya no se pisan en silencio: la segunda choca con una `ConcurrencyException`. El número que parecía decorativo resultó ser el **detector de conflictos**.
 
-Pero fíjate en algo: todo esto solo corre dentro de `Main`, en la secuencia que tú escribes, y muere al terminar. Nadie más puede pedirle nada. Una empresa real recibe peticiones desde afuera, a toda hora. En la próxima sección le ponemos una puerta de entrada: una **API HTTP**.
+Tienes el motor de event sourcing completo. Pero lo has probado corriendo el `Main` y leyendo la consola con los ojos — y todo vive en RAM: al reiniciar, se pierde. En las próximas secciones lo **blindas con tests** (para no volar a ciegas cuando lo refactorices) y luego lo llevas a una **base de datos real**.
 
 ---
 
@@ -165,6 +165,4 @@ Cada hecho se archiva en un **sobre `EventoAlmacenado`** con su **versión** (su
 ---
 
 [⬅️ Volver: El almacén: un cajón por empresa](./el-almacen-por-id.md)
-
-[➡️ Siguiente: La API HTTP](./la-api-http.md)
 
