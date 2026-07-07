@@ -40,6 +40,8 @@ ls
 ```
 Lista los archivos y carpetas del directorio actual.
 
+> 🔮 **Predice, luego corre.** Antes de escribir `ls`: *¿qué archivos o carpetas crees que vas a ver aquí?* Córrelo y compáralo. Este hábito de **predecir antes de ejecutar** lo usarás en todo el taller — engaña menos que copiar y correr sin pensar.
+
 > 🪟 **Windows:** `ls` funciona en PowerShell. Si por alguna razón no, usa `dir` (hace lo mismo).
 
 ### Paso 3: Moverme entre carpetas (`cd`)

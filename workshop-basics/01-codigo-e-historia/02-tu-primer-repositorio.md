@@ -150,6 +150,8 @@ git commit -m "marcar listado de empresas como planeado"
 
 ### Paso 8: Ver la historia (`git log`)
 
+> 🔮 **Predice, luego corre.** Hiciste dos commits. *¿Cuántas líneas crees que mostrará `git log`, y en qué orden — el más reciente arriba o abajo?* Ahora córrelo y compáralo.
+
 Mira las dos fotos que llevas:
 
 ```bash
@@ -176,6 +178,8 @@ git log --oneline
 - [ ] `git log --oneline` muestra **dos** commits con tus mensajes.
 - [ ] `git status` dice "nothing to commit, working tree clean" (no hay cambios pendientes).
 - [ ] Puedes explicar qué hace cada uno: `git add` (preparar) y `git commit` (guardar la foto).
+
+> 🚦 **Cómo te fue:** 🟢 lo hice y lo entendí · 🟡 me costó · 🔴 no me alcanzó. Si el ciclo `add → commit` no te quedó claro, repítelo con otro cambio pequeño antes de seguir.
 
 Si ves tus dos commits y el árbol está limpio, completaste el ciclo de Git.
 

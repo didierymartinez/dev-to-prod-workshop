@@ -19,14 +19,23 @@ Necesitas una copia en internet. Para eso existe **GitHub**.
 - Tu repositorio **local** es el que está en tu carpeta (lo creaste con `git init`).
 - Un repositorio **remoto** es una copia en un servidor de internet. El más popular es **GitHub**.
 
-Tú trabajas en local y, cuando quieres, **sincronizas** con el remoto:
+Tú trabajas en local y, cuando quieres, **sincronizas** con el remoto. Lo único que confunde al principio es **la dirección**:
 
-| Acción | Qué hace | Palabra técnica |
+```
+   TU COMPUTADOR                          GITHUB (internet)
+   (local)                                (remoto)
+      │  ──── push  (SUBIR lo tuyo) ────────▶  │
+      │  ◀──── pull (BAJAR lo nuevo) ────────  │
+```
+
+| Acción | Dirección | Qué hace |
 |---|---|---|
-| Subir tus commits al remoto | Empuja tu trabajo a GitHub | **push** |
-| Bajar cambios del remoto | Trae lo que haya nuevo en GitHub | **pull** |
+| **push** | local ▶ remoto | **Sube** tus commits a GitHub |
+| **pull** | remoto ▶ local | **Baja** a tu computador lo que haya nuevo en GitHub |
 
-> 💡 **Buenas noticias:** VS Code hace todo esto con botones. Aprenderás los nombres (`push`, `pull`) porque los verás en todas partes, pero rara vez tendrás que escribirlos.
+> ⚠️ **El botón "Sync" hace las DOS cosas**: primero **baja** lo nuevo del remoto (pull), luego **sube** lo tuyo (push). Por eso sincronizar no es "mandar lo mío": es "poner de acuerdo a los dos lados". Cuando el cambio lo hiciste **en GitHub** (por ejemplo, al fusionar un Pull Request, en la lección siguiente), "Sync" lo **baja** a tu local — no al revés. Tener clara esta dirección te ahorra la confusión más común de Git.
+
+> 💡 VS Code hace todo esto con botones. Aprenderás los nombres (`push`, `pull`) porque los verás en todas partes, pero rara vez tendrás que escribirlos.
 
 ---
 
@@ -77,7 +86,7 @@ Guarda. Ahora en VS Code:
 3. Pulsa el botón **✓ Commit**. (Si te pregunta por "Stage", acepta guardar todo.)
 4. Pulsa **Sync Changes** (o la flechita ↑) para subirlo a GitHub.
 
-Recarga la página de GitHub: tu cambio ya está ahí.
+> 🔮 **Predice, luego mira.** Antes de recargar GitHub: *el cambio de "Equipo", ¿ya debería aparecer allá? ¿en qué dirección viajó — de tu local a GitHub, o al revés?* Ahora recarga la página: tu cambio ya está ahí (viajó local ▶ remoto, un **push**).
 
 > 🧠 En VS Code, **Commit** guarda la foto localmente y **Sync / push** la sube. Son los dos pasos que ya conoces, ahora con botones.
 
@@ -85,10 +94,16 @@ Recarga la página de GitHub: tu cambio ya está ahí.
 
 ## ✅ Compruébalo
 
+**Que corre:**
 - [ ] Tu repositorio `gestion-empresas` aparece en tu cuenta de GitHub.
 - [ ] El `README.md` se ve con formato en la página principal del repo.
 - [ ] El cambio de la sección "Equipo" aparece en GitHub después de sincronizar.
-- [ ] Puedes explicar qué es un *remoto* y qué hacen *push* y *pull*.
+
+**Que entendiste:**
+- [ ] Puedes decir, sin dudar, en qué **dirección** va un *push* (local ▶ remoto) y un *pull* (remoto ▶ local).
+- [ ] Puedes explicar por qué "Sync" hace las dos cosas y no solo "manda lo mío".
+
+> 🚦 **Cómo te fue:** 🟢 lo hice y lo entendí · 🟡 me costó / dudé de la dirección · 🔴 no me alcanzó. Si dudaste de la dirección, relee el diagrama de arriba antes de la lección 1.4 (ahí lo volverás a usar).
 
 ---
 

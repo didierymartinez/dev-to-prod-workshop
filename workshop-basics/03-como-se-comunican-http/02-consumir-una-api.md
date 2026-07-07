@@ -69,7 +69,11 @@ Abajo aparece la respuesta. Observa estas tres cosas (son las que siempre revisa
 
 Ahora prueba pedir uno solo: cambia la URL a `https://jsonplaceholder.typicode.com/users/1` y pulsa **Send**. Verás un único usuario.
 
-Y prueba pedir uno que **no existe**: `https://jsonplaceholder.typicode.com/users/9999` → **Send**. Fíjate en el **Status**: ahora dice **404 Not Found** ("no encontrado"). El cuerpo viene vacío. La API te está diciendo, en idioma HTTP, que eso no existe.
+Y prueba pedir uno que **no existe**: `https://jsonplaceholder.typicode.com/users/9999`.
+
+> 🔮 **Predice, luego Send.** Antes de pulsar **Send**: *¿el Status será `200` como antes, o algo distinto? ¿qué crees que traerá el cuerpo?* Ahora pulsa Send y compáralo.
+
+Fíjate en el **Status**: ahora dice **404 Not Found** ("no encontrado"). El cuerpo viene vacío. La API te está diciendo, en idioma HTTP, que eso no existe.
 
 > 🧠 Acabas de ver dos respuestas distintas: `200` (encontrado) y `404` (no existe). En la próxima lección veremos todos los códigos importantes. Esta es la forma en que las APIs comunican el resultado de cada petición.
 
@@ -81,10 +85,16 @@ En Postman, guarda estas peticiones en una **Collection** (botón **Save** → c
 
 ## ✅ Compruébalo
 
+**Que corre:**
 - [ ] Viste la lista de usuarios en el navegador pegando la URL de `/users`.
 - [ ] En Postman, hiciste un GET a `/users` y obtuviste **200 OK** con datos JSON.
 - [ ] Pediste un usuario inexistente (`/users/9999`) y obtuviste **404 Not Found**.
-- [ ] Entiendes que `/users` devuelve todos y `/users/1` devuelve uno.
+
+**Que entendiste:**
+- [ ] Tu predicción del status para `/users/9999` coincidió con lo que salió.
+- [ ] Puedes explicar por qué `/users` devuelve todos y `/users/1` devuelve uno — y cómo se traslada a `/empresas`.
+
+> 🚦 **Cómo te fue:** 🟢 lo hice y lo entendí · 🟡 me costó · 🔴 no me alcanzó.
 
 ---
 

@@ -65,6 +65,8 @@ Vamos a *ver* el modelo petición–respuesta sucediendo de verdad, usando una h
 
 Verás aparecer una lista de **peticiones**: cada fila es una conversación cliente–servidor que tu navegador acaba de tener para armar esa página.
 
+> 🔮 **Predice, luego mira.** La página cargó bien. *¿Qué código de estado crees que tendrá esa primera petición — uno que diga "todo bien", o uno de error?* (Todavía no viste los códigos; adivina.) Ahora haz clic y compáralo.
+
 Haz clic en la primera fila (suele ser el documento principal). A la derecha verás detalles:
 - **Request URL:** a qué dirección se pidió.
 - **Request Method:** el tipo de petición (verás `GET` — lo estudiamos en la lección 3.3).
@@ -82,6 +84,8 @@ Responde con tus palabras y confirma en pantalla:
 - [ ] ¿Quién es el "cliente" y quién el "servidor" cuando abres una página?
 - [ ] En la pestaña Network, ¿puedes señalar la **URL**, el **método** y el **código de estado** de una petición?
 - [ ] ¿En qué se parece y en qué se diferencia una API de una página web normal?
+
+> 🚦 **Cómo te fue:** 🟢 lo vi y lo entendí · 🟡 me costó · 🔴 no me alcanzó.
 
 ---
 

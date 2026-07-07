@@ -20,6 +20,15 @@ Cada lección se apoya en la anterior. No saltes. Si una lección dice "abre el 
 
 Leer una lección no es hacerla. El aprendizaje ocurre cuando **tus manos escriben** los comandos y el código. Ten siempre la terminal y el editor abiertos mientras lees.
 
+### El objetivo es ENTENDER, no que "corra"
+
+Copiar y pegar hace que el programa funcione — pero funcionar no es entender. Por eso, en las lecciones de código, verás tres cosas una y otra vez:
+- **🔮 Predice**: antes de ejecutar, dices qué crees que pasará. Si tu predicción falla, acabas de descubrir algo que no entendías.
+- **🔨 Rómpelo**: cambias una pieza a propósito y ves qué se daña. Entiendes de verdad cuando puedes predecir qué pasa si lo cambias.
+- **Explica el porqué**: al guardar tu avance, escribes con tus palabras *por qué* funciona (no solo *qué* hiciste).
+
+Si en algún punto copias, pegas y "funciona" pero no sabrías rehacerlo tú, **para ahí**: ese es el momento de predecir y romper, no de seguir.
+
 ### El error es normal (y es tu amigo)
 
 Vas a ver mensajes de error. Mucho. Eso **no** significa que lo estés haciendo mal — significa que estás programando. La diferencia entre alguien con experiencia y un principiante no es que el experto no tenga errores: es que aprendió a **leerlos**.
@@ -45,12 +54,16 @@ Vas a aprender muchos términos nuevos. Anota en tus palabras qué significa cad
 
 ### Paso 3: Familiarízate con la estructura de una lección
 
-Todas las lecciones tienen las mismas secciones, siempre en el mismo orden:
+Todas las lecciones siguen el mismo patrón:
 
-- 🤔 **El problema** — por qué importa lo que vas a aprender.
-- 💡 **Conceptos** — las ideas nuevas explicadas.
-- 🛠️ **Manos a la obra** — los pasos para hacerlo tú.
-- ✅ **Compruébalo** — cómo confirmar que lo lograste.
+- 🤔 **El problema** — por qué importa lo que vas a aprender (y qué se quedó corto en la lección anterior).
+- 🛠️ **Manos a la obra** — el corazón de la lección. En las de código, cada paso va así:
+  - **Te muestro** el código y **te explico** cada parte nueva (cajas 🆕) — nada aparece sin explicarse.
+  - **🔮 Predice** qué hará, y córrelo.
+  - **✋ Ahora tú** — un cambio pequeño para practicar lo recién visto (con la solución escondida por si te trabas).
+  - a veces, **🔨 Rómpelo** para entender una pieza dañándola a propósito.
+- 📓 **Guarda tu avance** — un commit donde explicas, con tus palabras, *por qué* funciona.
+- ✅ **Compruébalo** — en dos partes: *que corre* y *que entendiste*. Más un semáforo 🚦 para calificarte honesto (🟢/🟡/🔴).
 - 🧠 **Lo que aprendiste** — el resumen.
 - 🆘 **Si algo salió mal** — soluciones a los tropiezos comunes.
 
@@ -62,6 +75,7 @@ Antes de seguir, confirma que:
 
 - [ ] Tienes una carpeta llamada `taller` en un lugar que recuerdas.
 - [ ] Entiendes que debes hacer las lecciones **en orden** y **escribiendo**, no solo leyendo.
+- [ ] Entiendes que el objetivo es **entender** (predecir, romper, explicar), no solo que el programa corra.
 - [ ] Sabes qué hacer cuando veas un error (leerlo, buscar la sección 🆘, buscarlo en internet).
 
 ---
@@ -69,8 +83,9 @@ Antes de seguir, confirma que:
 ## 🧠 Lo que aprendiste
 
 - Este taller se hace **con las manos**, una lección a la vez y en orden.
+- El objetivo es **entender**, no que el programa corra: predice, rompe, y explica el porqué.
 - Los errores son parte normal del proceso; lo importante es **leerlos**.
-- Cada lección tiene una estructura fija que te dice el problema, los conceptos, los pasos y cómo comprobar.
+- Cada lección sigue el mismo patrón: el problema → te muestro y te explico → predice → ahora tú → compruébalo (que corre / que entendiste).
 
 ---
 
