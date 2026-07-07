@@ -1,6 +1,6 @@
 # Suscripciones: reaccionar a los hechos
 
-El daemon ya te construye read models (proyecciones). Pero muchas veces, cuando un hecho ocurre, quieres **hacer algo hacia afuera**: al suspender una empresa, avisar a facturación, mandar un correo, publicar el hecho a otro servicio. Eso no es un read model —es un **efecto**—, y no debería colgar de la transacción de escritura (si el correo falla, ¿deshaces la suspensión?). Para eso Marten tiene **suscripciones**: código tuyo al que el daemon le entrega los hechos, con catch-up y reintentos.
+El daemon ya te construye read models (proyecciones). Pero muchas veces, cuando un hecho ocurre, quieres **hacer algo hacia afuera**: al suspender una empresa, avisar a facturación, mandar un correo, publicar el hecho a otro servicio. Eso no es un read model: es un **efecto**. No debería colgar de la transacción de escritura, porque si el correo falla no querrías deshacer la suspensión. Para eso Marten tiene **suscripciones**: código tuyo al que el daemon le entrega los hechos, con catch-up y reintentos.
 
 ## 🎯 El Objetivo
 
@@ -72,7 +72,7 @@ builder.Services.AddMarten(opts =>
 
 ### Paso 3 · Catch-up y "al-menos-una-vez"
 
-Dos comportamientos que definen a una suscripción, y que debes tener en la cabeza:
+Dos comportamientos que definen a una suscripción:
 
 - **Catch-up.** Si la registras cuando ya hay hechos viejos —o si el servicio estuvo caído—, la suscripción **rebobina** y procesa lo que se perdió desde su checkpoint (guardado como `EmailAlSuspender:All` en `mt_event_progression`). No pierdes avisos por haber estado abajo.
 - **Al-menos-una-vez.** Si tu `ProcessEventsAsync` **lanza**, el daemon **reintenta el mismo lote** (el checkpoint solo avanza cuando el lote **tuvo éxito**). Eso garantiza que no se salte un hecho — pero significa que tu efecto puede ejecutarse **más de una vez**. Por eso tu efecto debe ser **idempotente** o tolerar la reentrega (mandar el correo dos veces no debería cobrar dos veces).

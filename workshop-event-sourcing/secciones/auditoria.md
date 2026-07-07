@@ -8,7 +8,7 @@ Que cada evento cargue, además de su payload, la **metadata de auditoría** —
 
 ## 💥 El dolor: el payload no dice quién ni por qué
 
-`EmpresaSuspendida("impago")` no te dice **quién** apretó el botón, ni si fue parte de un proceso masivo de morosos, ni qué comando lo disparó. Meter `UsuarioQueσuspendió` en el `record` sería contaminar el hecho de negocio con algo transversal (y tendrías que hacerlo en **cada** evento). Lo que quieres es una franja de metadata **al lado** del payload, uniforme para todos los eventos.
+`EmpresaSuspendida("impago")` no te dice **quién** apretó el botón, ni si fue parte de un proceso masivo de morosos, ni qué comando lo disparó. Meter `UsuarioQueSuspendió` en el `record` sería contaminar el hecho de negocio con algo transversal (y tendrías que hacerlo en **cada** evento). Lo que quieres es una franja de metadata **al lado** del payload, uniforme para todos los eventos.
 
 Marten ya reserva ese espacio (`Timestamp`, `CorrelationId`, `CausationId`, `Headers`), pero la parte opcional viene **apagada**: si no la enciendes, esos valores llegan `null` — y Marten **ni siquiera crea las columnas**.
 
@@ -52,7 +52,7 @@ await session.SaveChangesAsync();
 </details>
 
 > [!NOTE]
-> 🆕 **En la sesión, no en el hecho.** `CorrelationId`/`CausationId` son propiedades de la sesión; `SetHeader(clave, valor)` mete extras (aquí `user_id` — el patrón del repo real: el usuario viaja como header). Es transversal: lo pones **una vez** por operación y **todos** los eventos de esa sesión lo llevan. La **correlación** es el hilo de la operación entera; la **causación** apunta al comando/mensaje que causó *este* evento — juntas encadenan comando → evento → evento para **trazar** qué pasó y por qué.
+> 🆕 **En la sesión, no en el hecho.** `CorrelationId`/`CausationId` son propiedades de la sesión; `SetHeader(clave, valor)` mete extras (aquí `user_id`; en el repo real el usuario viaja como header). Es transversal: lo pones **una vez** por operación y **todos** los eventos de esa sesión lo llevan. La **correlación** es el hilo de la operación entera; la **causación** apunta al comando/mensaje que causó *este* evento — juntas encadenan comando → evento → evento para **trazar** qué pasó y por qué.
 
 ### Paso 3 · Léela en cada evento
 

@@ -12,7 +12,7 @@ Recuerda cómo partiste la base al [blindar el motor](given-when-then.md): el **
 
 ### Paso 1 · La base, ahora sobre Marten
 
-> 🛠️ **Inténtalo tú.** **🔁** En `HandlerTest`, reemplaza el `EventStore` en RAM por Marten. Como crear el `DocumentStore` es **caro**, ponlo en un **`MartenFixture`** que xUnit cree **una vez** y comparta; cada test solo hace `ResetAllData()`. `Given` siembra con `StartStream`, `When` corre el handler `async`, `Then` lee los hechos del stream — todo `async` (ya sabes por qué).
+> 🛠️ **Inténtalo tú.** **🔁** En `HandlerTest`, reemplaza el `EventStore` en RAM por Marten. Como crear el `DocumentStore` es **caro**, ponlo en un **`MartenFixture`** que xUnit cree **una vez** y comparta; cada test solo hace `ResetAllData()`. `Given` siembra con `StartStream`, `When` corre el handler `async`, `Then` lee los hechos del stream — todo `async`.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>

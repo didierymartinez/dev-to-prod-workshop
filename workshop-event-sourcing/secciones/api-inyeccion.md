@@ -1,6 +1,6 @@
 # API + Inyección de dependencias: la app se vuelve un servicio
 
-En [El daemon](daemon-proyecciones.md) apareció un **host** por primera vez (para que el worker viviera en algún lado). Y desde el swap vienes cableando todo **a mano**: `new SuspenderHandler(new MartenEventStore(session))`, y antes `new` del store, del despachador, de cada handler. Un servicio HTTP real no puede `new`-ear eso en cada petición — el store es de toda la app, la sesión es de **cada petición**. Es hora de convertir la app en un **servicio**: un contenedor cablea las piezas por ti, y ahí, por fin, `async` cobra sentido.
+En [El daemon](daemon-proyecciones.md) apareció un **host** por primera vez (para que el worker viviera en algún lado). Y desde el swap vienes cableando todo **a mano**: `new SuspenderHandler(new MartenEventStore(session))`, y antes, un `new` por store, despachador y handler. Un servicio HTTP real no puede `new`-ear eso en cada petición — el store es de toda la app, la sesión es de **cada petición**. Es hora de convertir la app en un **servicio**: un contenedor cablea las piezas por ti, y ahí, por fin, `async` cobra sentido.
 
 ## 🎯 El Objetivo
 
@@ -8,7 +8,7 @@ Exponer la app como servicio HTTP donde un **contenedor de dependencias** arma e
 
 ## 💥 El dolor: el infierno de los `new` (y el `async` sin cobrar)
 
-Recuerda la semilla de [El despachador](el-despachador.md): cada pieza se cablea con un `new`, y quien crea el handler tiene que crear también todo lo que el handler necesita. En un `Main` de juguete se aguanta. En un servicio con endpoints, no: cada petición necesita su propia **sesión** de Marten (una unidad de trabajo por request), pero el `DocumentStore` es **uno** para toda la app. Newear a mano ese enredo, por petición, es frágil y se equivoca de tiempos de vida. Y el `async` que aprendiste en [Conoce a Marten](conoce-a-marten.md) prometía una ganancia —no congelar el hilo— que en un solo `Main` no se veía. Un servidor **sí** la muestra.
+Recuerda la semilla de [El despachador](el-despachador.md): cada pieza se cablea con un `new`, y quien crea el handler tiene que crear también todo lo que el handler necesita. En un `Main` de juguete se aguanta. En un servicio con endpoints, no: cada petición necesita su propia **sesión** de Marten (una unidad de trabajo por request), pero el `DocumentStore` es **uno** para toda la app. Hacer `new` de ese enredo a mano, por petición, es frágil y se equivoca de tiempos de vida. Y el `async` que aprendiste en [Conoce a Marten](conoce-a-marten.md) prometía una ganancia —no congelar el hilo— que en un solo `Main` no se veía. Un servidor **sí** la muestra.
 
 ## 🔧 Un contenedor cablea todo por ti
 

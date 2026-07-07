@@ -132,11 +132,17 @@ Actualiza también el `README.md` del proyecto marcando lo logrado (ya tienes AP
 
 ## ✅ Compruébalo
 
+**Que corre:**
 - [ ] Puedes registrar una empresa desde el formulario y aparece al instante en el listado.
 - [ ] Si los datos están incompletos, no se registra (el formulario o la API lo impiden).
-- [ ] Entiendes la diferencia entre el `fetch` de un `GET` (solo pedir) y el de un `POST` (method + headers + body).
 
-> 💥 **Rompe algo a propósito:** apaga la API (`Ctrl+C`) y trata de registrar una empresa. ¿Qué mensaje aparece? Vuelve a encenderla. Esto te muestra que la página depende de la API: sin servidor, no hay datos.
+**Que entendiste:**
+- [ ] Puedes explicar la diferencia entre el `fetch` de un `GET` (solo pedir) y el de un `POST` (method + headers + body).
+- [ ] Sabes por qué, tras registrar, hay que llamar a `cargarEmpresas()` para ver el cambio.
+
+> 🔨 **Rómpelo a propósito:** apaga la API (`Ctrl+C`) y trata de registrar una empresa. **Antes, predice:** ¿la página se romperá, o mostrará algún mensaje? Pruébalo, míralo y vuelve a encenderla. Esto muestra que la página **depende** de la API: sin servidor, no hay datos.
+
+> 🚦 **Cómo te fue:** 🟢 lo hice y lo entendí · 🟡 me costó · 🔴 no me alcanzó.
 
 ---
 

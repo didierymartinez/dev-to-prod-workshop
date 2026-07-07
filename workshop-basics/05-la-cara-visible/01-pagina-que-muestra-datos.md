@@ -147,11 +147,15 @@ function dibujar(empresas) {
 cargarEmpresas();
 ```
 
-Qué hace lo importante:
-- `fetch(`${API_URL}/empresas`)` hace el GET a tu API.
-- `await respuesta.json()` convierte el JSON recibido en algo que JavaScript puede usar.
-- `dibujar(...)` crea una tarjeta por empresa y la mete en el `<div id="listado">`.
-- El `try/catch` muestra un mensaje si algo falla (igual que en la Fase 2).
+**Te explico** (es tu primer JavaScript; estas son las piezas nuevas):
+
+> 🆕 **Las piezas de JavaScript.**
+> - `document.getElementById("estado")` busca en la página el elemento con ese `id` (el `<p id="estado">`), para poder cambiarlo desde el código.
+> - `fetch(...)` hace el GET a tu API (como Postman, pero automático). El `` `...${...}` `` es interpolación de texto en JavaScript — el equivalente del `$"...{...}"` de C# que viste en la Fase 2.
+> - `async` / `await`: pedir datos por internet **tarda**. `await` dice "espera aquí a que llegue la respuesta antes de seguir"; un método que usa `await` se marca `async`.
+> - `await respuesta.json()` convierte el JSON recibido en datos que JavaScript puede usar.
+> - `try { ... } catch (error) { ... }`: intenta lo de `try`; si algo falla (API caída, sin red), salta a `catch` y muestra el mensaje en vez de romperse en silencio.
+> - `dibujar(...)` crea una tarjeta por empresa y la mete en el `<div id="listado">`.
 
 ### Paso 4: Ver la página
 
@@ -188,6 +192,8 @@ Abre el **Pull Request** en GitHub y fusiónalo; luego vuelve a `main` y sincron
 - [ ] En la consola (F12) ves un error que menciona **CORS**.
 - [ ] En la pestaña Network ves que la petición a `/empresas` **sí se hizo** (aunque fue bloqueada).
 - [ ] Entiendes que tu página y tu `fetch` están bien; falta autorizar el acceso (lo harás en 5.2).
+
+> 🚦 **Cómo te fue:** 🟢 lo hice y entendí que el error de CORS es el siguiente tema · 🟡 me costó · 🔴 no me alcanzó.
 
 ---
 

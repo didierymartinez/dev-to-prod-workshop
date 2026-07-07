@@ -105,6 +105,8 @@ Esto ejecuta el `Up()` de las migraciones pendientes sobre tu base de datos real
 
 ### Paso 5: Comprobar que los datos NO se perdieron
 
+> 🔮 **Predice, luego compruébalo.** Acabas de cambiar la estructura de una tabla que **ya tenía datos**. *¿Crees que las empresas que registraste seguirán ahí, o el cambio de columna las borró?* Escribe tu respuesta antes de mirar.
+
 Este es el momento clave. Mira la tabla directamente con psql:
 
 ```bash
@@ -137,13 +139,19 @@ Abre el **Pull Request** en GitHub y fusiónalo; luego vuelve a `main` y sincron
 
 ## ✅ Compruébalo
 
+**Que corre:**
 - [ ] En `Migrations/` hay **dos** migraciones: `Inicial` y `AgregarEmailEmpresa`.
 - [ ] La tabla `Empresas` ahora tiene la columna `Email` (`\d "Empresas"` en psql).
 - [ ] Las empresas que ya existían **siguen ahí** (no se perdieron), con `Email` vacío.
+
+**Que entendiste:**
+- [ ] Tu predicción (¿sobreviven los datos al cambiar la columna?) coincidió.
 - [ ] Puedes explicar, con la analogía de Git, por qué una migración es el "control de versiones" del esquema.
 - [ ] Sabes el ciclo: cambiar el modelo → `migrations add` → `database update`.
 
-> 💡 **Reto opcional:** mira el archivo de migración `_AgregarEmailEmpresa.cs` y ubica su método `Down()`. ¿Qué hace? (Pista: lo contrario de `Up`.) Eso es lo que permitiría *revertir* el cambio si hiciera falta.
+> ✋ **Ahora tú.** Abre el archivo `_AgregarEmailEmpresa.cs` y ubica su método `Down()`. Léelo y responde: *¿qué haría si lo ejecutaras?* (Pista: es lo contrario de `Up`.) Eso es lo que permitiría **revertir** el cambio.
+
+> 🚦 **Cómo te fue:** 🟢 lo hice y entendí por qué las migraciones no pierden datos · 🟡 me costó · 🔴 no me alcanzó.
 
 ---
 

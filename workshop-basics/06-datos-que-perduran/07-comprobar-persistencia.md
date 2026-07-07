@@ -24,6 +24,8 @@ Confirma con `GET /empresas` que aparecen.
 
 ### Paso 2: La prueba clave — reiniciar la API
 
+> 🔮 **Predice, luego compruébalo.** Recuerda: al inicio de la fase, reiniciar la API **borraba** todo. Ahora los datos viven en PostgreSQL. *¿Seguirán tus empresas tras reiniciar, o desaparecerán como antes?* Escribe tu respuesta.
+
 1. Detén la API: `Ctrl + C`.
 2. Vuélvela a arrancar: `dotnet run`.
 3. Consulta `GET /empresas` otra vez.
@@ -40,13 +42,13 @@ docker exec -it empresas-db psql -U appuser -d empresasdb -c 'SELECT "Nit", "Raz
 
 Verás la tabla con tus empresas. Esa es la verdad: están guardadas en disco, dentro de PostgreSQL.
 
-### Paso 4: Un descubrimiento importante (rompe algo a propósito)
+### Paso 4: Un descubrimiento importante (rómpelo a propósito)
 
-> 💥 Detén y **borra** el contenedor de la base de datos:
+> 🔨 **Rómpelo.** Detén y **borra** el contenedor de la base de datos:
 > ```bash
 > docker rm -f empresas-db
 > ```
-> Vuelve a crearlo con el mismo comando de la lección 6.2 y arranca la API. Consulta `GET /empresas`. ¿Están tus empresas nuevas?
+> **Antes de seguir, predice:** los datos "persisten"… pero acabas de borrar el contenedor donde viven. Vuelve a crearlo con el mismo comando de la lección 6.2 y arranca la API. *¿Estarán tus empresas nuevas, o no?* Compruébalo con `GET /empresas`.
 
 **No están.** Volvieron solo las que la migración crea, o ninguna. ¿Por qué, si la base de datos "persiste"?
 
@@ -58,9 +60,15 @@ Porque los datos vivían **dentro del contenedor**, y al borrarlo se borró su c
 
 ## ✅ Compruébalo
 
+**Que corre:**
 - [ ] Registraste empresas, reiniciaste la API y **siguen ahí** (a diferencia del inicio de la fase).
 - [ ] Las viste directamente en la tabla con `psql` y `SELECT`.
+
+**Que entendiste:**
+- [ ] Tu predicción (¿sobreviven al reinicio de la API?) coincidió.
 - [ ] Entiendes por qué al **borrar el contenedor** sí se pierden (y que los volúmenes lo resuelven, en la Fase 8).
+
+> 🚦 **Cómo te fue:** 🟢 lo comprobé y entendí la diferencia reinicio-API vs borrar-contenedor · 🟡 me costó · 🔴 no me alcanzó.
 
 ---
 

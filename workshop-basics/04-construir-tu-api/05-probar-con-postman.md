@@ -41,6 +41,8 @@ Asegúrate de tener el servidor corriendo (`dotnet run` en `src/GestionEmpresas.
 
 ### Paso 2: Ejecutar el recorrido completo
 
+> 🔮 **Predice, luego lánzalas.** Antes de enviar cada una, **di en voz alta qué código esperas**. Ya construiste estos endpoints, así que deberías poder anticiparlos todos. Si alguno te sorprende, ahí hay algo que revisar en tu código.
+
 Lanza las peticiones en orden y confirma el **Status** de cada una:
 
 - [ ] Listar → **200** (ves las empresas)
@@ -87,9 +89,15 @@ Abre el **Pull Request** en GitHub y fusiónalo; luego vuelve a `main` y sincron
 
 ## ✅ Compruébalo
 
+**Que corre:**
 - [ ] Tienes una colección en Postman con las 5 peticiones guardadas.
 - [ ] Ejecutaste el recorrido y cada petición devolvió el código esperado (200, 201, 400, 204).
 - [ ] (Opcional) Tienes un `peticiones.http` versionado en el repo.
+
+**Que entendiste:**
+- [ ] Predijiste el código de cada petición **antes** de enviarla, y todos coincidieron (si alguno no, encontraste un bug — ¡eso es probar!).
+
+> 🚦 **Cómo te fue:** 🟢 predije todo y lo entendí · 🟡 me costó anticipar alguno · 🔴 no me alcanzó.
 
 ---
 

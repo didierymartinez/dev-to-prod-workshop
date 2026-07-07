@@ -8,7 +8,7 @@ Construir un **read model** —un documento que Marten actualiza con cada evento
 
 ## 💥 El dolor: preguntar a través de muchos agregados
 
-`AggregateStreamAsync` reconstruye **un** agregado rejugando **sus** eventos. Para *"todas las suspendidas"* tendrías que hacer eso por **cada** empresa y filtrar en memoria. Con mil empresas, mil replays por consulta. La escritura (event sourcing) es una cosa; la **lectura** eficiente es otra — eso es **CQRS**: separar el modelo de escribir del de leer.
+`AggregateStreamAsync` reconstruye **un** agregado rejugando **sus** eventos. Para *"todas las suspendidas"* tendrías que hacer eso por **cada** empresa y filtrar en memoria. Con mil empresas, mil replays por consulta. Escribir eventos y leerlos eficientemente son dos problemas distintos. Separar el modelo de escritura del de lectura es **CQRS**.
 
 ## 🔧 La proyección: un documento por empresa
 
@@ -61,7 +61,7 @@ opts.Projections.Add<ResumenEmpresaProjection>(ProjectionLifecycle.Inline);
 
 ### Paso 2 · Consulta el read model
 
-Rehidratar era para **uno**. Para consultar **muchos**, Marten te da LINQ sobre los documentos. Y como en la escritura, lo pones tras una **costura** —`IProjectionStore`, el lado de lectura, gemelo del `IEventStore`—:
+Rehidratar era para **uno**. Para consultar **muchos**, Marten te da LINQ sobre los documentos. Y como en la escritura, lo pones tras una **costura**: `IProjectionStore`, el lado de lectura, gemelo del `IEventStore`.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>

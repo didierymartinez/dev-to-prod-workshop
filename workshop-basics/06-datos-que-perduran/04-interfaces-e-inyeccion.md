@@ -167,12 +167,16 @@ Los tres cambios respecto a la Fase 4:
 
 ### Paso 3: Comprobar que todo sigue igual
 
+> 🔮 **Predice, luego corre.** Hiciste un cambio estructural grande (interfaz + inyección). *¿La API responderá **distinto** que antes, o **idéntico**?* Piensa tu respuesta, luego arranca y pruébala.
+
 ```bash
 cd src/GestionEmpresas.Api
 dotnet run
 ```
 
 Prueba tu API (Postman o el frontend): `GET /empresas`, crear, eliminar… **funciona idéntico a antes.** No cambiamos el comportamiento; cambiamos la estructura para que sea fácil de extender. Ese es el objetivo de un refactor.
+
+> 🔨 **Rómpelo (y entiende la DI).** Comenta (con `//`) la línea `builder.Services.AddSingleton<IEmpresaRepositorio, EmpresaRepositorioMemoria>();`. **Predice:** ¿qué pasará al pedir `GET /empresas`? Corre y compruébalo (verás `Unable to resolve service for type IEmpresaRepositorio`). Reactiva la línea. Eso muestra que el **registro** es lo que conecta el contrato con su implementación. *(Guarda tu respuesta para el commit.)*
 
 ### Paso 4: Guardar el avance
 
@@ -189,10 +193,16 @@ Abre el **Pull Request** en GitHub y fusiónalo; luego vuelve a `main` y sincron
 
 ## ✅ Compruébalo
 
+**Que corre:**
 - [ ] Tu API responde **igual que antes** (GET, POST, DELETE con sus códigos).
 - [ ] Existe la interfaz `IEmpresaRepositorio` y `EmpresaRepositorioMemoria` la implementa.
 - [ ] En `Program.cs` hay **una** línea que registra qué implementación usar, y los endpoints **piden** el repositorio.
+
+**Que entendiste:**
 - [ ] Puedes explicar, con la analogía del enchufe, qué es una interfaz y qué es la inyección de dependencias.
+- [ ] Tu predicción (¿la API cambia tras el refactor?) coincidió, y sabes qué pasó al comentar el registro.
+
+> 🚦 **Cómo te fue:** 🟢 lo entendí y podría explicárselo a alguien · 🟡 me costó · 🔴 no me alcanzó.
 
 ---
 

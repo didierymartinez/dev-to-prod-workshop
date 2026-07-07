@@ -95,7 +95,9 @@ Desglose:
 1. En la terminal de la API: `Ctrl + C` y luego `dotnet run` (para que tome el cambio).
 2. Recarga la página del navegador (la de Live Server).
 
-**Ahora sí: las tarjetas de empresas aparecen.** 🎉 La página dejó de mostrar el error y dibuja las tres empresas, con su plan y su estado (la inactiva se ve atenuada).
+> 🔮 **Predice, luego recarga.** No tocaste la página ni el `fetch` — solo autorizaste el origen en la API. *¿Crees que ahora las tarjetas cargarán, o seguirá el error de CORS?* Recarga y compáralo.
+
+**Ahora sí: las tarjetas de empresas aparecen.** 🎉 La página dejó de mostrar el error y dibuja las tres empresas, con su plan y su estado (la inactiva se ve atenuada). Fíjate: **el arreglo fue en la API, no en la página** — eso confirma que el problema nunca estuvo en tu `fetch`.
 
 ### Paso 3: Confirmar en las herramientas del navegador
 
@@ -116,10 +118,16 @@ Abre el **Pull Request** en GitHub y fusiónalo; luego vuelve a `main` y sincron
 
 ## ✅ Compruébalo
 
+**Que corre:**
 - [ ] La página muestra las tarjetas de empresas (ya no el mensaje de error).
 - [ ] En F12 → Console no hay error de CORS.
+
+**Que entendiste:**
 - [ ] Puedes explicar, con tus palabras, qué es un "origen" y por qué el navegador bloqueaba.
-- [ ] Entiendes que CORS se autoriza **en la API**, y que conviene autorizar orígenes concretos, no "cualquiera".
+- [ ] Entiendes que CORS se autoriza **en la API** (no en la página), y por qué conviene orígenes concretos, no "cualquiera".
+- [ ] Tu predicción (¿cargará tras el cambio?) coincidió.
+
+> 🚦 **Cómo te fue:** 🟢 lo hice y lo entendí · 🟡 me costó · 🔴 no me alcanzó.
 
 ---
 

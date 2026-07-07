@@ -1,6 +1,6 @@
 # Blindar el motor: Given-When-Then
 
-Tienes el motor de event sourcing completo, y hasta ahora lo probaste corriendo el `Main` y mirando la consola con los ojos. Pero vas a refactorizarlo en serio —arrancar tu almacén casero y meter Marten en su lugar—, y "mirar a ojo" no te avisará si en el camino rompes una regla. Antes de tocar el motor te construyes una **red de seguridad**: tests que fijan el comportamiento de hoy y que, cuando cambies el motor, **volverás a correr para probar que nada cambió**.
+Tienes el motor de event sourcing completo, y hasta ahora lo probaste corriendo el `Main` y mirando la consola con los ojos. Pero vas a refactorizarlo en serio —quitar tu almacén casero y meter Marten en su lugar—, y "mirar a ojo" no te avisará si en el camino rompes una regla. Antes de tocar el motor te construyes una **red de seguridad**: tests que fijan el comportamiento de hoy y que, cuando cambies el motor, **volverás a correr para probar que nada cambió**.
 
 ## 🎯 El Objetivo
 
@@ -56,7 +56,7 @@ public class SuspenderEmpresaTests
 ```
 </details>
 
-Funciona (`dotnet test` → verde), pero míralo: crear el store, sembrar, guardar el conteo, ejecutar, `Skip`, `Select`, comparar. Seis líneas de andamiaje para una idea de una. Y **todos** los tests de event sourcing tienen la misma forma: unos hechos previos, un comando, y los hechos que esperas. Destilemos esa forma.
+Funciona (`dotnet test` → verde), pero míralo: crear el store, sembrar, guardar el conteo, ejecutar, `Skip`, `Select`, comparar. Seis líneas de andamiaje para una sola idea. Y **todos** los tests de event sourcing tienen la misma forma: unos hechos previos, un comando, y los hechos que esperas. Destilemos esa forma.
 
 ### Paso 2 · Destila la gramática (y hazla swappeable)
 
@@ -114,7 +114,7 @@ public class SuspenderEmpresaTests : HandlerTest<SuspenderEmpresa>
 </details>
 
 > [!IMPORTANT]
-> **Por qué la base está partida así — y por qué importa para el swap.** El **motor** (`Store`) y **cómo** `Given`/`Then` hablan con él viven en la **base**. Los `[Fact]` de abajo —los **escenarios**— no mencionan el `EventStore` ni el `Skip`: solo dicen *dado esto, cuando aquello, entonces esto*. Por eso, el día del swap tocarás **solo la base** (cómo `Given`/`Then` hablan con Marten) y **los escenarios no cambian** —los mismos hechos previos, el mismo comando, los mismos hechos esperados—. Que sigan verdes probará que Marten hace lo que hacía tu motor casero.
+> **Por qué la base está partida así — y por qué importa para el swap.** El **motor** (`Store`) y **cómo** `Given`/`Then` hablan con él viven en la **base**. Los `[Fact]` de abajo —los **escenarios**— no mencionan el `EventStore` ni el `Skip`: solo dicen *dado esto, cuando aquello, entonces esto*. Por eso, el día del swap tocarás **solo la base**: cómo `Given`/`Then` hablan con Marten. **Los escenarios no cambian.** Que sigan verdes probará que Marten hace lo que hacía tu motor casero.
 
 > [!NOTE]
 > **Desde aquí, cada reto cierra con su test.** No es una sección que se visita y se olvida: de ahora en adelante, cada pieza que construyas o cambies se da por terminada solo cuando su escenario Given-When-Then está en verde. Los tests son el hilo que atraviesa el resto del taller.
