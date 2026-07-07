@@ -21,8 +21,11 @@ Seguirás versionando con Git lo que hagas (ya sabes cómo, desde la Fase 1).
 | 1 | [¿Qué es .NET y qué es compilar?](01-que-es-dotnet-y-compilar.md) | Entender la plataforma antes de usarla | 20 min |
 | 2 | [Tu primera aplicación de consola](02-tu-primera-app-de-consola.md) | Crear, compilar y ejecutar un programa | 35 min |
 | 3 | [Variables y tipos: guardar datos](03-variables-y-tipos.md) | Guardar y combinar datos (texto, número, sí/no) | 35 min |
-| 4 | [Trabajar con datos: las empresas](04-trabajar-con-datos.md) | Modelar y listar empresas en memoria | 40 min |
-| 5 | [Consultas y métodos sobre los datos](05-consultas-y-metodos.md) | Buscar, contar y organizar en métodos | 45 min |
+| 4 | [Una lista: muchos valores juntos](04-una-lista-de-valores.md) | Guardar y recorrer muchos valores (`List`, `foreach`) | 30 min |
+| 5 | [Un modelo: agrupar los datos de una empresa](05-un-modelo.md) | Crear un `record` y leer sus campos | 30 min |
+| 6 | [Una lista de empresas](06-lista-de-empresas.md) | Combinar lista + modelo (`List<Empresa>`) | 30 min |
+| 7 | [Decidir y contar](07-decidir-y-contar.md) | `if`, contar activas e inactivas | 30 min |
+| 8 | [Consultas y métodos sobre los datos](08-consultas-y-metodos.md) | Buscar y organizar en métodos | 45 min |
 
 ---
 

@@ -192,4 +192,4 @@ Te faltó el `$` justo antes de la comilla de apertura: `$"..."`.
 
 ---
 
-**➡️ Siguiente:** [Trabajar con datos: las empresas](04-trabajar-con-datos.md)
+**➡️ Siguiente:** [Una lista: muchos valores juntos](04-una-lista-de-valores.md)
