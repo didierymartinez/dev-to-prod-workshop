@@ -73,6 +73,8 @@ cd src/GestionEmpresas.Consola
 dotnet run
 ```
 
+> 🔮 **Predice, luego corre.** Antes de mirar: abriste `Program.cs` y viste una línea que imprime "Hello, World!". *¿Qué crees que aparecerá en pantalla al correr?* Ahora ejecútalo y compáralo con tu predicción.
+
 Verás en pantalla:
 ```
 Hello, World!
@@ -108,7 +110,7 @@ dotnet build
 
 Verás `Build succeeded` (compilación exitosa). No imprimió tus líneas, porque solo **tradujo** el código y revisó que no hubiera errores, sin correrlo.
 
-> 💥 **Rompe algo a propósito (para aprender a leer errores):** en `Program.cs`, borra el punto y coma `;` del final de la primera línea. Guarda y ejecuta `dotnet build`. Lee el error: te dice el archivo, la línea y que esperaba un `;`. Devuélvelo y vuelve a compilar. Aprender a leer estos mensajes es media batalla.
+> 🔨 **Rómpelo a propósito (para aprender a leer errores):** en `Program.cs`, borra el punto y coma `;` del final de la primera línea. **Antes de compilar, predice:** ¿`dotnet build` dirá "éxito" o "error"? Guarda y ejecuta `dotnet build`. Lee el error: te dice el archivo, la línea y que esperaba un `;`. Devuélvelo y vuelve a compilar. Aprender a leer estos mensajes es media batalla.
 
 ### Paso 7: Guardar el progreso en Git
 
@@ -148,10 +150,17 @@ En GitHub, abre el **Pull Request** y fusiónalo; luego vuelve a `main` en VS Co
 
 ## ✅ Compruébalo
 
+**Que corre:**
 - [ ] `dotnet --version` muestra una versión `8.x`.
 - [ ] `dotnet run` imprime tus dos líneas de texto.
-- [ ] Entiendes la diferencia entre `dotnet build` (solo compila) y `dotnet run` (compila y ejecuta).
 - [ ] Tu proyecto tiene un `.gitignore` y `bin/`/`obj/` no aparecen en Git (`git status` no los muestra).
+
+**Que entendiste:**
+- [ ] Puedes explicar la diferencia entre `dotnet build` (solo compila) y `dotnet run` (compila y ejecuta).
+- [ ] Al borrar el `;`, tu predicción ("éxito" o "error") coincidió con lo que dijo `dotnet build`.
+- [ ] Puedes explicar por qué `commit` y `push` son dos cosas distintas.
+
+> 🚦 **Cómo te fue** (sé honesto contigo): 🟢 lo hice solo · 🟡 me costó · 🔴 no me alcanzó. Si marcaste 🟡 o 🔴, no pasa nada: relee el paso y vuelve a intentar antes de seguir.
 
 ---
 
