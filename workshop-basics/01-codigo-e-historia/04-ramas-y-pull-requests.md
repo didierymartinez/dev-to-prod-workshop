@@ -89,10 +89,14 @@ Como eres el único en este proyecto, revísalo tú mismo y:
 
 ### Paso 6: Actualizar tu copia local
 
-`main` cambió en GitHub (acabas de fusionar), pero tu `main` local aún no lo sabe. Sincroniza:
+Ojo a este paso — aquí está la confusión más común. La fusión ocurrió **en GitHub** (el remoto), así que ahora **el remoto va adelante** y tu `main` local está atrasado: le falta la fusión.
+
+> 🔮 **Predice, luego mira.** Antes de sincronizar: *cuando pulses "Sync", ¿en qué dirección viajará la información — tu local subirá a GitHub, o GitHub bajará a tu local?* (Piensa: ¿dónde está el cambio que falta?)
 
 1. En VS Code, vuelve a la rama `main`: clic en el nombre de la rama (abajo a la izquierda) → elige `main`.
-2. Pulsa **Sync Changes** (la flechita) para traer la fusión.
+2. Pulsa **Sync Changes** (la flechita).
+
+La respuesta: esta vez "Sync" **baja** (pull) la fusión desde GitHub a tu local — **remoto ▶ local**, la dirección contraria a cuando subiste tus commits. Ese es el sentido de "sincronizar": no es "mandar lo mío", es **poner ambos lados de acuerdo**, en la dirección que haga falta. (Es justo lo que confunde a mucha gente: creer que sincronizar siempre sube.)
 
 > 🧠 Acabas de completar el flujo profesional: **rama → cambio → PR → revisión → merge → actualizar**. Lo repetirás en cada lección de aquí en adelante.
 
@@ -100,10 +104,16 @@ Como eres el único en este proyecto, revísalo tú mismo y:
 
 ## ✅ Compruébalo
 
+**Que corre:**
 - [ ] Creaste una rama, hiciste un commit en ella y la publicaste.
 - [ ] Abriste un Pull Request y viste el resaltado de líneas cambiadas.
 - [ ] Fusionaste el PR y tu `main` local ya incluye el cambio.
+
+**Que entendiste:**
 - [ ] Puedes explicar para qué sirve una rama y qué es un Pull Request.
+- [ ] En el Paso 6, tu predicción de la dirección del "Sync" (remoto ▶ local) coincidió — y entiendes por qué esta vez fue de bajada.
+
+> 🚦 **Cómo te fue:** 🟢 lo hice y lo entendí · 🟡 me costó / me perdí con las ramas o la dirección · 🔴 no me alcanzó.
 
 ---
 

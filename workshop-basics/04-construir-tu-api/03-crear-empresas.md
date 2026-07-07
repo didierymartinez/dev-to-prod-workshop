@@ -2,41 +2,58 @@
 
 > ⏱️ 35 minutos · 🎯 **Al terminar:** tu API podrá **recibir** una empresa nueva por POST, validarla y responder con el código correcto (`201` si se creó, `400` si los datos venían mal).
 
+> 🧭 **Cómo se aprende aquí.** Te muestro el código, te explico cada pieza, predices el código de respuesta, y al final un "Ahora tú".
+
 ---
 
 ## 🤔 El problema
 
-Listar empresas (GET) es solo la mitad. Una API útil también deja **crear** datos. Para eso recibe información en el cuerpo de la petición, la revisa (¿vienen completos los datos?) y responde según el resultado. Aquí implementas el lado servidor del POST que practicaste en la Fase 3.
+Listar (GET) es la mitad. Una API útil también deja **crear** datos: recibe información en el cuerpo de la petición, la revisa (¿vienen completos los datos?) y responde según el resultado. Aquí implementas el lado servidor del POST que practicaste en la Fase 3.
 
 ---
 
-## 💡 Conceptos
+## 💡 Recibir, validar, responder
 
-### Recibir datos del cuerpo (body)
-
-En un `POST`, el cliente envía datos en el **body** en JSON (lo viste en la Fase 3). .NET puede tomar ese JSON y convertirlo automáticamente en un objeto C#. Solo tienes que pedirlo como parámetro del endpoint: `(CrearEmpresaRequest req)`.
-
-### Validar antes de guardar
-
-Nunca confíes en que los datos llegan bien. Si falta la razón social o el NIT, la API debe **rechazar** la petición con un `400 Bad Request` y un mensaje claro, en vez de guardar basura.
-
-### Responder con el código correcto
-
-.NET ofrece atajos para responder con el código adecuado:
-
-| Atajo | Código | Cuándo |
-|---|---|---|
-| `Results.Created(url, dato)` | 201 | Se creó algo nuevo |
-| `Results.BadRequest(mensaje)` | 400 | Los datos venían mal |
-| `Results.Ok(dato)` | 200 | Todo bien, aquí están los datos |
+Tres ideas en juego:
+- **Recibir del body:** en un `POST` el cliente manda datos en el **body** en JSON. .NET los convierte solos en un objeto C# si los pides como parámetro.
+- **Validar antes de guardar:** nunca confíes en que los datos llegan bien. Si falta el NIT o la razón social, la API debe **rechazar** con `400 Bad Request`, no guardar basura.
+- **Responder con el código correcto:** `Results.Created` (201) al crear, `Results.BadRequest` (400) si algo falta, `Results.Ok` (200) para lo normal.
 
 ---
 
 ## 🛠️ Manos a la obra
 
-### Paso 1: Agregar el endpoint POST
+### Paso 1 · Preparar el modelo de entrada y el método del repositorio
 
-En `Program.cs`, agrega este endpoint **después** del `GET /empresas` y antes de `app.Run();`:
+Lo que el cliente envía al crear **no es** una `Empresa` completa: es solo lo que él conoce (razón social, NIT, plan). Le damos su propia forma.
+
+**Te muestro.** En `Models/Empresa.cs`, agrega debajo de la clase `Empresa`:
+
+```csharp
+// Lo que el cliente envía al crear (sin nada que ponga el servidor)
+public record CrearEmpresaRequest(string RazonSocial, string Nit, string Plan);
+```
+
+Y en `Repositorio/EmpresaRepositorio.cs`, agrega el método `Crear` dentro de la clase (junto a `ObtenerTodas`):
+
+```csharp
+public Empresa Crear(CrearEmpresaRequest req)
+{
+    var empresa = new Empresa { Nit = req.Nit, RazonSocial = req.RazonSocial, Plan = req.Plan };
+    _empresas.Add(empresa);
+    return empresa;
+}
+```
+
+**Te explico:**
+
+> 🆕 **`CrearEmpresaRequest` y `Crear`.**
+> - `CrearEmpresaRequest` es un `record` (como los de la Fase 2): describe **lo que llega** en el POST. No incluye `Activa` porque eso lo decide el servidor (por defecto `true`).
+> - `Crear(...)` arma una `Empresa` con los datos recibidos, la mete en la lista con `_empresas.Add(...)`, y la devuelve. Agregamos este método **ahora** porque **ahora** un endpoint lo va a usar — no antes.
+
+### Paso 2 · El endpoint POST
+
+**Te muestro.** En `Program.cs`, agrega este endpoint después del `GET /empresas` y antes de `app.Run();`:
 
 ```csharp
 // POST /empresas → registra una empresa nueva
@@ -55,59 +72,69 @@ app.MapPost("/empresas", (CrearEmpresaRequest req) =>
 });
 ```
 
-Desglose:
-- `(CrearEmpresaRequest req)` → .NET arma `req` automáticamente con el JSON que llegó en el body. Para guardar, usamos el `repo` que creamos en la lección 4.2.
-- `string.IsNullOrWhiteSpace(...)` revisa si un texto vino vacío o en blanco.
-- `Results.BadRequest(...)` responde **400** con un mensaje. El `new { mensaje = "..." }` crea un pequeño objeto que se convierte en JSON `{ "mensaje": "..." }`.
-- `repo.Crear(req)` guarda la empresa (el método que dejamos listo en la lección 4.2).
-- `Results.Created(url, dato)` responde **201** e indica en qué dirección quedó el recurso creado.
+**Te explico:**
 
-### Paso 2: Probar el caso exitoso
+> 🆕 **El endpoint que recibe y responde.**
+> - `app.MapPost("/empresas", (CrearEmpresaRequest req) => ...)`: `MapPost` atiende peticiones **POST**. .NET arma `req` **automáticamente** con el JSON del body.
+> - `string.IsNullOrWhiteSpace(...)` (lo viste en la Fase 2) revisa si un texto vino vacío. Si falta algo, `return Results.BadRequest(...)` responde **400** con un mensaje. El `new { mensaje = "..." }` es un objeto que se vuelve el JSON `{ "mensaje": "..." }`.
+> - `repo.Crear(req)` guarda; `Results.Created(url, dato)` responde **201** e indica dónde quedó el recurso.
 
-Reinicia el servidor (`Ctrl+C` y `dotnet run`). Abre **Postman**:
+> 🔮 **Predice, luego Send.** Reinicia (`Ctrl+C`, `dotnet run`). En Postman: **POST** a `http://localhost:5000/empresas`, Body → raw → JSON:
+> ```json
+> { "razonSocial": "Transportes Andinos S.A.S.", "nit": "811334455-6", "plan": "Profesional" }
+> ```
+> Antes de Send: *¿qué código esperas — 200, 201 u otro?* Envía y compáralo (debe ser **201**). Luego haz `GET /empresas`: la nueva empresa aparece.
 
-1. Método **POST**, URL `http://localhost:5000/empresas`.
-2. Pestaña **Body** → **raw** → **JSON**.
-3. Cuerpo:
-   ```json
-   {
-     "razonSocial": "Transportes Andinos S.A.S.",
-     "nit": "811334455-6",
-     "plan": "Profesional"
-   }
-   ```
-4. **Send**.
+> 🔨 **Rómpelo (provoca el 400).** Cambia el body para que la razón social venga vacía: `{ "razonSocial": "", "nit": "811334455-6", "plan": "Básico" }`. **Predice:** ¿qué código y qué mensaje? Envía y compruébalo (**400** con tu mensaje). *(Guárdalo para el commit.)*
 
-Resultado esperado: **201 Created**, y en el cuerpo la empresa nueva. Ahora haz un `GET /empresas`: la nueva empresa aparece en la lista.
+> ✋ **Ahora tú.** Agrega una tercera validación: que el `Plan` tampoco venga vacío, respondiendo 400 con un mensaje propio.
 
-### Paso 3: Probar el caso inválido
+<details>
+<summary>👉 Muéstrame una forma de hacerlo</summary>
 
-En Postman, cambia el body para que falte la razón social:
-```json
-{ "razonSocial": "", "nit": "811334455-6", "plan": "Básico" }
+```csharp
+if (string.IsNullOrWhiteSpace(req.Plan))
+    return Results.BadRequest(new { mensaje = "El plan es obligatorio." });
 ```
-**Send**. Resultado esperado: **400 Bad Request** con `{ "mensaje": "La razón social es obligatoria." }`.
+(Va junto a las otras validaciones, antes de `repo.Crear`.)
+</details>
 
-> 🧠 Acabas de hacer que tu API **se defienda** de datos malos. Una API que valida es una API confiable. Fíjate cómo el mismo endpoint responde `201` o `400` según el caso — eso es hablar HTTP con propiedad.
-
-### Paso 4: Guardar el avance
+### Paso final · Guardar el avance (commit de comprensión)
 
 ```bash
 cd ../..
 git checkout -b feat/api-crear-empresa
 git add .
-git commit -m "agregar endpoint POST /empresas con validación"
-git push -u origin feat/api-crear-empresa    # sube la rama a GitHub
 ```
-Abre el **Pull Request** en GitHub y fusiónalo; luego vuelve a `main` y sincroniza.
+
+> 📓 **En el commit, responde con TUS palabras** (reemplaza los `...`):
+> ```bash
+> git commit -m "endpoint POST /empresas con validación
+>
+> - Los datos del POST llegan en el ... y .NET los convierte en req porque ...
+> - Validar antes de guardar sirve para ...
+> - Un POST válido responde 201 y uno sin razón social responde ..., porque ..."
+> ```
+> ```bash
+> git push -u origin feat/api-crear-empresa
+> ```
+
+Abre el **Pull Request**, fusiónalo, vuelve a `main` y sincroniza.
 
 ---
 
 ## ✅ Compruébalo
 
+**Que corre:**
 - [ ] Un POST con datos válidos responde **201** y la empresa aparece luego en el GET.
-- [ ] Un POST sin razón social responde **400** con un mensaje claro.
-- [ ] Entiendes que los datos del POST llegan en el **body** y .NET los convierte en `req`.
+- [ ] Un POST sin razón social (o sin plan) responde **400** con un mensaje claro.
+
+**Que entendiste:**
+- [ ] Puedes explicar de dónde saca .NET el objeto `req` (del **body** JSON del POST).
+- [ ] Tus predicciones del código (201 vs 400) coincidieron, y sabes qué disparó cada una.
+- [ ] Entiendes por qué el método `Crear` se agregó al repositorio en esta lección y no antes.
+
+> 🚦 **Cómo te fue:** 🟢 lo entendí y pude hacer el "Ahora tú" solo · 🟡 me costó · 🔴 no me alcanzó.
 
 ---
 
@@ -125,10 +152,10 @@ Abre el **Pull Request** en GitHub y fusiónalo; luego vuelve a `main` y sincron
 Revisa que en Postman elegiste **Body → raw → JSON** y que el JSON está bien formado (comillas dobles, sin coma final). Un JSON inválido nunca llega a tu código.
 
 **Mando "razonSocial" pero llega vacío.**
-Los nombres del JSON deben coincidir con los del `CrearEmpresaRequest` (`razonSocial`, `nit`, `plan`). .NET no distingue mayúscula inicial, pero sí el nombre.
+Los nombres del JSON deben coincidir con los del `CrearEmpresaRequest` (`razonSocial`, `nit`, `plan`).
 
 **La empresa creada desaparece al reiniciar el servidor.**
-Es lo esperado: está en memoria. En la Fase 6 la guardaremos en una base de datos para que persista.
+Es lo esperado: está en memoria. En la Fase 6 la guardaremos en una base de datos.
 
 ---
 

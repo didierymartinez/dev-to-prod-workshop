@@ -57,9 +57,11 @@ Resultado: **200 OK** con los datos de la publicación 1.
    ```json
    { "title": "Mi primera publicación", "body": "Hola", "userId": 1 }
    ```
+> 🔮 **Predice, luego Send.** Antes de pulsar **Send**: acabas de *crear* algo (no leer). *¿El Status será `200` como en un GET, o un código distinto para "creé algo nuevo"?* Pulsa Send y compáralo.
+
 5. **Send**.
 
-Resultado: **201 Created**. La API responde que creó el recurso y te devuelve el nuevo objeto con un `id`. Ese `201` es el código estándar para "creé algo nuevo".
+Resultado: **201 Created**. La API responde que creó el recurso y te devuelve el nuevo objeto con un `id`. Ese `201` es el código estándar para "creé algo nuevo" — distinto del `200` de leer.
 
 > 🧠 Fíjate en lo que hiciste: en un `POST` **envías datos** en el *body* (cuerpo) de la petición. En un `GET` no envías cuerpo, solo pides. Esa diferencia la usarás al construir tu API.
 
@@ -88,10 +90,16 @@ DELETE /empresas/{nit}  → 204  (eliminada, sin contenido)
 
 ## ✅ Compruébalo
 
+**Que corre:**
 - [ ] Provocaste un `200`, un `201` y un `404` desde Postman.
 - [ ] Hiciste un POST enviando datos en el **body** en formato JSON.
+
+**Que entendiste:**
+- [ ] Tu predicción del código del POST (`201`, no `200`) coincidió, y sabes por qué difiere del GET.
 - [ ] Puedes decir, de memoria, qué hacen `GET`, `POST`, `PUT`, `DELETE`.
 - [ ] Sabes la diferencia entre un error `4xx` (culpa del cliente) y uno `5xx` (culpa del servidor).
+
+> 🚦 **Cómo te fue:** 🟢 lo hice y lo entendí · 🟡 me costó · 🔴 no me alcanzó.
 
 ---
 
