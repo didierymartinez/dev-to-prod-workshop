@@ -111,9 +111,9 @@ app.Run();
 
 > 🔮 **Predice, luego mira.** Arranca (`cd src/GestionEmpresas.Api` y `dotnet run`). Antes de abrir el navegador en `http://localhost:5000/empresas`: *¿cuántas empresas vas a ver y en qué formato?* Ábrelo y compáralo — verás las tres en JSON, **tu propia API entregando datos**.
 
-> 🔨 **Rómpelo (entiende la conexión endpoint↔repositorio).** En el endpoint, cambia `repo.ObtenerTodas()` por una lista vacía `Array.Empty<object>()`. **Predice:** ¿qué mostrará `/empresas`? Corre y compruébalo. Devuélvelo. *(Guarda tu respuesta para el commit.)*
+> 🔨 **Rómpelo (entiende la conexión endpoint↔repositorio).** En el endpoint, cambia `repo.ObtenerTodas()` por `Array.Empty<object>()` (que es, simplemente, "una lista vacía" — solo la usamos para el experimento). **Predice:** ¿qué mostrará `/empresas`? Corre y compruébalo. Devuélvelo. *(Guarda tu respuesta para el commit.)*
 
-> ✋ **Ahora tú.** Agrega un endpoint `GET /empresas/count` que devuelva solo **cuántas** empresas hay. *(Pista: `repo.ObtenerTodas().Count()` cuenta los elementos de una secuencia.)*
+> ✋ **Ahora tú.** Agrega un endpoint `GET /empresas/count` que devuelva solo **cuántas** empresas hay. *(Pista: en la Fase 2 usaste `.Count` como propiedad de una lista; sobre una secuencia como la que devuelve `ObtenerTodas()` se usa la versión con paréntesis, `repo.ObtenerTodas().Count()`.)*
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>

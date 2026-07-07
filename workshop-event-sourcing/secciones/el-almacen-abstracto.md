@@ -1,6 +1,6 @@
 # El almacén abstracto: tests rápidos sin Postgres
 
-Los tests de integración de la sección anterior **prueban el swap**, pero pesan: necesitan Docker y Postgres, y cada uno va a la base. No los corres en cada tecla, como sí hacías con los de RAM en [Blindar el motor](given-when-then.md). Quieres esa velocidad **de vuelta** para probar comportamiento — y dejar los de integración para lo suyo, confiar en el cableado. La traba es que tu handler **habla Marten directo** (`IDocumentSession`). Aquí metes una **costura** para poder cambiarle el almacén por uno en memoria.
+Los tests de integración de la sección anterior **prueban el swap**, pero pesan: necesitan Docker y Postgres, y cada uno va a la base. No los corres en cada tecla, como sí hacías con los de RAM en [Blindar el motor](given-when-then.md). Quieres esa velocidad **de vuelta** para probar comportamiento — y dejar los de integración para confirmar el cableado. La traba es que tu handler **habla Marten directo** (`IDocumentSession`). Aquí metes una **costura** para poder cambiarle el almacén por uno en memoria.
 
 ## 🎯 El Objetivo
 
@@ -8,7 +8,7 @@ Que tus handlers dependan de una **abstracción** (`IEventStore`), no de Marten:
 
 ## La costura: ¿qué le pide el handler al almacén?
 
-Mira tu `SuspenderHandler` del swap. De todo Marten, solo usa **tres** cosas: **rehidratar** la empresa, **emitir** un hecho, y **confirmar**. Nada más. Eso es justo el contrato que necesitas — ni una pieza más.
+Mira tu `SuspenderHandler` del swap. De todo Marten, solo usa **tres** cosas: **rehidratar** la empresa, **emitir** un hecho, y **confirmar**. Nada más. Eso es justo el contrato que necesitas.
 
 ### Paso 1 · Define `IEventStore` y desacopla el handler
 

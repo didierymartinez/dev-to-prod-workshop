@@ -65,6 +65,8 @@ Responde con tus palabras:
 - [ ] ¿Qué significa que los datos sean "persistentes"?
 - [ ] ¿Cómo organiza los datos una base de datos relacional?
 
+> 🚦 **Cómo te fue:** 🟢 lo entendí y puedo explicarlo con mis palabras · 🟡 me costó · 🔴 no me alcanzó.
+
 ---
 
 ## 🧠 Lo que aprendiste

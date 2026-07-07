@@ -4,7 +4,7 @@ Vuelve a la deuda que arrastras. En [Concurrencia optimista](concurrencia-optimi
 
 ## 🎯 El Objetivo
 
-Cambiar el *write-path* de tu `MartenEventStore` de *"leer y añadir sin control"* a **`FetchForWriting`**, que recupera la concurrencia optimista — **sin tocar el handler ni la interfaz `IEventStore`**.
+Cambiar cómo escribe tu `MartenEventStore` de *"leer y añadir sin control"* a **`FetchForWriting`**, que recupera la concurrencia optimista — **sin tocar el handler ni la interfaz `IEventStore`**.
 
 ## 💥 El dolor: read-modify-write no atómico
 
@@ -12,8 +12,7 @@ Mira el ciclo que dejó el swap: `GetAggregateRootAsync` (lee en la versión N) 
 
 ## 🔧 `FetchForWriting`: leer y controlar en un solo paso
 
-`FetchForWriting<Empresa>(id)` hace dos cosas a la vez: te da el agregado rehidratado (`.Aggregate`) **y captura la versión** en que lo leíste. Añades con `.AppendOne(hecho)`, y al `SaveChangesAsync` Marten **exige** que el stream siga en esa versión. Si otro escribió mientras decidías, **lanza** en vez de sobrescribir. Leer y guardar la versión, fundidos.
-
+`FetchForWriting<Empresa>(id)` hace dos cosas a la vez: te da el agregado rehidratado (`.Aggregate`) **y captura la versión** en que lo leíste. Añades con `.AppendOne(hecho)`, y al `SaveChangesAsync` Marten **exige** que el stream siga en esa versión. Si otro escribió mientras decidías, **lanza** en vez de sobrescribir.
 ### Paso 1 · `MartenEventStore` adopta `FetchForWriting`
 
 Lo bonito: el cambio vive **dentro** de `MartenEventStore`. Tu handler sigue pidiendo `GetAggregateRootAsync` → decidir → `AppendEvent` → `SaveChangesAsync`, igual que en [El almacén abstracto](el-almacen-abstracto.md). Ese es el pago de la costura `IEventStore`: cambias el motor de escritura sin tocar el dominio.
@@ -49,7 +48,7 @@ public class MartenEventStore(IDocumentSession session) : IEventStore
 > 🆕 **`FetchForWriting<T>(id)` → `IEventStream<T>`.** Devuelve un *stream para escritura*: `.Aggregate` es el agregado rehidratado (o `null` si no existe todavía — sirve para **crear** también), y por dentro guarda la **versión** con la que lo leíste. `.AppendOne(hecho)` encola un hecho en ese stream. El control de versión se cobra en `SaveChangesAsync`.
 
 > [!NOTE]
-> 🆕 **La clausura — el truco del `Despachador`, otra vez.** `FetchForWriting<T>` es genérico, pero `AppendEvent` recibe un `object`. Como en [El despachador](el-despachador.md), capturas el stream en una **clausura** (`_append`) al leer, y la reutilizas al añadir — sin que `MartenEventStore` tenga que ser genérico. *(Aquí guardas un stream, el de la empresa que toca el handler; la plantilla real guarda **varios** —un diccionario de streams— para componer comandos.)*
+> 🆕 **La clausura — el truco del `Despachador`, otra vez.** `FetchForWriting<T>` es genérico, pero `AppendEvent` recibe un `object`. Como en [El despachador](el-despachador.md), capturas el stream en una **clausura** (`_append`) al leer, y la reutilizas al añadir — sin que `MartenEventStore` tenga que ser genérico. *(Aquí guardas un stream, el de la empresa del handler. La plantilla real guarda varios, uno por stream.)*
 
 ### Paso 2 · Ahora el choque se nota (de nuevo)
 

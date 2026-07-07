@@ -1,10 +1,10 @@
 # Persistir a mano tiene un límite
 
-Tienes el motor blindado con tests verdes. Pero fíjate **dónde viven esos hechos**: en tu `EventStore`, un `Dictionary` en **RAM**. Tu test siembra, ejecuta y verifica — y luego el proceso termina y **todo se borra**. Para un test es justo lo que quieres (empezar de cero cada vez); para una app real es letal: el diario de "Constructora Andes" no puede desaparecer al reiniciar el servidor. Los hechos necesitan una **base de datos**. Guardar uno a mano resulta fácil. Leerlo de vuelta a su tipo, no: ahí verás dónde hacerlo a mano deja de valer la pena.
+Tienes el motor blindado con tests verdes. Pero fíjate **dónde viven esos hechos**: en tu `EventStore`, un `Dictionary` en **RAM**. Tu test siembra, ejecuta y verifica — y luego el proceso termina y **todo se borra**. Para un test es justo lo que quieres (empezar de cero cada vez); para una app real es letal: el diario de "Constructora Andes" no puede desaparecer al reiniciar el servidor. Los hechos necesitan una **base de datos**. Guardar uno a mano resulta fácil. Leerlo de vuelta a su tipo no lo es: ahí verás dónde hacerlo a mano deja de valer la pena.
 
 ## 🎯 El Objetivo
 
-Levantar un PostgreSQL real, **guardar un hecho a mano** y verlo sobrevivir a un reinicio. Y ver el **límite**: por qué recuperar ese hecho *a su tipo* desde C# marca dónde hacerlo a mano deja de tener sentido.
+Levantar un PostgreSQL real, **guardar un hecho a mano** y verlo sobrevivir a un reinicio. Y ver el **límite**: recuperar ese hecho *a su tipo* desde C#.
 
 ## Un evento no cabe en una tabla rígida
 

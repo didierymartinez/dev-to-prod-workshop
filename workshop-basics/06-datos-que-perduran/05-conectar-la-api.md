@@ -184,11 +184,13 @@ dotnet ef migrations add Inicial
 
 Esto crea una carpeta `Migrations/`. Ahora arranca la API: al iniciar, el `Database.Migrate()` aplicará la migración y **creará la tabla** en PostgreSQL.
 
+> 🔮 **Predice, luego corre.** Cambiaste la línea de registro y agregaste la conexión, pero **no tocaste los endpoints**. *¿Crees que tu API seguirá respondiendo igual (mismos GET/POST/DELETE) aunque ahora hable con PostgreSQL?* Y tras arrancar, *¿aparecerá una tabla `Empresas` que antes (6.3) no existía?* Escribe tus respuestas.
+
 ```bash
 dotnet run
 ```
 
-Verás que arranca sin errores. Tu API ya está conectada a PostgreSQL.
+Verás que arranca sin errores. Tu API ya está conectada a PostgreSQL — respondiendo idéntico, pero ahora guardando en disco. (Confírmalo abajo con `\dt`.)
 
 > 🧠 No te preocupes si el comando `migrations add` aún te resulta misterioso: en la **próxima lección** abrirás esa migración, entenderás exactamente qué es y para qué sirve, y la usarás para hacer crecer la base de datos.
 
@@ -207,10 +209,16 @@ Abre el **Pull Request** en GitHub y fusiónalo; luego vuelve a `main` y sincron
 
 ## ✅ Compruébalo
 
+**Que corre:**
 - [ ] La API arranca sin errores con `dotnet run`.
 - [ ] Existe la carpeta `Migrations/` con la migración `Inicial`.
 - [ ] La tabla existe: entra con `docker exec -it empresas-db psql -U appuser -d empresasdb` y ejecuta `\dt` → debe aparecer `Empresas`.
-- [ ] El único cambio para usar la base de datos fue el **registro** (más la conexión y la nueva clase); los endpoints quedaron intactos.
+
+**Que entendiste:**
+- [ ] El único cambio para usar la base de datos fue el **registro** (más la conexión y la nueva clase); los endpoints quedaron intactos — y tu predicción lo confirmó.
+- [ ] Puedes explicar por qué el repositorio de base de datos se registra `AddScoped` y no `AddSingleton`.
+
+> 🚦 **Cómo te fue:** 🟢 lo hice y entendí el valor de la interfaz+DI · 🟡 me costó · 🔴 no me alcanzó.
 
 ---
 

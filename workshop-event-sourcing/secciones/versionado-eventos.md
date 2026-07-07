@@ -1,6 +1,6 @@
 # Versionado y upcasting: el esquema evoluciona, la historia no
 
-Desde [El diario de una empresa](el-diario-de-una-empresa.md) la promesa fue: el diario **no se reescribe** — un `UPDATE` destruye el pasado. Pero el negocio **evoluciona**: un día `EmpresaRegistrada` necesita un campo que no existía cuando lo diseñaste, y tienes miles de eventos viejos sin él. ¿Los reescribes para meterles el campo? Eso es justo la amnesia que Event Sourcing evita — prohibido. La salida es traducir los eventos viejos a la forma nueva **al leerlos**, dejando la historia intacta: **upcasting**.
+Desde [El diario de una empresa](el-diario-de-una-empresa.md) la promesa fue: el diario **no se reescribe** — un `UPDATE` destruye el pasado. Pero el negocio **evoluciona**: un día `EmpresaRegistrada` necesita un campo que no existía cuando lo diseñaste, y tienes miles de eventos viejos sin él. Reescribirlos para meterles el campo es la amnesia que Event Sourcing evita: prohibido. La salida es traducir los eventos viejos a la forma nueva **al leerlos**, dejando la historia intacta: **upcasting**.
 
 ## 🎯 El Objetivo
 

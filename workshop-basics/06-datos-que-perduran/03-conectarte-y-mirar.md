@@ -71,7 +71,9 @@ Prueba estos comandos (los que empiezan con `\` son atajos de psql; los demás s
 SELECT version();      -- ver la versión de PostgreSQL
 ```
 
-Es normal que `\dt` diga que no hay tablas: tu API todavía no ha creado ninguna. Eso lo hará automáticamente en la lección 6.5.
+> 🔮 **Predice, luego corre `\dt`.** Tu API aún no ha tocado esta base. *¿Cuántas tablas crees que verás?* Escribe tu respuesta y luego corre `\dt`.
+
+Es normal que `\dt` diga que no hay tablas (`no relations`): tu API todavía no ha creado ninguna. Eso lo hará automáticamente en la lección 6.5. Si predijiste "ninguna", ya entiendes que la base arranca **vacía**.
 
 ### Paso 3: Salir
 
@@ -86,10 +88,15 @@ Vuelves a tu terminal normal. El contenedor sigue corriendo.
 
 ## ✅ Compruébalo
 
+**Que corre:**
 - [ ] Lograste entrar al prompt `empresasdb=#` con `docker exec ... psql`.
-- [ ] `\dt` te dijo que aún no hay tablas (correcto).
-- [ ] `SELECT version();` mostró PostgreSQL 16.
-- [ ] Puedes explicar qué es una *connection string* y por qué no va en el código.
+- [ ] `\dt` te dijo que aún no hay tablas (correcto), y `SELECT version();` mostró PostgreSQL 16.
+
+**Que entendiste:**
+- [ ] Predijiste que la base estaría vacía, y así fue.
+- [ ] Puedes explicar qué es una *connection string* y por qué **no** va en el código.
+
+> 🚦 **Cómo te fue:** 🟢 lo hice y lo entendí · 🟡 me costó · 🔴 no me alcanzó.
 
 ---
 

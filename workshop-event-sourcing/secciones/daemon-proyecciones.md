@@ -57,9 +57,9 @@ Con `Async`, guardar un evento **no** corre la proyección. El `SaveChangesAsync
 
 > 🔍 **¿Lo lograste?** Con el host corriendo (`await app.StartAsync()`), saca el store del host (`var store = app.Services.GetRequiredService<IDocumentStore>()`): abre una sesión, siembra `emp-7` (`EmpresaRegistrada` + `EmpresaSuspendida`) y `SaveChangesAsync` — vuelve al instante, y una consulta **inmediata** aún **no** ve el `ResumenEmpresa`. Espera a que el daemon alcance (`await app.WaitForNonStaleProjectionDataAsync(TimeSpan.FromSeconds(5))`, con `using Marten.Events;`), consulta `LoadAsync<ResumenEmpresa>("emp-7")` y **ahora sí**: `Suspendida = true`. La proyección se llenó **fuera** de tu transacción de escritura.
 
-### Paso 3 · Checkpoints, y por qué esto es un superpoder
+### Paso 3 · Checkpoints: retomar y reconstruir
 
-¿Cómo sabe el daemon por dónde va? Guarda, por proyección, **hasta qué evento** ha procesado — un *checkpoint*— y el número del último evento del sistema, el *high water mark*. Todo eso vive en una tabla de progreso que Marten administra. Con eso, el daemon **retoma** donde quedó tras un reinicio, y —clave— puedes **reconstruir** una proyección: borrar su read model, poner su checkpoint en cero, y el daemon la **rellena de nuevo** rejugando el historial, sin tocar tus eventos ni bloquear las escrituras.
+¿Cómo sabe el daemon por dónde va? Guarda, por proyección, **hasta qué evento** ha procesado — un *checkpoint*— y el número del último evento del sistema, el *high water mark*. Todo eso vive en una tabla de progreso que Marten administra. Con eso, el daemon **retoma** donde quedó tras un reinicio. Y puedes **reconstruir** una proyección: borra su read model, pon su checkpoint en cero, y el daemon la **rellena de nuevo** rejugando el historial, sin tocar tus eventos ni bloquear las escrituras.
 
 ---
 

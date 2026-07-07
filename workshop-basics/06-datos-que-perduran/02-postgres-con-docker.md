@@ -85,7 +85,9 @@ docker start empresas-db       # volver a arrancarlo
 docker rm -f empresas-db       # borrarlo por completo
 ```
 
-Ejecuta `docker ps`: debe aparecer `empresas-db` con estado *Up* (arriba). Eso confirma que tu base de datos está viva.
+> 🔮 **Predice, luego corre.** Levantaste el contenedor con `-d` (segundo plano). *¿Crees que `docker ps` mostrará `empresas-db` corriendo, aunque la terminal no muestre nada de Postgres?* Corre `docker ps` y compáralo.
+
+Debe aparecer `empresas-db` con estado *Up* (arriba). Eso confirma que tu base de datos está viva.
 
 > 🧠 **Foco:** Docker tiene muchísimos comandos, pero en la práctica diaria usarás sobre todo `run`, `ps`, `logs`, `stop/start` y `rm`. Domínalos y vas bien; el resto lo buscarás cuando lo necesites.
 
@@ -93,10 +95,15 @@ Ejecuta `docker ps`: debe aparecer `empresas-db` con estado *Up* (arriba). Eso c
 
 ## ✅ Compruébalo
 
+**Que corre:**
 - [ ] `docker --version` muestra una versión y Docker Desktop está abierto/corriendo.
 - [ ] `docker ps` muestra el contenedor `empresas-db` con estado *Up*.
-- [ ] Entiendes la diferencia entre **imagen** (plantilla) y **contenedor** (ejecución).
-- [ ] Sabes detener (`docker stop`) y arrancar (`docker start`) el contenedor.
+
+**Que entendiste:**
+- [ ] Puedes explicar la diferencia entre **imagen** (plantilla) y **contenedor** (ejecución).
+- [ ] Sabes detener (`docker stop`) y arrancar (`docker start`) el contenedor, y qué hace `-p 5432:5432`.
+
+> 🚦 **Cómo te fue:** 🟢 lo hice y lo entendí · 🟡 me costó · 🔴 no me alcanzó.
 
 ---
 
