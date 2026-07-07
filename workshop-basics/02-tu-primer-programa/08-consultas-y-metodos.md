@@ -1,4 +1,4 @@
-# Lección 2.5 — Consultas y métodos sobre los datos
+# Lección 2.8 — Consultas y métodos sobre los datos
 
 > ⏱️ 45 minutos · 🎯 **Al terminar:** sabrás organizar tu código en **métodos** reutilizables y responder preguntas sobre los datos (buscar una empresa, contar las activas). Son exactamente las operaciones que tu API hará en la Fase 4.
 
@@ -27,7 +27,7 @@ Un **método** es un bloque de código con un **nombre**, que puedes **invocar**
 
 ## 🛠️ Manos a la obra
 
-Partimos del código de la lección 2.4 (la lista de empresas en memoria).
+Partimos del código de la lección 2.7 (la lista de empresas en memoria).
 
 ### Paso 1 · Tu primer método: uno que no recibe nada
 
@@ -86,7 +86,7 @@ MostrarTodas(empresas);
 // - ...
 ```
 
-> 🛠️ **Inténtalo tú.** Crea `void MostrarTodas(List<Empresa> lista)` que reciba una lista de empresas, imprima cuántas hay (`lista.Count`) y luego recorra con `foreach` mostrando cada una con su estado en palabras (como en 2.4). Después invócalo con `MostrarTodas(empresas);`. *(Pista: `lista.Count` es la cantidad; el estado sale de `e.Activa ? "activa" : "inactiva"`.)*
+> 🛠️ **Inténtalo tú.** Crea `void MostrarTodas(List<Empresa> lista)` que reciba una lista de empresas, imprima cuántas hay (`lista.Count`) y luego recorra con `foreach` mostrando cada una con su estado en palabras (como en 2.6). Después invócalo con `MostrarTodas(empresas);`. *(Pista: `lista.Count` es la cantidad; el estado sale de `e.Activa ? "activa" : "inactiva"`.)*
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -113,7 +113,7 @@ void MostrarTodas(List<Empresa> lista)
 
 Ahora un método para el resumen de activas. Quiero que imprima `Activas: 2 de 3`:
 
-> 🛠️ **Inténtalo tú.** Crea `void MostrarResumen(List<Empresa> lista)` que imprima cuántas están activas sobre el total. *(Pista: en vez del bucle contador de 2.4, hay una forma de una línea. `lista.Count(...)` cuenta los elementos que cumplen una condición; la condición se escribe `e => e.Activa`.)*
+> 🛠️ **Inténtalo tú.** Crea `void MostrarResumen(List<Empresa> lista)` que imprima cuántas están activas sobre el total. *(Pista: en vez del bucle contador de 2.7, hay una forma de una línea. `lista.Count(...)` cuenta los elementos que cumplen una condición; la condición se escribe `e => e.Activa`.)*
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -128,7 +128,7 @@ void MostrarResumen(List<Empresa> lista)
 </details>
 
 > 🆕 **La condición corta `e => e.Activa` (lambda).**
-> `e => e.Activa` se lee: *"para cada empresa `e`, ¿su campo `Activa` es verdadero?"*. Es una **condición escrita en corto** que le pasas a un método como si fuera un dato. `Count(e => e.Activa)` recorre la lista y **cuenta** las que la cumplen — reemplaza el bucle manual de 2.4. La flecha `=>` aquí significa "para cada `e`, mira esto".
+> `e => e.Activa` se lee: *"para cada empresa `e`, ¿su campo `Activa` es verdadero?"*. Es una **condición escrita en corto** que le pasas a un método como si fuera un dato. `Count(e => e.Activa)` recorre la lista y **cuenta** las que la cumplen — reemplaza el bucle manual de 2.7. La flecha `=>` aquí significa "para cada `e`, mira esto".
 
 > 🔮 **Predice, luego corre.** Invoca `MostrarResumen(empresas);`. Antes de ejecutar: *¿qué número va a decir "Activas"?* Escríbelo, corre `dotnet run`, y confírmalo. Debe decir `Activas: 2 de 3`.
 

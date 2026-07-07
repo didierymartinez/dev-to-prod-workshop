@@ -22,6 +22,17 @@
 5. **El calor sobre el error.** Cuando el alumno se traba, el texto lo normaliza explícitamente ("trabarte aquí es esperado, no significa que no tienes bases"). Nunca se asume que "es obvio".
    *Caso:* la alumna concluyó "creo que no tengo buenas bases en programación" por una confusión que era culpa del texto, no suya.
 
+## A-bis. El arco evolutivo (rige todo el taller)
+
+**Una idea nueva por lección, nacida del dolor de la anterior.** El taller sube por **escalones pequeños**: cada lección de código introduce **un** concepto nuevo, y ese concepto aparece porque lo anterior se quedó corto. Prohibido el salto que mete 2+ ideas nuevas de golpe.
+*Caso:* de "una variable guarda un valor" (2.3) se saltaba directo a `List<Empresa>` — lista + genéricos + modelo propio, tres ideas juntas. El usuario lo marcó: *"salta de variables a una lista tipada… debe ser evolutivo"*. Se partió en escalones: lista de valores simples → un modelo → lista de modelos → decidir/contar.
+
+**Cómo se parte un salto en escalones:**
+1. Escribe la lista de **ideas atómicas** nuevas que exige el destino (p. ej. para `List<Empresa>`: qué es una colección, cómo se recorre, qué es un tipo propio, combinar ambos).
+2. Ordénalas de la más simple a la más compleja, cada una usando solo lo ya visto.
+3. Entre escalón y escalón, nombra el **dolor** que motiva el siguiente ("un nombre no basta: una empresa tiene NIT, plan, activa" → hace falta agrupar → un modelo).
+4. Si dudas entre una lección grande o dos pequeñas, elige **dos pequeñas**. En basics, más fino casi siempre gana.
+
 ## B. Estructura de una lección de código (el método: ENSEÑAR antes de RETAR)
 
 > ⚠️ **La regla que rige toda la sección.** Este taller es para alguien **sin experiencia**. No se le puede pedir que *intente* escribir sintaxis que no ha visto — solo abriría la solución y copiaría. Por eso el orden es **enseñar primero, retar después**. (El patrón inverso "reto-primero" del taller de event sourcing es para alumnos con base; **aquí no aplica**.)
