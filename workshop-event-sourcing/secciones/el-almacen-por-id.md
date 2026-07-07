@@ -64,7 +64,7 @@ Fíjate: el **id es siempre un parámetro**. El almacén no sabe de empresas ni 
 > **No llames al almacén directo desde tu handler.** `GetEvents` y `AppendEvent` son plomería interna: los llama el `EventStream` que construyes enseguida. Tu handler usará `stream.Get()` y `stream.Append(hecho)`; al `store` solo le pides el stream con `AbrirStream`. Llamar `store.AppendEvent(id, hecho)` tú mismo **funciona aquí** (el stream solo reenvía), pero es un hábito que se rompe: en [Concurrencia optimista](concurrencia-optimista.md) `AppendEvent` pasa a recibir un **sobre con versión**, y saltarte el stream te salta ese control.
 
 > [!NOTE]
-> 🌱 **Semilla — este no será tu único almacén.** El de hoy guarda en RAM, perfecto para aprender. Pero más adelante nacerán **hermanos con otros propósitos**: uno contra una **base de datos real** para producción ([Revelar Marten](revelar-marten.md)) y uno **en memoria pensado para tests** ([El TestStore](teststore.md)). El día que existan varios, extraeremos una interfaz `IEventStore` para poder **intercambiarlos sin tocar el resto del código**.
+> 🌱 **Semilla — este no será tu único almacén.** El de hoy guarda en RAM, perfecto para aprender. Pero más adelante nacerán **hermanos con otros propósitos**: uno contra una **base de datos real** para producción ([El swap](el-swap.md)) y uno **en memoria pensado para tests** ([El almacén abstracto](el-almacen-abstracto.md)). El día que existan varios, extraeremos una interfaz `IEventStore` para poder **intercambiarlos sin tocar el resto del código**.
 
 ## El `EventStream`: ahora el almacén te lo entrega
 
