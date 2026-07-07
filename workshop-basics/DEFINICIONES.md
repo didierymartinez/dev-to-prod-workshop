@@ -22,16 +22,20 @@
 5. **El calor sobre el error.** Cuando el alumno se traba, el texto lo normaliza explícitamente ("trabarte aquí es esperado, no significa que no tienes bases"). Nunca se asume que "es obvio".
    *Caso:* la alumna concluyó "creo que no tengo buenas bases en programación" por una confusión que era culpa del texto, no suya.
 
-## B. Estructura de una lección de código (el método)
+## B. Estructura de una lección de código (el método: ENSEÑAR antes de RETAR)
 
-1. **Motivar = mostrar en uso (example-first).** Para introducir una pieza, se abre con el **ejemplo de uso** — el código que quieres poder escribir + `// la salida esperada` — seguido de **🛠️ Inténtalo tú** con pistas, y la solución en `<details><summary>👉 Muéstrame una forma de hacerlo</summary>`. El ejemplo ES la motivación.
-   *Caso:* lo que la alumna amó de otro taller fue exactamente esto: *"me explica algo, me dice qué debo hacer y después me muestra cómo era"*.
-2. **No se copia y pega bloques grandes.** Prohibido "reemplaza el contenido por esto" seguido de 30 líneas. Cada pieza es un reto que el alumno intenta **antes** de ver la solución. El `<details>` respeta al que quiere intentar primero.
-3. **Una idea por paso; pasos separados, no anidados.** Dos piezas = dos `### Paso N`, cada uno con su reto y su solución.
-   *Caso:* la caja "Conceptos" mezclaba *qué es un método* con *consultas sobre listas* → la alumna dedujo, falsamente, "para construir un método necesitas una lista". Se separó: el primer método que escribe **no recibe nada**.
-4. **Cada pieza se introduce donde tiene consumidor real.** No se adelantan conceptos "para después". Un `Where`/`FirstOrDefault` se explica en el paso donde se usa, no en un bloque teórico al inicio.
-5. **Cajas `🆕`** para sintaxis nueva del lenguaje, en su primer uso, con anatomía visual cuando ayuda (etiquetar las partes de una firma, leer una condición "de adentro hacia afuera").
-6. **Advertir donde nace la tentación o la confusión**, no después. Si una pieza suele malinterpretarse (el `!`, un método sin parámetros), el aviso va justo ahí.
+> ⚠️ **La regla que rige toda la sección.** Este taller es para alguien **sin experiencia**. No se le puede pedir que *intente* escribir sintaxis que no ha visto — solo abriría la solución y copiaría. Por eso el orden es **enseñar primero, retar después**. (El patrón inverso "reto-primero" del taller de event sourcing es para alumnos con base; **aquí no aplica**.)
+
+1. **Worked-example primero: te muestro → te explico → predices.** Para introducir una pieza nueva, el paso abre **mostrando el código completo** (un *ejemplo resuelto*, no un hueco), seguido de **su explicación** con cada símbolo aterrizado (cajas `🆕`), y un **🔮 predice** antes de correrlo. El alumno **aprende viéndolo funcionar**, no adivinándolo.
+   *Caso:* la alumna dijo *"si me toca armarlo, no soy capaz"* — porque el reto llegaba antes de la enseñanza. Primero se enseña; recién entonces puede.
+2. **El 🛠️ Inténtalo tú va DESPUÉS de enseñar, y es una variación pequeña.** Una vez mostrada y explicada la pieza, el reto pide **aplicar lo recién visto con un cambio acotado** (agrega un dato, cuenta lo contrario, cambia la condición) — nunca "invéntalo de cero". Solución en `<details><summary>👉 Muéstrame una forma de hacerlo</summary>`. El reto prueba **transferencia**, después del aprendizaje.
+   *Caso:* lo que la alumna amó de otro taller fue *"me explica, me dice qué hacer, y luego me muestra cómo era"* — el "me explica" va **primero**.
+3. **Nada de bloques gigantes para copiar sin más.** El "te muestro" no es "reemplaza 30 líneas por esto y sigue": es un bloque **pequeño por idea**, con su explicación pegada. Si una pieza es grande, se parte.
+4. **Una idea por paso; pasos separados, no anidados.** Dos piezas = dos `### Paso N`, cada uno con su enseñanza y su reto.
+   *Caso:* la caja "Conceptos" mezclaba *qué es un método* con *consultas sobre listas* → la alumna dedujo, falsamente, "para construir un método necesitas una lista". Se separó.
+5. **Cada pieza se introduce donde tiene consumidor real.** No se adelantan conceptos "para después". Un `Where`/`FirstOrDefault` se enseña en el paso donde se usa, no en un bloque teórico al inicio.
+6. **Cajas `🆕`** para sintaxis nueva del lenguaje, en su primer uso, con anatomía visual cuando ayuda (etiquetar las partes de una firma, leer una condición "de adentro hacia afuera").
+7. **Advertir donde nace la tentación o la confusión**, no después. Si una pieza suele malinterpretarse (el `!`, un método sin parámetros), el aviso va justo ahí.
 
 ## C. Validar comprensión, no ejecución (lo propio de este taller)
 
@@ -53,7 +57,7 @@ Estos dispositivos son **obligatorios** en toda lección de código. Son las se�
 - (Lecciones de código) `> 🧭 Cómo se aprende aquí` la primera vez que el patrón entra en una fase.
 - `## 🤔 El problema` — la pregunta concreta que la lección responde.
 - `## 💡 …` — el concepto mínimo, **una idea**, decoplado de lo que no es (regla B3). En lecciones puramente conceptuales (p. ej. 2.1), esta es la sección principal.
-- `## 🛠️ Manos a la obra` — `### Paso N`, cada uno example-first (B1) con **🛠️ Inténtalo tú** + `<details>`, cajas `🆕`, y **🔮/🔨** (regla C).
+- `## 🛠️ Manos a la obra` — `### Paso N`, cada uno **enseña primero** (te muestro el código + cajas `🆕` + 🔮 predice) y **luego** un **🛠️ Inténtalo tú** de variación + `<details>` (regla B). El 🔨 rómpelo va tras el reto (regla C).
 - `### Paso final · Guardar el avance` — rama + commit **de comprensión** (C3) + push + PR.
 - `## ✅ Compruébalo` — en dos partes (D6→C6) + 🚦 autocalificación (C5).
 - `## 🧠 Lo que aprendiste` — resumen en viñetas.

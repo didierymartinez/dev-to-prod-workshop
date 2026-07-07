@@ -191,4 +191,4 @@ Instala la extensión "C# Dev Kit" (Fase 0). Te da autocompletado y resaltado de
 
 ---
 
-**➡️ Siguiente:** [Trabajar con datos: las empresas](03-trabajar-con-datos.md)
+**➡️ Siguiente:** [Variables y tipos: guardar datos](03-variables-y-tipos.md)
