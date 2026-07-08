@@ -92,10 +92,14 @@ Este es el flujo que usan los equipos de software profesionales. Lo recorriste e
 
 ## ✅ Compruébalo
 
+> 🔮 **Predice, luego compruébalo.** Fusionaste el PR y **no tocaste el servidor**. *¿Crees que tu cambio aparecerá solo en `http://<IP>:5000/empresas/resumen`? ¿en cuánto tiempo?* Escribe tu respuesta y espera a que el CD termine.
+
 - [ ] Hiciste un cambio, abriste un PR y viste el **CI** correr las pruebas.
 - [ ] Al fusionar, el **CD** construyó, publicó y desplegó solo.
 - [ ] El cambio apareció en `http://<IP>:5000/empresas/resumen` sin que tocaras el servidor.
 - [ ] Puedes explicar la diferencia entre el flujo manual (Fase 9) y el automático (Fase 10).
+
+> 🚦 **Cómo te fue:** 🟢 viví el ciclo CI/CD completo y lo entendí · 🟡 me costó · 🔴 no me alcanzó.
 
 ---
 

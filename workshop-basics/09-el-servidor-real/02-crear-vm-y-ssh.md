@@ -70,6 +70,8 @@ Desglose:
 
 Tarda un par de minutos. Cuando termine, muestra un resumen con la **IP pública** de tu servidor.
 
+> 🧠 **Dónde quedó tu llave (la necesitarás en la Fase 10).** `--generate-ssh-keys` guardó tu **llave privada** en `~/.ssh/id_rsa` (en Windows: `%USERPROFILE%\.ssh\id_rsa`) y la **pública** en `~/.ssh/id_rsa.pub`. La privada es secreta y **nunca** se comparte; en la Fase 10 la usarás para que el despliegue automático entre al servidor. Si `ls ~/.ssh` te muestra otro nombre (p. ej. `id_ed25519`), ese es el tuyo.
+
 ### Paso 4: Abrir el puerto de la aplicación
 
 Por defecto el servidor solo deja entrar SSH. Tu API correrá en el puerto **5000** (lo definiste en el `docker-compose.yml` de la Fase 8), así que hay que abrirlo:
@@ -110,6 +112,8 @@ Para salir y volver a tu máquina, escribe `exit` (no lo hagas aún; lo usaremos
 - [ ] `az vm create` terminó y te dio una IP pública.
 - [ ] Abriste el puerto 5000 con `az vm open-port`.
 - [ ] Entraste al servidor con `ssh` y tu prompt muestra `azureuser@vm-app`.
+
+> 🚦 **Cómo te fue:** 🟢 lo hice y lo entendí · 🟡 me costó · 🔴 no me alcanzó.
 
 ---
 

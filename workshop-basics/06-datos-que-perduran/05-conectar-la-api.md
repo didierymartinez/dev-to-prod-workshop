@@ -70,8 +70,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 }
 ```
 
+> 🆕 **El constructor primario `Clase(args) : Base(...)`.** Es la primera vez que ves paréntesis **pegados al nombre de una clase**: `AppDbContext(DbContextOptions<AppDbContext> options)`. Significa "esta clase **recibe** `options` al crearse", y `: DbContext(options)` se los pasa a su clase base. ¿Quién le entrega esos `options`? La **inyección de dependencias** de la lección 6.4: tú registras el DbContext y el framework lo crea pasándole lo que necesita. (Verás la misma forma en `EmpresaRepositorioDb(AppDbContext db)` del Paso 3: recibe `db` por inyección.)
+
 - `DbSet<Empresa> Empresas` le dice a EF Core que habrá una tabla de empresas.
-- `OnModelCreating` afina detalles: el NIT es la llave primaria; la razón social es obligatoria y máximo 200 caracteres.
+- `OnModelCreating(ModelBuilder modelBuilder)` afina detalles de la tabla: `HasKey(x => x.Nit)` marca el NIT como **llave primaria**; `Property(...).IsRequired().HasMaxLength(200)` dice que la razón social es obligatoria y máximo 200 caracteres. No memorices la sintaxis; entiende que aquí **describes cómo debe ser la tabla**.
 
 ### Paso 3: La implementación de base de datos del repositorio
 
@@ -169,6 +171,10 @@ app.MapGet("/empresas", (IEmpresaRepositorio repo) => repo.ObtenerTodas());
 
 app.Run();
 ```
+
+> 🆕 **Las dos piezas nuevas del arranque.**
+> - `AddDbContext<AppDbContext>(opt => opt.UseNpgsql(...))` **registra la conexión**: le dice a la app cómo hablar con PostgreSQL, usando la connection string que sacas de `GetConnectionString("BaseDatos")` (la del `appsettings.Development.json`).
+> - El bloque `using (var scope = ...) ...Database.Migrate();` **aplica las migraciones al arrancar**: crea o actualiza las tablas antes de atender peticiones. No memorices su forma; su trabajo es "asegúrate de que la tabla exista al iniciar".
 
 > 🧠 **Este es el momento que preparamos en 6.4.** Para pasar de memoria a base de datos cambiaste la **línea de registro** (`AddSingleton…Memoria` → `AddScoped…Db`) y agregaste la conexión. Los **endpoints no se tocaron**. Eso es el valor de las interfaces y la inyección de dependencias.
 >

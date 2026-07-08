@@ -67,6 +67,8 @@ server {
 
 ### Paso 2: El frontend usa el mismo origen
 
+> 🧠 **¿De dónde sale el `frontend/`?** Es la carpeta que construiste en la **Fase 5** (`index.html`, `styles.css`, `app.js`), que vive en tu repositorio. Hasta ahora la abrías con Live Server en tu máquina; a partir de esta lección, el **gateway la servirá desde el servidor**, junto a la API. Por eso más abajo (Paso 4) la copiarás al servidor con `scp`.
+
 Como la página y la API estarán bajo la misma dirección, el frontend ya no necesita la URL absoluta. Edita `frontend/app.js` y cambia la primera línea:
 
 ```javascript
@@ -160,10 +162,14 @@ Tu sistema pasaría de `http://<IP>` a `https://empresas.tudominio.com`. Lo deja
 
 ## ✅ Compruébalo
 
+> 🔮 **Predice, luego compruébalo.** Pusiste un gateway delante. *¿Qué esperas ahora: que `http://<IP>` (puerto 80) muestre el panel? ¿que `http://<IP>:5000` siga respondiendo o no? ¿habrá error de CORS?* Escribe tus tres respuestas antes de probar.
+
 - [ ] `http://<IP>` (puerto 80) muestra el panel de empresas con datos.
 - [ ] En F12 → Console no hay error de CORS (la página y la API son el mismo origen).
 - [ ] `http://<IP>:5000` ya **no** responde (la API no está expuesta directamente).
 - [ ] Puedes explicar qué hace un gateway y cómo resuelve CORS desde la infraestructura.
+
+> 🚦 **Cómo te fue:** 🟢 acerté las predicciones y entendí el gateway · 🟡 me costó · 🔴 no me alcanzó.
 
 ---
 

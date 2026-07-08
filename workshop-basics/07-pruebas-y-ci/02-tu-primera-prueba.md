@@ -20,12 +20,14 @@ Las pruebas viven en su **propio proyecto**, aparte de la aplicación. Así no s
 
 Una prueba es un método marcado con `[Fact]` (un "hecho" que debe cumplirse). Dentro usa **`Assert`** para verificar resultados:
 
-- `Assert.NotNull(x)` → x no debe ser nulo.
-- `Assert.Null(x)` → x debe ser nulo.
+- `Assert.NotNull(x)` / `Assert.Null(x)` → x **no** debe / **sí** debe ser nulo.
+- `Assert.NotEmpty(lista)` → la lista no debe estar vacía.
 - `Assert.Equal(esperado, real)` → ambos deben ser iguales.
-- `Assert.True(condición)` → la condición debe ser verdadera.
+- `Assert.True(condición)` / `Assert.False(condición)` → la condición debe ser verdadera / falsa.
 
 Si un `Assert` no se cumple, la prueba falla y te dice qué esperaba.
+
+> 🆕 **El `!` después de una variable (`empresa!`).** En una prueba verás `empresa!.RazonSocial`. Ese `!` **pegado después** de la variable NO es el "no" de negar (ese va antes: `!activa`). Aquí significa *"yo sé que `empresa` no es nula, confía en mí"* — se usa cuando ya lo comprobaste con `Assert.NotNull` la línea anterior. Es distinto del `!` de la Fase 2.
 
 ---
 
@@ -123,6 +125,8 @@ Fíjate cómo cada prueba sigue **Preparar → Actuar → Verificar** (lo coment
 
 Desde la raíz del proyecto:
 
+> 🔮 **Predice, luego corre.** Escribiste **cinco** pruebas (`[Fact]`). *¿Cuántas crees que pasarán, si tu repositorio está bien hecho?* Corre `dotnet test` y compáralo.
+
 ```bash
 dotnet test
 ```
@@ -137,7 +141,7 @@ Passed!  - Failed: 0, Passed: 5, Skipped: 0, Total: 5
 
 ### Paso 4: Ver una prueba fallar (para reconocer el rojo)
 
-Para saber cómo se ve un fallo, cámbialo a propósito un momento: en la prueba `ObtenerPorNit_ConNitInexistente_DevuelveNull`, cambia `Assert.Null` por `Assert.NotNull`. Ejecuta `dotnet test`:
+> 🔨 **Rómpelo (para reconocer el rojo).** En la prueba `ObtenerPorNit_ConNitInexistente_DevuelveNull`, cambia `Assert.Null` por `Assert.NotNull`. **Predice:** ¿cuántas pruebas fallarán ahora, y cuál? Ejecuta `dotnet test`:
 
 ```
 Failed!  - Failed: 1, Passed: 4
@@ -163,9 +167,31 @@ Abre el **Pull Request** en GitHub y fusiónalo; luego vuelve a `main` y sincron
 
 ## ✅ Compruébalo
 
+**Que corre:**
 - [ ] `dotnet test` ejecuta y muestra `Passed: 5` (todas en verde).
 - [ ] Reconoces cómo se ve una prueba fallida (la provocaste y la corregiste).
+
+**Que entendiste:**
 - [ ] Puedes señalar las partes Preparar / Actuar / Verificar en una de tus pruebas.
+- [ ] Tu predicción de cuántas pasan/fallan coincidió en ambos casos (verde y rojo).
+
+> ✋ **Ahora tú.** Escribe una sexta prueba: que `Eliminar` con un NIT **inexistente** devuelva `false`. *(Usa `Assert.False(...)` y el patrón Preparar → Actuar → Verificar.)* Corre `dotnet test` y confirma `Passed: 6`.
+
+<details>
+<summary>👉 Muéstrame una forma de hacerlo</summary>
+
+```csharp
+[Fact]
+public void Eliminar_ConNitInexistente_DevuelveFalse()
+{
+    var repo = new EmpresaRepositorioMemoria();
+    var resultado = repo.Eliminar("000");
+    Assert.False(resultado);
+}
+```
+</details>
+
+> 🚦 **Cómo te fue:** 🟢 escribí la 6.ª prueba solo · 🟡 me costó / miré la solución · 🔴 no me alcanzó.
 
 ---
 

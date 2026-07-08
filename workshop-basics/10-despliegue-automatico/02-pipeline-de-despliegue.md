@@ -157,6 +157,8 @@ Cuando ambos trabajos estén en verde, visita `http://<IP>:5000/empresas`. La ap
 - [ ] La imagen aparece en tus **Packages** de GitHub (y la hiciste pública).
 - [ ] `http://<IP>:5000/empresas` responde, servido por la imagen desplegada automáticamente.
 
+> 🚦 **Cómo te fue:** 🟢 lo hice y entendí el pipeline · 🟡 me costó · 🔴 no me alcanzó.
+
 ---
 
 ## 🧠 Lo que aprendiste
@@ -169,6 +171,9 @@ Cuando ambos trabajos estén en verde, visita `http://<IP>:5000/empresas`. La ap
 ---
 
 ## 🆘 Si algo salió mal
+
+**`cat ~/.ssh/id_rsa` dice que el archivo no existe.**
+Es la llave que Azure generó en la Fase 9.2. Lista tu carpeta con `ls ~/.ssh` (Windows: `dir %USERPROFILE%\.ssh`) y usa el archivo **sin** `.pub` (la privada) — puede llamarse `id_rsa` o `id_ed25519`. Ese es el contenido que va en el secreto `VM_SSH_KEY`.
 
 **El trabajo "desplegar" falla con "denied" o "manifest unknown" al hacer pull.**
 La imagen sigue privada. Hazla **pública** (Paso 5) y vuelve a ejecutar.

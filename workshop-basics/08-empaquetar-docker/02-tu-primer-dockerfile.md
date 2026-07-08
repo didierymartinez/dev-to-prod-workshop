@@ -91,7 +91,7 @@ docker build -t gestion-empresas-api .
 ```
 
 - `docker build` construye la imagen siguiendo el Dockerfile.
-- `-t gestion-empresas-api` le pone un **nombre** (tag) a la imagen.
+- `-t gestion-empresas-api` le pone un **nombre** a la imagen (la `-t` es de *tag*). *(Más adelante, en la Fase 10, un "tag" también servirá para marcar la **versión**, como `:latest`. Aquí lo usamos solo como nombre.)*
 - El `.` final indica que el contexto de construcción es la carpeta actual.
 
 La primera vez tarda (descarga las imágenes base). Cuando termine, verifica que existe:
@@ -105,6 +105,8 @@ Debe aparecer tu imagen en la lista. **Acabas de empaquetar tu aplicación.**
 ### Paso 4: Probar que la imagen arranca
 
 Ejecuta un contenedor a partir de tu imagen:
+
+> 🔮 **Predice, luego corre.** Vas a arrancar **solo** la imagen de la API, sin la base de datos. *¿Crees que funcionará del todo, o le faltará algo?* Escribe tu respuesta y luego corre:
 
 ```bash
 docker run --rm -p 5000:8080 gestion-empresas-api
@@ -128,10 +130,16 @@ Abre el **Pull Request** en GitHub y fusiónalo; luego vuelve a `main` y sincron
 
 ## ✅ Compruébalo
 
+**Que corre:**
 - [ ] `docker build -t gestion-empresas-api .` termina sin errores.
 - [ ] `docker images gestion-empresas-api` muestra tu imagen.
 - [ ] Al correrla con `docker run`, la app arranca y (esperado) reclama la base de datos.
+
+**Que entendiste:**
+- [ ] Tu predicción (¿funciona sola?) coincidió, y sabes por qué le falta la base de datos.
 - [ ] Entiendes por qué usamos dos etapas (compilar con SDK, ejecutar con runtime ligero).
+
+> 🚦 **Cómo te fue:** 🟢 lo hice y lo entendí · 🟡 me costó · 🔴 no me alcanzó.
 
 ---
 

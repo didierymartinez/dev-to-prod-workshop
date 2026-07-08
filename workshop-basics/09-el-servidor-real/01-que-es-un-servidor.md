@@ -58,6 +58,8 @@ Responde con tus palabras:
 - [ ] ¿Qué significa "alquilar una máquina virtual en la nube"?
 - [ ] ¿Por qué usaremos una VM (IaaS) en este taller en vez de una opción más cómoda (PaaS)?
 
+> 🚦 **Cómo te fue:** 🟢 lo entendí y puedo explicarlo · 🟡 me costó · 🔴 no me alcanzó.
+
 ---
 
 ## 🧠 Lo que aprendiste

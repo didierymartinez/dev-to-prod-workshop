@@ -100,10 +100,11 @@ form.addEventListener("submit", async (evento) => {
 ```
 
 Desglose:
+- `form.addEventListener("submit", ...)` significa *"cuando el formulario se **envíe**, ejecuta esta función"*. `addEventListener` = "quédate atento a este evento y reacciona"; es como conectas comportamiento a algo de la página.
 - `evento.preventDefault()` evita el comportamiento por defecto del formulario (recargar la página).
 - `new FormData(form)` recoge lo que el usuario escribió; `Object.fromEntries(...)` lo convierte en un objeto cómodo.
-- En `fetch`, ahora pasamos un segundo argumento con `method`, `headers` y `body` — las mismas tres cosas de un POST en Postman.
-- Si la API responde bien (`respuesta.ok`), limpiamos el formulario y **recargamos la lista** llamando a `cargarEmpresas()` (la función de la lección 5.1). Si no, mostramos el mensaje de error que devuelve la API (recuerda la validación de la Fase 4).
+- En `fetch`, ahora pasamos un segundo argumento con `method`, `headers` y `body` — las mismas tres cosas de un POST en Postman. `JSON.stringify({...})` convierte tu objeto de C#… perdón, de JavaScript, en el **texto JSON** que viaja en el body (es el inverso de `respuesta.json()` de la 5.1).
+- Si la API responde bien (`respuesta.ok`), limpiamos el formulario y **recargamos la lista** llamando a `cargarEmpresas()` (la función de la lección 5.1). Si no, mostramos con `alert(...)` el mensaje de error que devuelve la API (recuerda la validación de la Fase 4).
 
 ### Paso 4: Probar
 
@@ -111,7 +112,7 @@ Con la API corriendo y la página abierta en Live Server:
 
 1. Llena el formulario (razón social, NIT, plan) y pulsa **Registrar**.
 2. La empresa nueva **aparece de inmediato** en el listado de abajo.
-3. Prueba el caso de error: deja la razón social vacía → el navegador te obliga a llenarla (`required`). Quítale el `required` mentalmente y manda un NIT pero sin razón social desde un caso límite: verás la alerta con el mensaje de la API (`400`).
+3. Prueba el caso de error. Primero, con el `required` puesto: deja la razón social vacía y pulsa Registrar → el **navegador** te obliga a llenarla (no llega a la API). Ahora, para ver el error de la **API**: en `index.html`, borra temporalmente la palabra `required` del `<input name="razonSocial">`, deja ese campo vacío y envía. La API responde **400** y aparece la alerta con su mensaje. Vuelve a poner el `required`.
 
 > 🧠 Acabas de conectar el formulario de tu página con la validación de tu API. La página propone, la API dispone: si los datos están mal, la API responde `400` y tu página muestra el porqué. Las dos capas trabajando juntas.
 
