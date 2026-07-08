@@ -63,6 +63,8 @@ Responde con tus palabras:
 - [ ] ¿Qué es una "red privada" y por qué una máquina sin IP pública es más segura?
 - [ ] ¿Qué hace el gateway y por qué es el único que mira a internet?
 
+> 🚦 **Cómo te fue:** 🟢 lo entendí y puedo explicarlo · 🟡 me costó · 🔴 no me alcanzó.
+
 ---
 
 ## 🧠 Lo que aprendiste

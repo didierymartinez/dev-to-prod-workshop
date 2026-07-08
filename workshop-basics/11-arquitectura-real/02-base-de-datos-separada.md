@@ -64,6 +64,8 @@ echo "App (privada): $IP_APP_PRIV   |   BD (privada): $IP_DB_PRIV"
 
 ### Paso 3: El firewall — solo la app puede hablarle a la BD
 
+> 🆕 **NSG = el firewall de Azure.** El "firewall" del que habló la lección 11.1, en Azure se llama **Network Security Group (NSG)**. Al crear `vm-db`, Azure creó automáticamente el suyo con el nombre `vm-dbNSG` (el nombre de la VM + `NSG`). Una **regla** de NSG dice qué tráfico se permite o se bloquea.
+
 Aunque `vm-db` ya es invisible desde internet, agregamos una regla explícita: al puerto de PostgreSQL (5432) solo puede entrar la IP privada de `vm-app`.
 
 ```bash
@@ -111,6 +113,8 @@ exit             # salir de vm-db (vuelves a tu máquina)
 ```
 
 ### Paso 5: Apuntar la app a la base de datos remota
+
+> ⚠️ **Ojo con los datos.** Esta base nueva (`vm-db`) arranca **vacía**. Las empresas que hayas registrado antes quedaron en el volumen de `vm-app` y **no se migran** aquí — es un entorno nuevo. En un caso real, migrar esos datos sería un paso aparte; para el taller, empezamos limpio.
 
 Ahora la API (en `vm-app`) debe conectarse a la base de datos de `vm-db`, no a una local. En tu máquina, edita `docker-compose.prod.yml`: **quita el servicio `db` y el volumen**, y deja que la API use la variable `DB_HOST`:
 
@@ -178,7 +182,9 @@ Visita `http://<IP>:5000/empresas`. La app funciona — pero ahora los datos viv
 - [ ] Desde tu máquina **no puedes** conectarte a la base de datos directamente (no hay IP pública a la cual apuntar) — esa es la protección.
 - [ ] Entiendes qué es un *jump host* y por qué entraste a `vm-db` a través de `vm-app`.
 
-> 💥 **Comprueba la protección (rompe y arregla):** borra la regla del firewall con `az network nsg rule delete -g rg-gestion-empresas --nsg-name vm-dbNSG -n PermitirPostgresDesdeApp` y reinicia la API (`docker compose ... up -d` en vm-app). En los logs verás que ya **no puede conectarse** a la base de datos. Vuelve a crear la regla (Paso 3). Así compruebas que el firewall es lo que autoriza el tráfico.
+> 🔨 **Rómpelo (comprueba la protección).** Borra la regla del firewall con `az network nsg rule delete -g rg-gestion-empresas --nsg-name vm-dbNSG -n PermitirPostgresDesdeApp` y reinicia la API (`docker compose ... up -d` en vm-app). **Antes, predice:** ¿la API seguirá conectándose a la base? En los logs verás que **ya no puede**. Vuelve a crear la regla (Paso 3). Así compruebas que el firewall es lo que autoriza el tráfico.
+
+> 🚦 **Cómo te fue:** 🟢 lo hice y entendí la separación + firewall · 🟡 me costó · 🔴 no me alcanzó.
 
 ---
 

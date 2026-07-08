@@ -95,6 +95,8 @@ Abre el **Pull Request** en GitHub y fusiónalo; luego vuelve a `main` y sincron
 - [ ] Reemplazaste `TU_USUARIO` por tu usuario de GitHub en minúsculas.
 - [ ] Puedes explicar por qué conviene que el servidor **descargue** la imagen en vez de construirla.
 
+> 🚦 **Cómo te fue:** 🟢 lo hice y lo entendí · 🟡 me costó · 🔴 no me alcanzó.
+
 ---
 
 ## 🧠 Lo que aprendiste

@@ -2,6 +2,8 @@
 
 > ⏱️ 40 minutos · 🎯 **Al terminar:** tendrás una página web con un diseño propio que intenta cargar las empresas desde tu API. Aprenderás a usar `fetch` desde el navegador y descubrirás un obstáculo real que resolverás en la siguiente lección.
 
+> 🧭 **Cómo se aprende aquí.** Es tu **primer JavaScript**, así que trae bastante sintaxis nueva. El HTML y el CSS los **copias** (no hay que memorizarlos); el JavaScript **te lo muestro y te explico pieza por pieza**. Antes de abrir la página, **predices** qué pasará — y el "fallo" que verás es, a propósito, el tema de la próxima lección.
+
 ---
 
 ## 🤔 El problema
@@ -157,13 +159,21 @@ cargarEmpresas();
 > - `try { ... } catch (error) { ... }`: intenta lo de `try`; si algo falla (API caída, sin red), salta a `catch` y muestra el mensaje en vez de romperse en silencio.
 > - `dibujar(...)` crea una tarjeta por empresa y la mete en el `<div id="listado">`.
 
+> 🆕 **Cómo `dibujar` construye las tarjetas (manipular la página desde JS).**
+> - `for (const e of empresas)` recorre la lista — es el `foreach` de C#, en JavaScript.
+> - `document.createElement("div")` crea un elemento nuevo; `.innerHTML = ...` le pone contenido; `listado.appendChild(card)` lo **mete** en la página. Así el JavaScript dibuja HTML sobre la marcha.
+> - Dentro del texto verás `${e.activa ? "activa" : "inactiva"}`: es el **ternario** de la Fase 2 (`condición ? a : b`), ahora en JavaScript.
+> - No memorices cada método del DOM; entiende la idea: *JS crea un pedazo de HTML por cada empresa y lo cuelga en la página*.
+
 ### Paso 4: Ver la página
 
 1. Asegúrate de que tu API esté corriendo: en una terminal, dentro de `src/GestionEmpresas.Api`, ejecuta `dotnet run`.
 2. En VS Code, clic derecho sobre `frontend/index.html` → **"Open with Live Server"**.
 3. Se abrirá el navegador en `http://127.0.0.1:5500/...`.
 
-Verás el **encabezado azul** y tu diseño… pero las tarjetas **no cargan**: aparece "❌ No se pudieron cargar".
+> 🔮 **Predice, luego mira.** Tu API corre y tu `fetch` apunta a ella. *¿Crees que las tarjetas de empresas cargarán, o algo lo impedirá?* Escribe tu respuesta antes de mirar la página.
+
+Verás el **encabezado azul** y tu diseño… pero las tarjetas **no cargan**: aparece "❌ No se pudieron cargar". (¿Lo predijiste? El porqué es el Paso 5.)
 
 ### Paso 5: Diagnosticar (no es un fracaso, es el siguiente tema)
 

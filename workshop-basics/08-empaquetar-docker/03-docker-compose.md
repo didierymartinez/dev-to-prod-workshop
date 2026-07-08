@@ -121,6 +121,8 @@ Para detener todo: `Ctrl+C`, o desde otra terminal `docker compose down`.
    ```
 4. Consulta `http://localhost:5000/empresas`.
 
+> 🔮 **Predice, luego compruébalo.** En la Fase 6, borrar el contenedor de la base **borraba** los datos. Ahora agregaste un **volumen**. *¿Crees que tus empresas sobrevivirán a este `down` + `up`?* Escribe tu respuesta antes de consultar.
+
 **Tus empresas siguen ahí.** Aunque borraste los contenedores, el **volumen** `empresas_pgdata` conservó los datos. Esto es lo que faltaba en la Fase 6: ahora la base de datos es confiable.
 
 Para borrar **también** los datos (empezar de cero), se usa la bandera `-v`:
@@ -148,10 +150,16 @@ Abre el **Pull Request** en GitHub y fusiónalo; luego vuelve a `main` y sincron
 
 ## ✅ Compruébalo
 
+**Que corre:**
 - [ ] `docker compose up --build` levanta la API y la base de datos juntas.
 - [ ] `http://localhost:5000/empresas` responde con datos.
 - [ ] Tras `docker compose down` y volver a `up`, los datos **siguen** (gracias al volumen).
-- [ ] Entiendes que `down -v` sí borra los datos, y que `Host=db` conecta por el nombre del servicio.
+
+**Que entendiste:**
+- [ ] Tu predicción (¿sobreviven al down/up con volumen?) coincidió.
+- [ ] Entiendes que `down -v` sí borra los datos, y que `Host=db` conecta por el **nombre del servicio**, no por `localhost`.
+
+> 🚦 **Cómo te fue:** 🟢 lo hice y lo entendí · 🟡 me costó · 🔴 no me alcanzó.
 
 ---
 

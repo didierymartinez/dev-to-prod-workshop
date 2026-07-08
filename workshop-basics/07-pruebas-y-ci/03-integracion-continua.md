@@ -93,6 +93,8 @@ Abre un **Pull Request** en GitHub. Verás aparecer, dentro del PR, una sección
 
 ¡Acabas de montar tu primer pipeline! Ahora, **cada cambio** que propongas será compilado y probado automáticamente por GitHub.
 
+> 🔮 **Predice, luego mira.** Tus pruebas pasan en tu máquina. *¿El check del CI en el Pull Request saldrá verde o rojo?* Espera a que el workflow corra en la pestaña del PR y compáralo.
+
 Fusiona el Pull Request.
 
 ### Paso 4 (recomendado): Exigir que el CI pase antes de fusionar
@@ -110,10 +112,17 @@ Ahora `main` está protegida: ningún Pull Request con el CI en rojo podrá fusi
 
 ## ✅ Compruébalo
 
+**Que corre:**
 - [ ] Existe el archivo `.github/workflows/ci.yml` en tu repositorio.
 - [ ] En la pestaña **Actions** de GitHub ves la ejecución del workflow con sus pasos en verde.
 - [ ] En el Pull Request apareció el check del CI y pasó.
 - [ ] (Opcional) Activaste la protección de rama para exigir el CI.
+
+**Que entendiste:**
+- [ ] Tu predicción (verde/rojo) coincidió, y sabes por qué.
+- [ ] Puedes explicar qué corre el CI y por qué son los **mismos** comandos `dotnet` de tu máquina.
+
+> 🚦 **Cómo te fue:** 🟢 lo hice y lo entendí · 🟡 me costó · 🔴 no me alcanzó.
 
 ---
 

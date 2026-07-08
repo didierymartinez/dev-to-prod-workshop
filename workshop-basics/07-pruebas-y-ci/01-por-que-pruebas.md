@@ -59,6 +59,8 @@ Responde con tus palabras:
 - [ ] ¿Cuáles son los tres pasos de casi toda prueba?
 - [ ] ¿Por qué probaremos la versión en memoria del repositorio?
 
+> 🚦 **Cómo te fue:** 🟢 lo entendí y puedo explicarlo · 🟡 me costó · 🔴 no me alcanzó.
+
 ---
 
 ## 🧠 Lo que aprendiste

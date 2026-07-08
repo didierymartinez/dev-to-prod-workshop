@@ -32,6 +32,8 @@ Entra al servidor (`ssh azureuser@$IP`) e instálalo con el script oficial:
 curl -fsSL https://get.docker.com | sudo sh
 ```
 
+> 🧠 Ese comando **descarga** el script oficial de instalación de Docker (`curl`) y lo **ejecuta como administrador** (`| sudo sh`). Es la forma recomendada por Docker para servidores Linux; no tienes que entender el script, solo saber qué hace la línea.
+
 Para poder usar Docker sin escribir `sudo` cada vez, agrega tu usuario al grupo `docker`:
 
 ```bash
@@ -96,6 +98,8 @@ docker compose logs api  # revisa que la API arrancó bien (Ctrl+C para salir de
 
 ### Paso 4: ¡Verlo desde internet!
 
+> 🔮 **Predice, luego míralo.** Tu API corre en el servidor. *¿Crees que responderá si abres su IP pública desde OTRO computador (no el tuyo)? ¿aunque cierres tu portátil?* Escribe tu respuesta.
+
 Desde tu navegador (en cualquier computador), visita — usando la IP pública de tu servidor:
 
 ```
@@ -114,6 +118,8 @@ http://<IP>:5000/empresas
 - [ ] Copiaste el proyecto con `scp` y existe `~/gestion-empresas` en el servidor.
 - [ ] `docker compose ps` muestra `api` y `db` en estado *Up*.
 - [ ] `http://<IP>:5000/empresas` responde con datos desde el navegador.
+
+> 🚦 **Cómo te fue:** 🟢 lo hice y entendí que ya no depende de mi máquina · 🟡 me costó · 🔴 no me alcanzó.
 
 ---
 

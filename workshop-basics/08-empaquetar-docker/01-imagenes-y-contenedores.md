@@ -61,6 +61,8 @@ Responde con tus palabras:
 - [ ] ¿Por qué una imagen corre igual en cualquier máquina con Docker?
 - [ ] ¿Dónde deben vivir los datos que no quieres perder, y por qué no dentro del contenedor?
 
+> 🚦 **Cómo te fue:** 🟢 lo entendí y puedo explicarlo · 🟡 me costó · 🔴 no me alcanzó.
+
 ---
 
 ## 🧠 Lo que aprendiste

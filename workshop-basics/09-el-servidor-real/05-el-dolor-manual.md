@@ -112,6 +112,8 @@ IP=$(az vm show -g rg-gestion-empresas -n vm-app -d --query publicIps -o tsv)
 - [ ] Puedes enumerar los pasos del despliegue manual y explicar por qué es frágil.
 - [ ] Apagaste la VM con `az vm deallocate`.
 
+> 🚦 **Cómo te fue:** 🟢 sentí el dolor del despliegue manual (y por qué urge automatizar) · 🟡 me costó · 🔴 no me alcanzó.
+
 ---
 
 ## 🧠 Lo que aprendiste

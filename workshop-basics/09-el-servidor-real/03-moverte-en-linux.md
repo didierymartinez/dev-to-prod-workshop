@@ -96,6 +96,8 @@ Sin mirar, intenta:
 - [ ] Actualizar la lista de paquetes e instalar uno (`sudo apt update`, `sudo apt install -y ...`).
 - [ ] Salir del servidor (`exit`) y volver a entrar (`ssh azureuser@$IP`).
 
+> 🚦 **Cómo te fue:** 🟢 me muevo en Linux sin consultar · 🟡 me costó · 🔴 no me alcanzó.
+
 ---
 
 ## 🧠 Lo que aprendiste

@@ -92,6 +92,8 @@ No hay código nuevo. Practica la chuleta sobre tu propio proyecto:
 - [ ] Entraste a la base de datos con `exec ... psql`.
 - [ ] Sabes la diferencia entre `down` (conserva datos) y `down -v` (los borra).
 
+> 🚦 **Cómo te fue:** 🟢 lo hice y lo entendí · 🟡 me costó · 🔴 no me alcanzó.
+
 ---
 
 ## 🧠 Lo que aprendiste

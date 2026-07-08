@@ -48,6 +48,8 @@ public bool Eliminar(string nit)
 
 Antes de subir, podrías correr las pruebas en tu máquina:
 
+> 🔮 **Predice, luego corre.** Estropeaste `Eliminar`. *¿Cuál de tus pruebas crees que fallará por esto?* Escribe su nombre y luego corre `dotnet test`.
+
 ```bash
 dotnet test
 ```
@@ -103,10 +105,17 @@ El CI vuelve a correr **solo** sobre el Pull Request. Ahora pasa: el check se po
 
 ## ✅ Compruébalo
 
+**Que corre:**
 - [ ] Introdujiste un bug y viste el check del CI en **rojo** en el Pull Request.
 - [ ] Pudiste ver, en "Details", qué prueba falló y por qué.
 - [ ] Corregiste el bug y viste el check pasar a **verde**.
+
+**Que entendiste:**
+- [ ] Predijiste qué prueba fallaría, y acertaste.
+- [ ] Puedes explicar por qué "el código roto se detiene en la puerta" y no en producción.
 - [ ] (Si activaste protección de rama) confirmaste que no se podía fusionar con el CI en rojo.
+
+> 🚦 **Cómo te fue:** 🟢 viví el ciclo completo y lo entendí · 🟡 me costó · 🔴 no me alcanzó.
 
 ---
 
