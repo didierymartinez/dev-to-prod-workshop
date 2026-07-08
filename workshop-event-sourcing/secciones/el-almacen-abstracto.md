@@ -51,7 +51,7 @@ public class SuspenderHandler(IEventStore store) : ICommandHandler<SuspenderEmpr
 
 La misma interfaz, dos motores detrás: uno real (Marten) para producción, uno en memoria para los tests.
 
-> 🛠️ **Inténtalo tú.** (1) `MartenEventStore` recibe una `IDocumentSession` y traduce cada método a Marten (lo que hacía el handler antes). (2) `TestStore` guarda los hechos en diccionarios en memoria y rehidrata **aplicando** los eventos al agregado.
+> 🛠️ **Inténtalo tú.** (1) `MartenEventStore` recibe una `IDocumentSession` y traduce cada método a Marten (lo que hacía el handler antes). (2) `TestStore` guarda los hechos en diccionarios en memoria y rehidrata **aplicando** los eventos al agregado. Como no puede tener un `switch` por evento (serviría a un solo agregado), usa **reflexión**: busca en el agregado el método `Apply(TEvento)` que calza con el tipo del evento y lo invoca —la misma convención `Apply` de [el swap](el-swap.md), llamada a mano—. Esa API (`GetMethods`/`Invoke`) es idioma nuevo: te la muestro en la solución.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>

@@ -16,7 +16,7 @@ Una **proyección** escucha los eventos y mantiene un documento al día. Aquí, 
 
 ### Paso 1 · El read model y la proyección
 
-> 🛠️ **Inténtalo tú.** (1) Un documento `ResumenEmpresa` (Id, Nombre, Plan, Suspendida). (2) Una proyección que lo **pliega** desde los eventos: `Create` para el primero, `Apply(evento, doc)` para los demás. (3) Regístrala **inline**.
+> 🛠️ **Inténtalo tú.** (1) Un documento `ResumenEmpresa` (Id, Nombre, Plan, Suspendida). (2) Una proyección que lo **pliega** desde los eventos: hazla heredar de `SingleStreamProjection<ResumenEmpresa, string>` (marcada `partial`), con `Create` para el primer evento y `Apply(evento, doc)` para los demás. (3) Regístrala **inline** con `opts.Projections.Add<...>(ProjectionLifecycle.Inline)`.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>

@@ -16,7 +16,9 @@ Marten ya reserva ese espacio (`Timestamp`, `CorrelationId`, `CausationId`, `Hea
 
 ### Paso 1 · Enciende la captura (es opt-in)
 
-> 🛠️ **Inténtalo tú.** En la config del store, enciende `MetadataConfig` para correlación, causación y headers.
+Tres piezas de metadata te interesan. La **correlación** (`CorrelationId`) es el hilo que une todo lo que ocurrió en una misma operación —una petición, un proceso masivo de morosos—: todo lo de esa operación comparte el mismo id. La **causación** (`CausationId`) apunta al comando o mensaje que causó *este* evento en concreto. Y los **headers** son extras libres, donde meterás el `user_id` (quién). Marten puede capturar las tres, pero vienen **apagadas**.
+
+> 🛠️ **Inténtalo tú.** En la config del store, enciende en `MetadataConfig` la captura de correlación, causación y headers.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -52,7 +54,7 @@ await session.SaveChangesAsync();
 </details>
 
 > [!NOTE]
-> 🆕 **En la sesión, no en el hecho.** `CorrelationId`/`CausationId` son propiedades de la sesión; `SetHeader(clave, valor)` mete extras (aquí `user_id`; en el repo real el usuario viaja como header). Es transversal: lo pones **una vez** por operación y **todos** los eventos de esa sesión lo llevan. La **correlación** es el hilo de la operación entera; la **causación** apunta al comando/mensaje que causó *este* evento — juntas encadenan comando → evento → evento para **trazar** qué pasó y por qué.
+> 🆕 **En la sesión, no en el hecho.** `CorrelationId`/`CausationId` son propiedades de la sesión; `SetHeader(clave, valor)` mete extras (aquí `user_id`; en el repo real el usuario viaja como header). Es transversal: lo pones **una vez** por operación y **todos** los eventos de esa sesión lo llevan. Correlación y causación, juntas, encadenan comando → evento → evento para **trazar** qué pasó y por qué.
 
 ### Paso 3 · Léela en cada evento
 

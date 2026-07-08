@@ -14,7 +14,9 @@ Si mandas el correo **dentro** del handler, atas dos cosas que no deberían ir j
 
 ### Paso 1 · La suscripción
 
-> 🛠️ **Inténtalo tú.** Una clase que herede de `SubscriptionBase`, se llame (`Name`), filtre `EmpresaSuspendida` (`IncludeType<T>()`), y en `ProcessEventsAsync` recorra el lote y ejecute tu efecto.
+Marten te da una clase base para esto, `SubscriptionBase`. Heredas de ella, le pones un `Name` (su identidad, donde guarda su checkpoint), filtras qué hechos te importan con `IncludeType<T>()`, y sobrescribes `ProcessEventsAsync`, al que el daemon te entrega los hechos en **lotes** (`page.Events`, cada uno un `IEvent` con su `Data`).
+
+> 🛠️ **Inténtalo tú.** Escribe esa clase: hereda de `SubscriptionBase`, ponle `Name`, filtra `EmpresaSuspendida` con `IncludeType<T>()`, y en `ProcessEventsAsync` recorre el lote y ejecuta tu efecto.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -50,7 +52,7 @@ public class EmailAlSuspender : SubscriptionBase
 </details>
 
 > [!NOTE]
-> 🆕 **`SubscriptionBase` + `ProcessEventsAsync`.** El daemon te entrega los hechos en **lotes** (`page.Events`, cada uno un `IEvent` con su `Data` y su metadata). `IncludeType<EmpresaSuspendida>()` filtra qué te llega. `Name` es su identidad (su checkpoint). Devuelves `NullChangeListener.Instance` salvo que necesites un gancho justo antes/después del commit del lote.
+> 🆕 **El lote y el retorno.** Cada `e` de `page.Events` es un `IEvent`: su `Data` es el hecho (`EmpresaSuspendida`), más su metadata (`StreamKey`, versión, …). Devuelves `NullChangeListener.Instance` salvo que necesites un gancho justo antes/después del commit del lote.
 
 ### Paso 2 · Regístrala en el daemon
 

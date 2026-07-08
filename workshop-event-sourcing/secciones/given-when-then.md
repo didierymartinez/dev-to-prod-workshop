@@ -25,7 +25,7 @@ Cada cambio: recompilar, correr, volver a leer. Y si el refactor a Marten hace q
 Para probarlo no necesitas ni base de datos ni mocks: tu `EventStore` vive en **RAM**, creas uno nuevo por test y es un doble perfecto. Un test es **sembrar → ejecutar → inspeccionar los hechos nuevos**.
 
 > [!NOTE]
-> 🆕 **xUnit.** Corre métodos marcados con `[Fact]`; `Assert.…` comprueba una condición y, si falla, el test se pone rojo. Se instala aparte y **referencia** tu proyecto: `dotnet new xunit -o GestionEmpresas.Tests` + `dotnet add GestionEmpresas.Tests reference GestionEmpresas.csproj`.
+> 🆕 **xUnit.** Corre métodos marcados con `[Fact]`; `Assert.…` comprueba una condición y, si falla, el test se pone rojo. Se instala aparte y **referencia** tu proyecto: `dotnet new xunit -o GestionEmpresas.Tests` + `dotnet add GestionEmpresas.Tests reference GestionEmpresas.csproj`. Tres piezas que usarás para afirmar el hecho nuevo: `.Skip(previos)` salta los hechos que ya había y deja solo los emitidos; `Assert.Single(lista)` afirma que hay **uno solo** y te lo devuelve; `Assert.IsType<T>(x)` afirma el tipo y te devuelve `x` ya convertido, para leer sus datos.
 
 ### Paso 1 · El primer test, a pelo
 
