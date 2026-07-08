@@ -201,7 +201,7 @@ El flujo del dominio queda claro: **cargar** (rehidratar el pasado) → **actuar
 Pero ese ciclo **cargar → actuar → guardar** está suelto en el `Program.cs`. En la próxima sección lo encapsulamos en una pieza con un solo trabajo: el **Command Handler**.
 
 > [!NOTE]
-> 🌱 **Semilla — el agregado terminará GUARDÁNDOSE sus propios hechos.** Hoy `CambiarPlan` **devuelve** el hecho y el handler lo archiva (`stream.Append(hecho)`). Funciona y deja todo a la vista. Pero las herramientas de producción usan otro modelo: el agregado **se aplica el hecho a sí mismo y lo recuerda** en una lista de *cambios sin confirmar*, y al final **un solo paso** los persiste todos juntos (en una transacción). Cuando afinemos el motor a su forma de producción **invertiremos** esto —de "devolver y que otro guarde" a "el agregado acumula y un middleware persiste"— en [El agregado que acumula](el-agregado-acumula.md). Por ahora, devolver el hecho es el peldaño correcto.
+> 🌱 **Semilla — el agregado terminará GUARDÁNDOSE sus propios hechos.** Hoy `CambiarPlan` **devuelve** el hecho y el handler lo archiva (`stream.Append(hecho)`). Funciona y deja todo a la vista. Pero las herramientas de producción usan otro modelo: el agregado **se aplica el hecho a sí mismo y lo recuerda** en una lista de *cambios sin confirmar*, y al final **un solo paso** los persiste todos juntos (en una transacción). Cuando afinemos el motor a su forma de producción **invertiremos** esto —de "devolver y que otro guarde" a "el agregado acumula y un middleware persiste"— en [El agregado de la plantilla](el-agregado-de-la-plantilla.md). Por ahora, devolver el hecho es el peldaño correcto.
 
 ---
 

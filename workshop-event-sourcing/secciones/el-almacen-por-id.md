@@ -186,7 +186,7 @@ Console.WriteLine($"emp-7: suspendida={andes.Suspendida}");
 Con esto, el id es **uno solo** que entregas **una vez**: se lo das al **almacén** al pedir el stream (`AbrirStream(id)`), y el **stream** se lo pasa en cada `GetEvents`/`AppendEvent` como la **llave del cajón**. No son varios ids; es uno que entregas una vez y viaja solo.
 
 > [!NOTE]
-> 🌱 **Semilla — este `EventStream` es un andamio.** Nos sirve para ver el ciclo (cargar → escribir). Pero el almacén de verdad (el que adoptaremos) **no te entrega un objeto así**: te da **directamente la empresa** rehidratada. Cuando lleguemos ahí, el `EventStream` **desaparece** ([El almacén directo](el-almacen-directo.md)). Es un peldaño, no la meta.
+> 🌱 **Semilla — este `EventStream` es un andamio.** Nos sirve para ver el ciclo (cargar → escribir). Pero el almacén de verdad (el que adoptaremos) **no te entrega un objeto así**: te da **directamente la empresa** rehidratada. Cuando lleguemos ahí, el `EventStream` **desaparece** (lo verás en [El swap](el-swap.md)). Es un peldaño, no la meta.
 
 ---
 
