@@ -41,7 +41,7 @@ opts.Events.Upcast<EmpresaRegistradaV1, EmpresaRegistrada>(
 > [!NOTE]
 > 🆕 **`Upcast<TVieja, TNueva>(func)`.** Marten, al leer un evento viejo, lo deserializa a `TVieja` y aplica tu función para producir `TNueva`. **Casa por el nombre del evento guardado**: con `EventNamingStyle.SmarterTypeName`, `EmpresaRegistradaV1` se guardó como `empresa_registrada_v1` — Marten **no** le quita el `V1`, y ese sufijo es tu **marca de versión** (distinto de `empresa_registrada`, el actual). El `"Colombia"` es el **valor legado**: sabes que todas las empresas viejas eran colombianas; el JSON no lo sabía, tú sí.
 
-> 🔍 **¿Lo lograste?** Mira `mt_events` en psql: las filas viejas siguen **idénticas** (`type = 'empresa_registrada_v1'`, sin `Pais`). Pero al rehidratar con `AggregateStreamAsync` (o `FetchStreamAsync`), tu `Empresa` recibe un `EmpresaRegistrada` **con `Pais = "Colombia"`**. La historia intacta; la traducción, solo al leer.
+> 🔍 **¿Lo lograste?** Mira `mt_events` en psql: las filas viejas siguen **idénticas** (`type = 'empresa_registrada_v1'`, sin `Pais`). Pero al rehidratar con `AggregateStreamAsync`, tu `Empresa` recibe un `EmpresaRegistrada` **con `Pais = "Colombia"`**. La historia intacta; la traducción, solo al leer.
 
 ### Paso 2 · Renombrar sin conservar la clase vieja
 
