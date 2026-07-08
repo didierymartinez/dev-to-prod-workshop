@@ -14,7 +14,7 @@ Recuerda la semilla de [El despachador](el-despachador.md): cada pieza se cablea
 
 ### Paso 1 · Registra las piezas (con su tiempo de vida)
 
-Pasas de un host de consola a un **host web** (`WebApplication`), y registras cada pieza **una vez**, diciendo cuánto vive.
+Pasas de un host de consola a un **host web** (`WebApplication`), y registras cada pieza **una vez**, diciendo cuánto vive. Ese *cuánto vive* es el **tiempo de vida** de la pieza: `Scoped` = una instancia **por petición** (nace con el request, muere al responder); *singleton* = una sola para toda la app. La **sesión** de Marten la quieres `Scoped` (una unidad de trabajo por petición); el `DocumentStore`, singleton.
 
 > 🛠️ **Inténtalo tú.** Con `WebApplication.CreateBuilder`: `AddMarten` (+ `UseLightweightSessions` para que la sesión sea **por petición**), registra `IEventStore → MartenEventStore` y el handler como **`Scoped`**, y (del daemon) mantén `AddAsyncDaemon`.
 
@@ -47,11 +47,14 @@ var app = builder.Build();
 </details>
 
 > [!NOTE]
-> 🆕 **El contenedor y los tiempos de vida.** `builder.Services` es el **contenedor de inyección de dependencias**: la lista de "cómo construir cada pieza". `AddScoped` = **una instancia por petición HTTP** (nace al llegar el request, muere al responder) — justo lo que quieres para la **sesión** de Marten (una unidad de trabajo por petición). `UseLightweightSessions` registra la `IDocumentSession` así. El `DocumentStore` (la fábrica) queda como **singleton**, uno para toda la app. Nadie hace `new`: el contenedor construye el grafo.
+> 🆕 **El contenedor.** `builder.Services` es el **contenedor de inyección de dependencias**: la lista de "cómo construir cada pieza". `AddScoped` registra las tuyas con el tiempo de vida por petición, y `UseLightweightSessions` registra así la `IDocumentSession` (la sesión por petición); el `DocumentStore` (la fábrica) queda **singleton**. Nadie hace `new`: el contenedor construye el grafo.
 
 ### Paso 2 · El endpoint pide su handler (y ya no hay `new`)
 
 Un endpoint declara qué necesita **en sus parámetros**; el contenedor lo **inyecta** ya construido.
+
+> [!NOTE]
+> 🆕 **Minimal API: `MapPost`.** Un **endpoint** es una ruta HTTP atada a una función. `app.MapPost("/empresas/{id}/suspender", ...)` dice: ante un `POST` a esa ruta, ejecuta esta función. El `{id}` sale de la URL, el cuerpo JSON se ata al `record SuspenderBody`, y `Results.Ok()` responde `200`. Es idioma nuevo de ASP.NET: te lo muestro. Fíjate en el único parámetro que **no** viene del HTTP —el `handler`—: ese lo inyecta el contenedor.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>

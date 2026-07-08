@@ -45,7 +45,7 @@ opts.Events.Upcast<EmpresaRegistradaV1, EmpresaRegistrada>(
 
 ### Paso 2 · Renombrar sin conservar la clase vieja
 
-La misma función tipada también **renombra** campos (`new EmpresaRegistrada(Nombre: vieja.RazonSocialAntigua, …)`). Pero si ya **borraste** la clase vieja del código, usas un upcaster de **JSON crudo**, que trabaja directo sobre lo guardado:
+La misma función tipada también **renombra** campos (`new EmpresaRegistrada(Nombre: vieja.RazonSocialAntigua, …)`). Pero si ya **borraste** la clase vieja del código, usas un upcaster de **JSON crudo**, que trabaja directo sobre lo guardado: recibe el `JsonDocument` del evento, lees sus campos con `RootElement.GetProperty("Campo").GetString()` y construyes la forma nueva a mano. Como ya no hay clase vieja de la que partir, le pasas el **nombre viejo del evento como texto**:
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>

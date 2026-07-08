@@ -16,7 +16,10 @@ Con `Inline`, cada `SaveChangesAsync` de un evento **corre las proyecciones ahí
 
 Cambias el ciclo de vida de la proyección a `Async`. Pero una proyección async no se actualiza sola: la corre un **daemon**, un worker en segundo plano. Y un worker necesita **dónde vivir** — un *host*. Por eso, en vez de crear el store a mano con `DocumentStore.For`, registras Marten en el host con **`AddMarten`** y le enciendes el daemon.
 
-> 🛠️ **Inténtalo tú.** Monta un host mínimo: `AddMarten` con tu misma config + la proyección en `ProjectionLifecycle.Async`, y `AddAsyncDaemon(DaemonMode.Solo)`.
+> [!NOTE]
+> 🆕 **El esqueleto de un host (idioma nuevo, te lo muestro).** Un host se arma siempre igual: `Host.CreateApplicationBuilder(args)` → registras servicios en `builder.Services` → `builder.Build()` → `await app.StartAsync()` (queda corriendo, y con él el daemon). Es la primera vez que lo ves; cópialo tal cual. Lo tuyo en el reto es solo el cableado de Marten.
+
+> 🛠️ **Inténtalo tú.** Sobre ese esqueleto: `AddMarten` con tu misma config pero con la proyección en `ProjectionLifecycle.Async`, y encadena `.AddAsyncDaemon(DaemonMode.Solo)`.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -46,7 +49,7 @@ await app.StartAsync();             // el daemon queda corriendo
 </details>
 
 > [!NOTE]
-> 🆕 **`AddMarten` + el host.** Es la primera vez que ves un **host** (`Host.CreateApplicationBuilder`) y **inyección de dependencias** (`AddMarten` mete Marten en el contenedor, en vez de tu `DocumentStore.For` a mano). El daemon lo **necesita**: es un servicio en segundo plano y vive dentro del host. Este es un host mínimo, solo para el daemon; crecerá cuando conviertas la app en un servicio.
+> 🆕 **`AddMarten` mete Marten en el contenedor.** Es la **inyección de dependencias**: `AddMarten` registra Marten en `builder.Services`, en vez de tu `DocumentStore.For` a mano. El daemon lo **necesita**: es un servicio en segundo plano que vive dentro del host. Y cuando quieras el store de vuelta, se lo **pides** al contenedor con `GetRequiredService<IDocumentStore>()` (lo usarás en el checkpoint). Este host es mínimo, solo para el daemon; crecerá cuando conviertas la app en un servicio.
 
 > [!NOTE]
 > 🆕 **`AddAsyncDaemon(DaemonMode.Solo)`.** Enciende el **daemon**: un worker que, en segundo plano, lee el stream de eventos y alimenta las proyecciones `Async`. `Solo` = un único daemon corriendo todas las proyecciones (hay otros modos para varias instancias; los dejas para después).

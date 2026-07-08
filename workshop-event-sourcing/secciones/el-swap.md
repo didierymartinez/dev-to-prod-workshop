@@ -35,7 +35,7 @@ var store = DocumentStore.For(opts =>
 
 Tu handler dejaba así el ciclo: `AbrirStream → Get → decidir → Append`. Con Marten es el mismo ciclo, con sus comandos:
 
-> 🛠️ **Inténtalo tú.** **🔁** Reescribe `SuspenderHandler`: en vez de recibir el `EventStore`, recibe una `IDocumentSession` de Marten (el contrato que cumple la `LightweightSession` que ya abriste: una sesión para leer y escribir). Rehidrata con `session.Events.AggregateStreamAsync<Empresa>(id)`, decide con el mismo `Suspender(...)`, y si hay hecho, `session.Events.Append(id, hecho)` + `SaveChangesAsync`. El `Handle` se vuelve `async` (Marten habla con Postgres).
+> 🛠️ **Inténtalo tú.** **🔁** Reescribe `SuspenderHandler`: en vez de recibir el `EventStore`, recibe una `IDocumentSession` de Marten (el contrato que cumple la `LightweightSession` que ya abriste: una sesión para leer y escribir). Rehidrata con `session.Events.AggregateStreamAsync<Empresa>(id)`, decide con el mismo `Suspender(...)`, y si hay hecho, `session.Events.Append(id, hecho)` + `SaveChangesAsync`. El `Handle` se vuelve `async` (Marten habla con Postgres) — y al volverse async cambia también el **contrato**: renombra `void Handle(T)` a `Task HandleAsync(T)`, tanto en el handler como en la interfaz `ICommandHandler<T>`.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>

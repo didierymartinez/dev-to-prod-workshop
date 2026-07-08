@@ -10,6 +10,8 @@ Que tu handler sea **una clase con un método `Handle`**, sin interfaz — Wolve
 
 ### Paso 1 · Borra la interfaz
 
+Hasta ahora `IEventStore` entraba por el **constructor** del handler. Con Wolverine puedes pedirla como **un parámetro más** del método `Handle`: él la inyecta al invocar (igual que inyectaba en el endpoint de [API + DI](api-inyeccion.md)).
+
 > 🛠️ **Inténtalo tú.** **🔁** Quita `: ICommandHandler<SuspenderEmpresa>` del handler. Déjalo como una clase con un método `Handle` que reciba el comando **y sus dependencias por parámetro**. Wolverine lo descubre por su nombre + el método.
 
 <details>
