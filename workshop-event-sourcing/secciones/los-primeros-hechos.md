@@ -151,7 +151,7 @@ Console.WriteLine($"{empresa.Nombre}: plan {empresa.Plan}, {(empresa.Suspendida 
 
 > 🔍 **¿Lo lograste?** Corre `dotnet run`: la empresa se reconstruye igual (misma salida de arriba), pero ahora el estado vive **dentro** de un objeto que lo protege — y `empresa.Plan = "X"` ni siquiera compila.
 
-Esa clase que es **dueña** de la coherencia de la empresa, y el **único punto autorizado** para tocarla, tiene un nombre en diseño de dominio: **Aggregate Root** (raíz del agregado). Nadie le cambia el plan a `Empresa` por fuera; se lo pide a `Empresa`. (La frontera del agregado se estudia en [El almacén directo](el-almacen-directo.md); por ahora, quédate con el nombre.)
+Esa clase que es **dueña** de la coherencia de la empresa, y el **único punto autorizado** para tocarla, tiene un nombre en diseño de dominio: **Aggregate Root** (raíz del agregado). Nadie le cambia el plan a `Empresa` por fuera; se lo pide a `Empresa`. (Esa frontera —que `Empresa` sea el único que decide— la construyes en [Decidir el futuro](decidir-el-futuro.md); por ahora, quédate con el nombre.)
 
 > [!NOTE]
 > 🌱 Mira ese `foreach` con cuatro `if (hecho is …)` dentro del constructor. Funciona hoy, pero **crecerá feo**: cada hecho nuevo es otro `if`, y el día que tengas una `Factura` además de la `Empresa`, copiarías todo este bucle. En la próxima sección lo vamos a **sentir doler** y lo evolucionaremos paso a paso — el código nos pedirá una forma mejor.
