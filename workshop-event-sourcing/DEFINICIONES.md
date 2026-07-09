@@ -54,8 +54,8 @@
 
 ## D. Formato fijo (dispositivos de una sección)
 
-- `# H1` con título en el idioma del alumno + intro corta que engancha con la sección anterior.
-- `## 🎯 El Objetivo` — una frase de logro.
+- `# H1` con título en el idioma del alumno + **intro corta (1-2 frases): un gancho con la sección anterior, NO un re-enunciado del 💥 dolor ni del 🎯**. *Caso: el intro de Given-When-Then repetía «verificabas a ojo, no avisa» (el dolor) y «red de seguridad» (el objetivo) → se recortó a un gancho.*
+- `## 🎯 El Objetivo` — una frase de logro **en términos que el alumno YA conoce**: no nombres un concepto/API/sección que llega después como si se supiera; descríbelo en llano. *Caso: el 🎯 nombraba «Given/When/Then», «Marten» y «el swap» antes de que existieran → se reescribió como «dado/cuando/entonces» y «cambiar el motor por debajo».*
 - `## 💥 El dolor` — el problema sentido (el único lugar donde la prosa de motivación es obligatoria).
 - `## 🔧 …` — el trabajo, con retos **🛠️ Inténtalo tú** (example-first, regla B1) + solución en `<details><summary>👉 Muéstrame una forma de hacerlo</summary>`.
 - `> 🆕 **Idioma de C#…**` — cajas para sintaxis nueva del lenguaje, en su primer uso.
@@ -69,16 +69,29 @@
 - Archivos = slugs sin número bajo `secciones/`; el orden vive en `MAPA.md` y la cadena ⬅️/➡️; las citas entre secciones son enlaces por título.
 - **Validación determinista:** `bash tools/validate-workshop.sh workshop-event-sourcing --strict-links` → **0 errores**, siempre, después de cada cambio.
 
+## F. El reto (🛠️) — cómo se escribe una instrucción intentable
+
+El reto es donde más se rompe la pedagogía. Un reto es una **instrucción para que el alumno lo intente**, no el resumen de la solución ni una lista de piezas a transcribir. Checklist:
+
+1. **Example-first (= B1).** Abre con la **línea/uso** que el alumno quiere lograr (`Given(new EmpresaRegistrada(...))`); luego "haz que funcione". La meta se ve antes que la mecánica.
+2. **Verbos concretos, no vagos.** Di QUÉ hacer con verbos de acción ("**abre** el stream de `AggregateId`, le **agrega** los hechos, **recuerda** cuántos había"), nunca "un método que **siembre**" / "que haga X". *Caso: "`Given(params object[])` que siembre" no decía sembrar qué ni dónde.*
+3. **Cada pieza de la solución, pedida o explicada ANTES.** Si el `<details>` usa `_previos`, `AggregateId`, `params`, un campo o un `using`, el reto (o una 🆕 previa) lo **nombra y motiva**. Cero sorpresas en la solución. *Caso: `_previos` y `AggregateId` aparecían en la solución sin que el reto los pidiera.*
+4. **No sobre-prescribas.** No impongas estructura ni una firma exacta cuando **da igual** (archivo nuevo vs. mismo archivo, `params` vs. `object[]`): deja la decisión libre, o di el porqué. *Caso: "en un archivo nuevo `HandlerTest.cs`" imponía separar archivos sin necesidad.*
+5. **La guía va ANTES del `<details>`, nunca después.** La 🆕 que explica una API/concepto **nuevo o inguessable** precede al reto. Si la explicación llega tras la solución, el alumno solo puede **copiar**. *Caso emblemático (auditoría de 11 retos): las 🆕 de `MetadataConfig`, la reflexión del `TestStore`, `MapPost`, `SubscriptionBase`… venían tras el `<details>`.*
+6. **Idioma nuevo se MUESTRA, no se reta (= D/🆕).** Si la API es inguessable (flags de config, el andamiaje de un host, minimal API), **muéstrala**; reta solo lo que el alumno puede intentar por patrón. Si aparece reflexión/`dynamic`, enmárcalo con honestidad ("es la maquinaria que el framework esconde").
+7. **Un miembro `abstract` se anuncia junto a su `override`.** Añadir un miembro abstracto a una base sin implementarlo en la subclase **no compila**; el reto pide **ambas** ediciones antes de correr. *Caso: `abstract Handler` en el Paso 3 de Given-When-Then.*
+8. **Evolutivo, una pieza por paso (= B2).** No entregues una clase/base entera de golpe: constrúyela o transfórmala **un miembro por paso**, verde en cada uno; el alumno ve la pieza **emerger** de lo que ya tenía. *Caso: `HandlerTest` se tiraba completa; se rehízo extrayendo Given → When → Then, uno por paso.*
+
 ## E. Los agentes y el flujo de validación
 
 | Agente | Lente | Cuándo corre |
 |---|---|---|
-| **revisor-estilo** (nuevo) | La pluma y el método: reglas A y B de este documento (ironía, redundancia, jerga, meta-refs, teasers, frases apiladas, retos example-first, semillas concretas) | Al terminar **cada sección** |
+| **revisor-estilo** | La pluma y el método: reglas A, B y **F** (ironía, redundancia, jerga, meta-refs, teasers, frases apiladas, **retos: example-first, verbos concretos, sin sobre-prescribir, guía-antes-del-`<details>`, arranque=gancho**, semillas concretas) | Al terminar **cada sección** |
 | **revisor-coherencia** | El hilo entre secciones: progresión, nada usado antes de explicarse, naming/dominio consistente (reglas C) | Al terminar **cada bloque** |
-| **revisor-principiante** | La cabeza del alumno: fricción operativa + motivos no demostrados + preguntas ignoradas | En secciones con conceptos nuevos densos, o ante dudas de claridad |
-| **verificador-tecnico** | El código: compila (.NET 10, Marten 9, Wolverine), fiel a la doc oficial, buenas prácticas | Al terminar **cada bloque** |
-| **verificador-e2e** | Los pasos reales (Docker, Postgres, Rabbit, Azure): los sigue como un alumno | Solo en **hitos** (fin de bloques 4, 7 y 9) — costoso |
+| **revisor-principiante** | La cabeza del alumno: fricción + motivos no demostrados + **conceptos asumidos / usados antes de ganarse** + **guía tras la solución** + **piezas sorpresa en el `<details>`** + preguntas ignoradas | Al terminar **cada sección** con conceptos nuevos |
+| **verificador-tecnico** | El código: compila (.NET 10, Marten 9, Wolverine), fiel a la doc oficial, buenas prácticas | Al terminar **cada sección** con código nuevo |
+| **verificador-e2e** | Los pasos reales (Docker, Postgres, Rabbit, Azure): los sigue como un alumno | Solo en **hitos** — costoso |
 
-**Pipeline por sección:** escribir → validador (0 errores) → `revisor-estilo`.
-**Pipeline por bloque:** + `revisor-coherencia` + `verificador-tecnico` (+ `revisor-principiante` si hay dudas).
-**Hitos (bloques 4, 7, 9):** + `verificador-e2e` contra infra real.
+**Pipeline por sección: el skill `revisar-seccion`** — corre validador + `revisor-estilo` + `revisor-principiante` + `verificador-tecnico` sobre la sección y consolida los hallazgos. Es la forma estándar de cerrar cada sección (reemplaza correr los agentes a mano).
+**Pipeline por bloque:** + `revisor-coherencia` sobre el bloque.
+**Hitos:** + `verificador-e2e` contra infra real.
