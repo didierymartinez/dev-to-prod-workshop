@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Cosmos.BuildingBlocks\Cosmos.EventSourcing.Abstractions\Cosmos.EventSourcing.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\Cosmos.BuildingBlocks\Cosmos.EventDriven.Abstractions\Cosmos.EventDriven.Abstractions.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

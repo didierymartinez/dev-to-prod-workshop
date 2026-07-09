@@ -1,0 +1,22 @@
+# Base de datos de la plataforma Academia (eventos de progreso de los alumnos).
+# Puerto 5433 para no chocar con el Postgres 5432 que usa el taller mismo.
+services:
+  academia-db:
+    image: postgres:17-alpine
+    container_name: academia-db
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: academia
+      POSTGRES_USER: academia
+      POSTGRES_PASSWORD: dev_local_pwd
+    volumes:
+      - academia-datos:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U academia -d academia"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  academia-datos:

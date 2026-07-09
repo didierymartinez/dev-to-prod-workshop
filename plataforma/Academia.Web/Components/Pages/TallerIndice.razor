@@ -1,0 +1,38 @@
+@page "/taller/{Slug}"
+@using Academia.Web.Servicios
+@inject CatalogoDeTalleres Catalogo
+
+<PageTitle>@(_taller?.Nombre ?? "Taller")</PageTitle>
+
+@if (_taller is null)
+{
+    <p>Taller no encontrado.</p>
+}
+else
+{
+    <h1>@_taller.Nombre</h1>
+    <ol>
+        @foreach (var seccion in _taller.Secciones.Where(s => s.Orden >= 0))
+        {
+            <li><a href="/seccion/@_taller.Slug/@seccion.Slug">@seccion.Titulo</a></li>
+        }
+    </ol>
+
+    @if (_taller.Secciones.Any(s => s.Orden < 0))
+    {
+        <h3>Fuera de la cadena</h3>
+        <ul>
+            @foreach (var seccion in _taller.Secciones.Where(s => s.Orden < 0))
+            {
+                <li><a href="/seccion/@_taller.Slug/@seccion.Slug">@seccion.Titulo</a></li>
+            }
+        </ul>
+    }
+}
+
+@code {
+    [Parameter] public string Slug { get; set; } = "";
+    private Academia.Contenido.Taller? _taller;
+
+    protected override void OnParametersSet() => _taller = Catalogo.PorSlug(Slug);
+}

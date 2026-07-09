@@ -1,0 +1,77 @@
+@page "/"
+@rendermode InteractiveServer
+@using Academia.Dominio
+@using Academia.Web.Servicios
+@using Cosmos.EventSourcing.Abstractions.Commands
+@inject CatalogoDeTalleres Catalogo
+@inject ICommandRouter Comandos
+@inject NavigationManager Nav
+
+<PageTitle>Academia Cosmos</PageTitle>
+
+<h1>Academia Cosmos</h1>
+<p>Los talleres se cursan <strong>en tu máquina</strong>, con tus herramientas reales.
+   Aquí lees las secciones, y tu <code>git push</code> registra el avance:
+   la IA valida que entendiste el <em>porqué</em>, no solo que copiaste.</p>
+
+<h2>Talleres</h2>
+<ul>
+    @foreach (var taller in Catalogo.Todos)
+    {
+        <li>
+            <a href="/taller/@taller.Slug">@taller.Nombre</a>
+            <small>(@taller.Secciones.Count(s => s.Orden >= 0) secciones)</small>
+        </li>
+    }
+</ul>
+
+<h2>Inscribirme / retomar</h2>
+<div style="max-width: 480px; display: grid; gap: .5rem;">
+    <input placeholder="Tu identificador (ej. didier)" @bind="_alumno" />
+    <select @bind="_taller">
+        @foreach (var t in Catalogo.Todos)
+        {
+            <option value="@t.Slug">@t.Nombre</option>
+        }
+    </select>
+    <input placeholder="URL de tu repo (https://github.com/usuario/repo)" @bind="_repo" />
+    <button @onclick="Inscribir" disabled="@_ocupado">@(_ocupado ? "Inscribiendo…" : "Empezar / retomar")</button>
+    @if (_error is not null)
+    {
+        <p style="color: crimson">@_error</p>
+    }
+</div>
+
+@code {
+    private string _alumno = "";
+    private string _taller = "";
+    private string _repo = "";
+    private bool _ocupado;
+    private string? _error;
+
+    protected override void OnInitialized() =>
+        _taller = Catalogo.Todos.FirstOrDefault()?.Slug ?? "";
+
+    private async Task Inscribir()
+    {
+        _error = null;
+        if (string.IsNullOrWhiteSpace(_alumno) || string.IsNullOrWhiteSpace(_repo))
+        {
+            _error = "Falta tu identificador o la URL del repo.";
+            return;
+        }
+
+        _ocupado = true;
+        try
+        {
+            await Comandos.InvokeAsync(
+                new InscribirAlumno(_alumno.Trim(), _taller, _repo.Trim()), CancellationToken.None);
+            Nav.NavigateTo($"/progreso/{_alumno.Trim()}/{_taller}");
+        }
+        catch (Exception ex)
+        {
+            _error = $"No se pudo inscribir: {ex.Message}";
+        }
+        finally { _ocupado = false; }
+    }
+}

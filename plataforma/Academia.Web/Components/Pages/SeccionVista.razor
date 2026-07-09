@@ -1,0 +1,95 @@
+@page "/seccion/{TallerSlug}/{Slug}"
+@rendermode InteractiveServer
+@using Academia.IA
+@using Academia.Web.Servicios
+@inject CatalogoDeTalleres Catalogo
+@inject AsistenteDeSeccion Asistente
+
+<PageTitle>@(_seccion?.Titulo ?? "Sección")</PageTitle>
+
+@if (_seccion is null)
+{
+    <p>Sección no encontrada.</p>
+}
+else
+{
+    <div style="display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: 2rem; align-items: start;">
+        <article>
+            @((MarkupString)_html)
+            <hr />
+            <nav style="display: flex; justify-content: space-between;">
+                <span>@if (_seccion.SlugAnterior is not null)
+                      { <a href="/seccion/@TallerSlug/@_seccion.SlugAnterior">⬅️ Anterior</a> }</span>
+                <span>@if (_seccion.SlugSiguiente is not null)
+                      { <a href="/seccion/@TallerSlug/@_seccion.SlugSiguiente">Siguiente ➡️</a> }</span>
+            </nav>
+        </article>
+
+        <aside style="position: sticky; top: 1rem; border: 1px solid #ddd; border-radius: 8px; padding: 1rem;">
+            <h3 style="margin-top: 0">🧭 Asistente</h3>
+            <p style="font-size: .85rem; color: #666">Te guía sin revelarte las soluciones de los retos.</p>
+            <div style="max-height: 50vh; overflow-y: auto; display: grid; gap: .5rem;">
+                @foreach (var turno in _conversacion)
+                {
+                    <div style="background: @(turno.EsAlumno ? "#eef" : "#f5f5f5"); border-radius: 6px; padding: .5rem .75rem; white-space: pre-wrap;">@turno.Texto</div>
+                }
+                @if (_respondiendo && _parcial.Length > 0)
+                {
+                    <div style="background: #f5f5f5; border-radius: 6px; padding: .5rem .75rem; white-space: pre-wrap;">@_parcial</div>
+                }
+            </div>
+            <div style="display: flex; gap: .5rem; margin-top: .75rem;">
+                <input style="flex: 1" placeholder="Pregunta sobre esta sección…" @bind="_pregunta"
+                       @onkeydown="@(e => { if (e.Key == "Enter") _ = Preguntar(); })" disabled="@_respondiendo" />
+                <button @onclick="Preguntar" disabled="@_respondiendo">@(_respondiendo ? "…" : "→")</button>
+            </div>
+        </aside>
+    </div>
+}
+
+@code {
+    [Parameter] public string TallerSlug { get; set; } = "";
+    [Parameter] public string Slug { get; set; } = "";
+
+    private Academia.Contenido.Seccion? _seccion;
+    private string _html = "";
+    private readonly List<TurnoDeChat> _conversacion = [];
+    private string _pregunta = "";
+    private string _parcial = "";
+    private bool _respondiendo;
+
+    protected override void OnParametersSet()
+    {
+        _seccion = Catalogo.PorSlug(TallerSlug)?.Secciones.FirstOrDefault(s => s.Slug == Slug);
+        _html = _seccion is null ? "" : Markdig.Markdown.ToHtml(_seccion.CuerpoMarkdown);
+        _conversacion.Clear();
+    }
+
+    private async Task Preguntar()
+    {
+        if (_seccion is null || _respondiendo || string.IsNullOrWhiteSpace(_pregunta)) return;
+
+        _conversacion.Add(new TurnoDeChat(EsAlumno: true, _pregunta.Trim()));
+        _pregunta = "";
+        _parcial = "";
+        _respondiendo = true;
+        try
+        {
+            await foreach (var trozo in Asistente.ResponderAsync(_seccion, _conversacion))
+            {
+                _parcial += trozo;
+                StateHasChanged();
+            }
+            _conversacion.Add(new TurnoDeChat(EsAlumno: false, _parcial));
+        }
+        catch (Exception ex)
+        {
+            _conversacion.Add(new TurnoDeChat(EsAlumno: false, $"(El asistente no está disponible: {ex.Message})"));
+        }
+        finally
+        {
+            _parcial = "";
+            _respondiendo = false;
+        }
+    }
+}
