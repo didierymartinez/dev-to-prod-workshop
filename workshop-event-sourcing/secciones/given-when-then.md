@@ -1,40 +1,54 @@
 # Blindar el motor: Given-When-Then
 
-Tienes el motor de event sourcing completo, y hasta ahora lo probaste corriendo el `Main` y mirando la consola con los ojos. Pero vas a refactorizarlo en serio —quitar tu almacén casero y meter Marten en su lugar—, y "mirar a ojo" no te avisará si en el camino rompes una regla. Antes de tocar el motor te construyes una **red de seguridad**: tests que fijan el comportamiento de hoy y que, cuando cambies el motor, **volverás a correr para probar que nada cambió**.
+Tienes el motor de event sourcing completo, y vas a refactorizarlo en serio: cambiar tu almacén casero por Marten (una librería de persistencia real, que llega en las próximas secciones). Antes de tocarlo, hay que **blindarlo** — que un cambio no lo rompa sin que te enteres.
 
 ## 🎯 El Objetivo
 
-Una base de test **Given / When / Then** que fije el comportamiento del motor — escrita de modo que los **mismos escenarios sobrevivan al swap** (corran igual contra Marten, sin tocarlos).
+Una **red de seguridad** de pruebas para tu motor: cada escenario afirma que **dados** unos hechos previos, **cuando** llega un comando, **entonces** se emiten estos hechos. Afirma **qué pasó** (los eventos), no **cómo se guarda** — así los mismos escenarios sobreviven a cambiar el motor por debajo, sin reescribirlos.
 
-## 💥 El dolor: probar a ojo no escala
+## 💥 El dolor: probar a ojo no avisa
 
-Cada cambio que haces lo verificas así: `dotnet run`, y lees la consola.
+Llevas varias secciones verificando igual: `dotnet run`, leer la consola, y decidir **tú** si lo que salió es lo correcto. Funciona para una regla, pero es manual y —peor— es **silencioso**: si al refactorizar el motor `Suspender` deja de emitir su hecho, la consola no grita; imprime algo un poco distinto que quizá no notes. Y vas a mover el motor **entero**. Necesitas algo que te avise **solo** cuando algo se rompa.
 
-```csharp
-// en Program.cs: siembras, ejecutas, y LEES para ver si salió bien
-var store = new EventStore();
-store.AbrirStream<Empresa>("emp-7").Append(new EmpresaRegistrada("Constructora Andes", "Básico"));
-new SuspenderHandler(store).Handle(new SuspenderEmpresa("emp-7", "falta de pago"));
-Console.WriteLine(store.AbrirStream<Empresa>("emp-7").Get().Suspendida);   // ¿true? … míralo tú
+## 🔧 El motor se prueba a sí mismo, en RAM
+
+Tu `EventStore` ya vive en memoria: creas uno nuevo por test y no montas nada más. Un test es **sembrar → ejecutar → inspeccionar los hechos nuevos**.
+
+**Crea el proyecto de tests como hermano del tuyo — no dentro.** Un proyecto .NET compila todos los `.cs` bajo su carpeta; si el de tests queda anidado en `Empresas.Historia/`, tu proyecto se lo traga y no compila. Créalo desde tu **carpeta de trabajo** (la del `.git`):
+
+```bash
+# parado en tu carpeta de trabajo (la del .git) — NO dentro de Empresas.Historia/
+dotnet new xunit -o Empresas.Historia.Tests
+dotnet add Empresas.Historia.Tests reference Empresas.Historia/Empresas.Historia.csproj
 ```
 
-Cada cambio: recompilar, correr, volver a leer. Y si el refactor a Marten hace que `Suspender` deje de emitir el hecho, **la consola no grita** — imprime algo un poco distinto que quizá no notes. Vas a mover el motor entero; necesitas algo que te avise **solo**.
+Debe quedar así, los dos como **hermanos**:
 
-## 🔧 Tu motor es su propio doble
+```
+tu-carpeta/                    (aquí está el .git)
+├── Empresas.Historia/         ← tu proyecto
+└── Empresas.Historia.Tests/   ← los tests
+```
 
-Para probarlo no necesitas ni base de datos ni mocks: tu `EventStore` vive en **RAM**, creas uno nuevo por test y es un doble perfecto. Un test es **sembrar → ejecutar → inspeccionar los hechos nuevos**.
+Los tests los corres con `dotnet test Empresas.Historia.Tests`.
 
 > [!NOTE]
-> 🆕 **xUnit.** Corre métodos marcados con `[Fact]`; `Assert.…` comprueba una condición y, si falla, el test se pone rojo. Se instala aparte y **referencia** tu proyecto: `dotnet new xunit -o GestionEmpresas.Tests` + `dotnet add GestionEmpresas.Tests reference GestionEmpresas.csproj`. Tres piezas que usarás para afirmar el hecho nuevo: `.Skip(previos)` salta los hechos que ya había y deja solo los emitidos; `Assert.Single(lista)` afirma que hay **uno solo** y te lo devuelve; `Assert.IsType<T>(x)` afirma el tipo y te devuelve `x` ya convertido, para leer sus datos.
+> 🆕 **Un test corre solo.** Corre `dotnet test Empresas.Historia.Tests`: el `[Fact]` de ejemplo que trae el template **pasa** — y **nadie lo llamó**. A diferencia de tu `Main`, xUnit encuentra los métodos `[Fact]` y los ejecuta él mismo (*test discovery*). Borra el ejemplo (`UnitTest1.cs`); el tuyo va ahí.
 
 ### Paso 1 · El primer test, a pelo
 
-> 🛠️ **Inténtalo tú.** Un `[Fact]` que: crea un `EventStore`, **siembra** un `EmpresaRegistrada` para `"emp-7"` (guarda cuántos hechos había), **ejecuta** `new SuspenderHandler(store).Handle(new SuspenderEmpresa("emp-7", "falta de pago"))`, y afirma que el hecho **nuevo** es un `EmpresaSuspendida` con ese motivo.
+En `Empresas.Historia.Tests/`, crea `SuspenderEmpresaTests.cs`: una clase pública con un método `[Fact]`. Hace lo de siempre —sembrar → ejecutar → inspeccionar— pero **afirmando** con `Assert`, no imprimiendo.
+
+> [!NOTE]
+> 🆕 **Tres piezas de xUnit para afirmar el hecho nuevo.** `.Skip(previos)` salta los hechos que ya había y deja solo los emitidos. `Assert.Single(lista)` afirma que hay **uno solo** y te lo devuelve. `Assert.IsType<T>(x)` afirma el tipo y te devuelve `x` ya convertido, para leer sus datos.
+
+> 🛠️ **Inténtalo tú.** Un `[Fact]` que: crea un `EventStore`, **siembra** un `EmpresaRegistrada` para `"emp-7"` (guarda cuántos hechos había), **ejecuta** el `SuspenderHandler` con `SuspenderEmpresa("emp-7", "falta de pago")`, y afirma que el hecho **nuevo** es un `EmpresaSuspendida` con ese motivo.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```csharp
+// Empresas.Historia.Tests/SuspenderEmpresaTests.cs
 using Xunit;
 
 public class SuspenderEmpresaTests
@@ -56,48 +70,125 @@ public class SuspenderEmpresaTests
 ```
 </details>
 
-Funciona (`dotnet test` → verde), pero míralo: crear el store, sembrar, guardar el conteo, ejecutar, `Skip`, `Select`, comparar. Seis líneas de andamiaje para una sola idea. Y **todos** los tests de event sourcing tienen la misma forma: unos hechos previos, un comando, y los hechos que esperas. Destilemos esa forma.
+> 🔨 **Rómpelo.** `dotnet test Empresas.Historia.Tests` → **`Passed: 1`**. Ahora cambia el motivo esperado a `"otro"`, corre, y míralo **rojo**; devuélvelo y vuelve al verde. Eso confirma que el test **vigila** — algo que "mirar a ojo" no hacía.
 
-### Paso 2 · Destila la gramática (y hazla swappeable)
+Funciona. Pero mira el cuerpo: seis líneas de andamiaje —crear el store, sembrar, contar, ejecutar, `Skip`/`Select`, comparar— envuelven **una** idea. Y **todos** los tests de event sourcing tienen la **misma forma**: unos hechos previos, un comando, los hechos que esperas. Vas a subir ese andamiaje a una **base** — pero **una pieza por paso**, viendo tu test encoger.
+
+### Paso 2 · Sube el sembrado → nace `Given`
+
+La primera pieza que se repetirá en todo test: **sembrar los hechos previos**. Súbela a una clase base. La base y tus tests son **clases separadas, en archivos separados**, las dos dentro del proyecto de tests; tu `Program.cs` de producción **no se toca**.
+
+> 🛠️ **Inténtalo tú.** Quieres que el test abra diciendo *dados estos hechos previos*: `Given(new EmpresaRegistrada(...))`. Sube el sembrado a una base `HandlerTest<TCommand>` (ponla en el proyecto de tests — mismo archivo del test u otro, da igual). La base guarda el `EventStore` y el id del agregado (`AggregateId`, `"emp-7"` por ahora); su método `Given(params object[])` **abre el stream de `AggregateId`, le agrega los hechos** que recibe y **recuerda cuántos había** (para después aislar los nuevos). Haz que tu test **herede** de la base y cambia el sembrado por `Given(...)`.
 
 > [!NOTE]
-> 🆕 **AwesomeAssertions (`BeEquivalentTo`).** Tus eventos son `record`, así que se comparan **por valor**; `BeEquivalentTo` compara dos listas de hechos por valor y da un mensaje de fallo legible. `dotnet add package AwesomeAssertions`.
-
-> 🛠️ **Inténtalo tú.** Crea `HandlerTest<TCommand>` con: `Given(params object[])` (siembra), `When(TCommand)` (ejecuta el handler, que cada test concreto provee), `Then(params object[])` (compara los hechos **nuevos** con `BeEquivalentTo`). Luego reescribe el test de arriba heredando de ella.
+> 🆕 **`params object[]` y `abstract`/herencia.** `Given(params object[])` —y más adelante `Then`— deja pasar **varios** hechos sin armar un array (`Given(a, b)`): un escenario puede tener más de un hecho previo, y un comando puede emitir más de uno. Y la base es `abstract` —como `AggregateRoot` en [Refactorizando el motor](refactorizando-el-motor.md)—: lo **compartido** por todos los tests vive arriba; cada test hereda.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```csharp
-using AwesomeAssertions;
-
+// Empresas.Historia.Tests/HandlerTest.cs — la BASE (nace con el motor + Given)
 public abstract class HandlerTest<TCommand>
 {
-    // ── El MOTOR vive aquí: la ÚNICA pieza que el swap cambiará. ──
-    protected readonly EventStore Store = new();
+    protected readonly EventStore Store = new();   // el MOTOR — lo único que cambiará al reemplazar el almacén
     protected string AggregateId = "emp-7";
-    private int _previos;
-
-    protected abstract ICommandHandler<TCommand> Handler { get; }
+    protected int _previos;
 
     protected void Given(params object[] eventos)
     {
         var stream = Store.AbrirStream<Empresa>(AggregateId);
         foreach (var hecho in eventos) stream.Append(hecho);
-        _previos = Store.GetEvents(AggregateId).Count;
+        _previos = Store.GetEvents(AggregateId).Count;   // recuerda dónde termina "lo previo"
     }
-
-    protected void When(TCommand comando) => Handler.Handle(comando);
-
-    protected void Then(params object[] esperados) =>
-        Store.GetEvents(AggregateId).Skip(_previos).Select(s => s.EventData)
-             .Should().BeEquivalentTo(esperados);
 }
 ```
 
 ```csharp
+// Empresas.Historia.Tests/SuspenderEmpresaTests.cs — ahora HEREDA; el resto sigue a pelo POR AHORA
 using Xunit;
 
+public class SuspenderEmpresaTests : HandlerTest<SuspenderEmpresa>
+{
+    [Fact]
+    public void Suspender_una_empresa_activa_emite_EmpresaSuspendida()
+    {
+        Given(new EmpresaRegistrada("Constructora Andes", "Básico"));   // ← el sembrado, ya en la base
+
+        new SuspenderHandler(Store).Handle(new SuspenderEmpresa(AggregateId, "falta de pago"));
+
+        var nuevos = Store.GetEvents(AggregateId).Skip(_previos).Select(s => s.EventData).ToList();
+        var hecho = Assert.IsType<EmpresaSuspendida>(Assert.Single(nuevos));
+        Assert.Equal("falta de pago", hecho.Motivo);
+    }
+}
+```
+</details>
+
+> 🔍 `dotnet test` → sigue **verde**. Solo mudaste el sembrado a la base; el comportamiento no cambió.
+
+### Paso 3 · Sube la ejecución → nace `When`
+
+La segunda pieza repetida: **ejecutar el handler**. Solo cambia **cuál** handler. Súbelo a `When`, y deja que cada test diga cuál es el suyo.
+
+> 🛠️ **Inténtalo tú.** **🔁** Ahora la línea de en medio: `When(new SuspenderEmpresa(...))`. Para que `When` llame al handler **sin que la base sepa cuál es** (cada comando tiene el suyo), la base lo pide como una propiedad `abstract` que cada test rellena. Añade a la base `When(TCommand)` y `abstract Handler`; en el test, declara `Handler => new SuspenderHandler(Store)` y cambia la ejecución por `When(...)`. Haz las **dos** ediciones antes de correr: un `abstract` en la base sin su `override` en el test no compila.
+
+<details>
+<summary>👉 Muéstrame una forma de hacerlo</summary>
+
+```csharp
+// + en la BASE:
+protected abstract ICommandHandler<TCommand> Handler { get; }
+protected void When(TCommand comando) => Handler.Handle(comando);
+```
+
+```csharp
+// el test provee SU handler y usa When:
+public class SuspenderEmpresaTests : HandlerTest<SuspenderEmpresa>
+{
+    protected override ICommandHandler<SuspenderEmpresa> Handler => new SuspenderHandler(Store);
+
+    [Fact]
+    public void Suspender_una_empresa_activa_emite_EmpresaSuspendida()
+    {
+        Given(new EmpresaRegistrada("Constructora Andes", "Básico"));
+        When(new SuspenderEmpresa(AggregateId, "falta de pago"));   // ← la ejecución, ya en la base
+
+        var nuevos = Store.GetEvents(AggregateId).Skip(_previos).Select(s => s.EventData).ToList();
+        var hecho = Assert.IsType<EmpresaSuspendida>(Assert.Single(nuevos));
+        Assert.Equal("falta de pago", hecho.Motivo);
+    }
+}
+```
+</details>
+
+> [!NOTE]
+> 🆕 **Es tu `ICommandHandler<T>`, otra vez.** Ese `abstract Handler` es el contrato de [El despachador](el-despachador.md) ganando su sueldo: `When` hace `Handler.Handle(comando)` sin conocer la clase concreta.
+
+> 🔍 `dotnet test` → **verde**. Ya solo queda cruda la última pieza: la comparación.
+
+### Paso 4 · Sube la comparación → nace `Then` (y el test queda en tres líneas)
+
+La última pieza: **comparar los hechos nuevos con los que esperas**. Como usa `_previos` (de la base), vive en la base también.
+
+> [!NOTE]
+> 🆕 **AwesomeAssertions (`BeEquivalentTo`).** Podrías comparar con `Assert.Equal`, pero al fallar su mensaje sobre listas es difícil de leer. `BeEquivalentTo` compara **campo por campo** (tus eventos son `record`, iguales por valor) y te dice **cuál** dato difiere. Instálalo en el proyecto de tests: `dotnet add Empresas.Historia.Tests package AwesomeAssertions`.
+
+> 🛠️ **Inténtalo tú.** **🔁** La última línea: `Then(new EmpresaSuspendida(...))`. Añade a la base `Then(...)` que tome los hechos **nuevos** (los que hay después de `_previos`) y los compare **por valor** con los que esperas (`BeEquivalentTo`). En el test, cambia toda la cola de `Assert` por `Then(...)`.
+
+<details>
+<summary>👉 Muéstrame una forma de hacerlo</summary>
+
+```csharp
+// + en la BASE (usa _previos, por eso vive aquí):
+using AwesomeAssertions;   // este using va ARRIBA del archivo, junto a los demás
+
+protected void Then(params object[] esperados) =>
+    Store.GetEvents(AggregateId).Skip(_previos).Select(s => s.EventData)
+         .Should().BeEquivalentTo(esperados);
+```
+
+```csharp
+// el test, ya en su forma final — tres líneas que se leen como especificación:
 public class SuspenderEmpresaTests : HandlerTest<SuspenderEmpresa>
 {
     protected override ICommandHandler<SuspenderEmpresa> Handler => new SuspenderHandler(Store);
@@ -113,33 +204,30 @@ public class SuspenderEmpresaTests : HandlerTest<SuspenderEmpresa>
 ```
 </details>
 
-> [!IMPORTANT]
-> **Por qué la base está partida así — y por qué importa para el swap.** El **motor** (`Store`) y **cómo** `Given`/`Then` hablan con él viven en la **base**. Los `[Fact]` de abajo —los **escenarios**— no mencionan el `EventStore` ni el `Skip`: solo dicen *dado esto, cuando aquello, entonces esto*. Por eso, el día del swap tocarás **solo la base**: cómo `Given`/`Then` hablan con Marten. **Los escenarios no cambian.** Que sigan verdes probará que Marten hace lo que hacía tu motor casero.
-
 > [!NOTE]
-> **Desde aquí, cada reto cierra con su test.** No es una sección que se visita y se olvida: de ahora en adelante, cada pieza que construyas o cambies se da por terminada solo cuando su escenario Given-When-Then está en verde. Los tests son el hilo que atraviesa el resto del taller.
+> **La base guarda el motor; los escenarios, el invariante.** El `Store` —el motor— vive en la base. Los `[Fact]` de abajo no lo mencionan: solo dicen *dado esto, cuando aquello, entonces esto*. Por eso, el día que cambies el motor tocarás **solo la base**; los escenarios no cambian, y que sigan verdes probará que el motor nuevo hace lo mismo.
 
-> 🔍 **¿Lo lograste?** `dotnet test` → **`Passed: 1`**, y el test se lee como la especificación del comportamiento. Comprueba que vigila: cambia el motivo esperado a `"otro"`, corre, y míralo ponerse **rojo**; devuélvelo a `"falta de pago"` y vuelve al verde.
+> 🔍 **¿Lo lograste?** `dotnet test` → **`Passed: 1`**, y el `[Fact]` se lee como la especificación del comportamiento. La base nació **método por método** —Given, When, Then—, cada uno cuando su repetición lo pidió.
 
 ---
 
 ### El Descubrimiento
 
-Destilaste la forma que **todo** test de event sourcing comparte: **Given** (hechos previos) → **When** (un comando) → **Then** (los hechos emitidos), partiendo la base entre el **motor** (intercambiable) y los **escenarios** (el invariante). Ese es el pago de blindar el motor *antes* de tocarlo.
+Destilaste la forma que **todo** test de event sourcing comparte: **Given** (hechos previos) → **When** (un comando) → **Then** (los hechos emitidos). Y no la recibiste hecha: la sacaste **de tu propio test**, un método a la vez. Ese es el pago de blindar el motor *antes* de tocarlo.
 
 Tu motor está protegido. Ahora sí puedes refactorizarlo sin volar a ciegas — y lo primero que le falta para ser real es no perder la historia al apagarse. Esa es la próxima grieta.
 
 > [!NOTE]
-> 🌱 **Semilla — estos escenarios validarán el swap.** Cuando cambies el motor a Marten ([persistir a mano](persistir-a-mano.md) y el swap), la base apuntará a Postgres y estos mismos `[Fact]` correrán como tests de **integración** contra Marten real: si siguen verdes, el swap no cambió el comportamiento. Y más adelante, el **`TestStore`** del equipo ([El almacén abstracto](el-almacen-abstracto.md)) te dejará correrlos rápido, sin base de datos. Es la misma base `HandlerTest`, evolucionando.
+> 🌱 **Semilla — estos escenarios validarán el swap.** Cuando cambies el motor a Marten ([persistir a mano](persistir-a-mano.md) y el swap), la base apuntará a Postgres y estos mismos `[Fact]` correrán como tests de **integración** (tocan una base de datos real, no solo RAM): si siguen verdes, el swap no cambió el comportamiento. Y más adelante, el **`TestStore`** del equipo ([El almacén abstracto](el-almacen-abstracto.md)) te dejará correrlos rápido, sin base de datos. Es la misma base `HandlerTest`, evolucionando.
 
 ---
 
 ## ✅ Compruébalo
 
-- [ ] Escribiste el primer test a pelo y `dotnet test` lo pone en **verde** (`Passed: 1`).
-- [ ] Lo rompiste a propósito (cambiando el valor esperado) y lo viste **rojo**, luego lo arreglaste.
-- [ ] Destilaste la base `HandlerTest<TCommand>` con `Given`/`When`/`Then`; el test heredado se lee en tres líneas.
-- [ ] Explicas por qué el **motor** vive en la base y los **escenarios** en los `[Fact]` — y qué gana eso cuando llegue el swap.
+- [ ] Creaste el proyecto de tests **hermano** (no anidado) y entiendes que `dotnet test` **descubre** y corre los `[Fact]` solo — nadie los llama, a diferencia del `Main`.
+- [ ] Escribiste el primer test a pelo y `dotnet test` lo pone en **verde** (`Passed: 1`); lo rompiste a propósito y lo viste **rojo**, luego lo arreglaste.
+- [ ] Subiste el andamiaje a `HandlerTest<TCommand>` **un método por paso** (Given, When, Then), verde en cada uno; el test heredado queda en tres líneas.
+- [ ] Explicas por qué el **motor** (`Store`) vive en la base y los **escenarios** en los `[Fact]` — y qué gana eso cuando llegue el swap.
 - [ ] Explicas por qué en ES el test afirma **hechos emitidos**, no filas de una tabla.
 
 ---
@@ -162,7 +250,7 @@ git push
 
 ## 🧠 En una frase
 
-Blindas el motor con la gramática **Given** (hechos previos) → **When** (un comando) → **Then** (hechos emitidos). La base guarda el **motor** (intercambiable) y los `[Fact]` los **escenarios** (el invariante): al swapear a Marten, los mismos escenarios lo validan. Desde aquí, cada reto cierra con su test.
+Blindas el motor con la gramática **Given** (hechos previos) → **When** (un comando) → **Then** (hechos emitidos), que destilas de tu propio test **un método por paso**. La base guarda el **motor** (intercambiable) y los `[Fact]` los **escenarios** (el invariante): al swapear a Marten, los mismos escenarios lo validan. Desde aquí, cada reto cierra con su test.
 
 ---
 
