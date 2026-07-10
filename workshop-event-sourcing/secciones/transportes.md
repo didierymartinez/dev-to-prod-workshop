@@ -14,12 +14,25 @@ Hasta ahora el bus fue abstracto: el outbox guardaba el saliente, pero ¿salient
 
 ### Paso 1 · Levanta RabbitMQ y conéctalo
 
-Primero necesitas el broker corriendo. Añádelo a tu `docker-compose` (imagen `rabbitmq:management`, que trae el panel de administración) y levántalo con `docker compose up -d`. El panel queda en `localhost:15672`, usuario/clave `guest`/`guest`.
+Primero necesitas el broker corriendo. Añade el servicio a tu `docker-compose.yml` (junto al de Postgres de [Persistir a mano](persistir-a-mano.md)) y levántalo con `docker compose up -d`:
+
+```yaml
+  rabbitmq:
+    image: rabbitmq:management      # incluye el panel de administración
+    ports:
+      - "5672:5672"     # el broker (AMQP)
+      - "15672:15672"   # el panel web
+```
+
+El panel queda en `localhost:15672`, usuario/clave `guest`/`guest`.
 
 > [!NOTE]
 > 🆕 **Cómo rutea un broker.** Un mensaje entra por un **exchange** (el buzón de entrada del broker), que lo reparte hacia una o más **colas**, donde el mensaje espera hasta que alguien lo lee. El conjunto de exchanges y colas es la **topología**. Un servicio publica a su exchange; los consumidores leen de sus colas.
 
 > 🛠️ **Inténtalo tú.** Conecta RabbitMQ por su connection string con nombre, y deja que Rabbit **cree su propia topología** (exchanges y colas) al arrancar.
+
+> [!NOTE]
+> 🆕 **Transporte, connection string con nombre y `AutoProvision`.** Un **transporte** es el broker por donde viajan los mensajes entre procesos. `rabbitConnectionStringName` no es la URL cruda: es el **nombre** de una entrada en tu `appsettings.json` (`"ConnectionStrings": { "rabbit": "amqp://guest:guest@localhost" }`), para no incrustar credenciales en el código. `AutoProvision()` le dice a Wolverine: si el exchange o la cola no existen en Rabbit, **créalos** al arrancar. Cómodo en desarrollo y donde el servicio es dueño de su topología: enciendes y funciona.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -30,9 +43,6 @@ opts.UseRabbitMqUsingNamedConnection(rabbitConnectionStringName)
 ```
 </details>
 
-> [!NOTE]
-> 🆕 **Transporte, connection string con nombre y `AutoProvision`.** Un **transporte** es el broker por donde viajan los mensajes entre procesos. `rabbitConnectionStringName` no es la URL cruda: es el **nombre** de una entrada en tu config (`ConnectionStrings:rabbit` en `appsettings`; en local apunta a `amqp://guest:guest@localhost`), para no incrustar credenciales en el código. `AutoProvision()` le dice a Wolverine: si el exchange o la cola no existen en Rabbit, **créalos** al arrancar. Cómodo en desarrollo y donde el servicio es dueño de su topología: enciendes y funciona.
-
 > 🔍 **¿Lo lograste?** Con RabbitMQ arriba y el panel abierto (`localhost:15672`), suspende `emp-7` con el `curl` de [Revelar Wolverine](revelar-wolverine.md). En el panel ves aparecer el **exchange** de tu servicio y un mensaje pasando por él: el `EmpresaSuspendida` **salió del proceso**. Compáralo con antes de configurar el transporte, cuando el mensaje se quedaba en memoria y el panel no mostraba nada.
 
 ### Paso 2 · Azure Service Bus, que recibe su topología
@@ -40,6 +50,9 @@ opts.UseRabbitMqUsingNamedConnection(rabbitConnectionStringName)
 En producción sobre Azure, el transporte es **Azure Service Bus** — y aquí el diseño se **invierte**: la topología (tópicos, suscripciones) **no** la crea el servicio, la declara **Terraform**. El servicio solo se conecta a lo que ya existe.
 
 > 🛠️ **Inténtalo tú.** Conecta Azure Service Bus **sin** auto-provision, y apaga las *system queues*.
+
+> [!NOTE]
+> 🆕 **Momento-criterio — `SystemQueuesAreEnabled(false)`.** Por defecto Wolverine crea unas colas de sistema por nodo para el patrón **request/response** (mando un mensaje y **espero contestación**: la respuesta vuelve por esa cola). Un EDA es **pub/sub de una sola vía**: publicas un hecho y sigues, nadie te contesta — así que la cola de respuesta **sobra**. Y en ASB **sin** permisos de auto-provision, intentar crearla **rompía el arranque** de las variantes dockerizadas. La plantilla las apaga, y lo blinda con un test guardrail que verifica que **todos** los helpers de ASB las dejen en `false`. El contraste con Rabbit es la lección: Rabbit se arma solo (`AutoProvision`), ASB recibe su topología de afuera.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -53,14 +66,13 @@ opts.UseAzureServiceBus(serviceBusConnectionString)
 ```
 </details>
 
-> [!NOTE]
-> 🆕 **Momento-criterio — `SystemQueuesAreEnabled(false)`.** Por defecto Wolverine crea unas colas de sistema por nodo para el patrón **request/response** (mando un mensaje y **espero contestación**: la respuesta vuelve por esa cola). Un EDA es **pub/sub de una sola vía**: publicas un hecho y sigues, nadie te contesta — así que la cola de respuesta **sobra**. Y en ASB **sin** permisos de auto-provision, intentar crearla **rompía el arranque** de las variantes dockerizadas. La plantilla las apaga, y lo blinda con un test guardrail que verifica que **todos** los helpers de ASB las dejen en `false`. El contraste con Rabbit es la lección: Rabbit se arma solo (`AutoProvision`), ASB recibe su topología de afuera.
-
 > 🔍 **¿Lo lograste?** ASB vive en la nube, así que aquí no hay panel local que mirar: la comprobación es de **arranque**. Con la topología ya declarada por Terraform y `SystemQueuesAreEnabled(false)`, el host levanta limpio. Si las dejaras encendidas, al arrancar Wolverine intentaría **crear** su cola de sistema en ASB, no tendría permiso (la app no provisiona), y el host **fallaría con una excepción de permisos** — justo el bug que el `false` evita.
 
 ### Paso 3 · El evento huérfano y el validador que nació y murió
 
-Aquí está el filo del criterio. El bucle de [Público vs privado](publico-privado.md) rutea los `IPublicEvent` que encuentra **en el ensamblado que escanea**. Pero un evento puede quedar **sin ruta**: si vive en otro ensamblado que el bucle no mira, si el servicio que lo publica no aplicó esa política de ruteo, o si marcaste privado uno que debía salir. Un `IPublicEvent` sin ruta **no explota**: cae a la cola local en memoria (`local://` = la cola del propio proceso, frente a una ruta **externa** que apunta al broker). Y por esa cola **`IMessageContext.TenantId` no se propaga** —la cola en memoria no pasa por el pipeline de entrega donde Wolverine reinyecta el tenant en el sobre, así que llega nulo—, de modo que los handlers que dependen del [sobre](el-sobre.md) fallan **en silencio**: el síntoma parece un bug del resolver de tenant cuando en realidad es **ruteo faltante**.
+*(Este "paso" no trae código que escribir: es una decisión de criterio del historial de la plantilla — léela.)*
+
+Aquí está el filo del criterio. El bucle de [Público vs privado](publico-privado.md) rutea los `IPublicEvent` que encuentra **en el ensamblado que escanea**. Pero un evento puede quedar **sin ruta**: si vive en otro ensamblado que el bucle no mira, si el servicio que lo publica no aplicó esa política de ruteo, o si marcaste privado uno que debía salir. Un `IPublicEvent` sin ruta **no explota**: cae a la cola local en memoria (`local://` = la cola del propio proceso, frente a una ruta **externa** que apunta al broker). Y por esa cola el `TenantId` **no viaja**: la cola en memoria se salta el pipeline de entrega donde Wolverine reinyecta el tenant en el sobre (ese mecanismo lo construyes en [El tenant viaja con el mensaje](el-tenant-viaja-con-el-mensaje.md); por ahora basta con que llega **nulo**). Así, los handlers que dependen del [sobre](el-sobre.md) fallan **en silencio**: el síntoma parece un bug del resolver de tenant cuando en realidad es **ruteo faltante**.
 
 La plantilla intentó atrapar esto **en código**: un `EventoRoutingValidator` que, al arrancar, enumeraba todos los `IPublicEvent`/`IPrivateEvent` concretos y exigía que cada uno tuviera una ruta **externa** (no `local://`). Si faltaba, tiraba una excepción con la lista de huérfanos. Se añadió con esa intención… y **se retiró tres versiones después**.
 

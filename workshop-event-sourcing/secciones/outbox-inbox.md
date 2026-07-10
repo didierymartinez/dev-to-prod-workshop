@@ -1,6 +1,6 @@
 # Outbox e Inbox: que el mensaje no se pierda
 
-Ya publicas `EmpresaSuspendida` hacia facturación, con su [sobre](el-sobre.md). Pero piensa en el instante exacto de publicar: guardas el evento en Postgres **y** lo mandas al bus. Son **dos sistemas distintos**. ¿Qué pasa si el proceso muere **entre** los dos? O guardaste el hecho pero nunca salió (facturación jamás se entera), o salió pero el guardado falló (le mentiste al mundo). No puedes hacer atómicos dos sistemas independientes. Este es el problema que [Suscripciones](suscripciones.md) dejó anotado, y que `IntegrateWithWolverine` ya venía preparando.
+Ya publicas `EmpresaSuspendida` hacia facturación, con su [sobre](el-sobre.md). Pero guardas el evento en Postgres **y** lo mandas al bus: **dos sistemas distintos** que no se pueden hacer atómicos. Es el problema que [Suscripciones](suscripciones.md) dejó anotado, y que `IntegrateWithWolverine` ya venía preparando.
 
 ## 🎯 El Objetivo
 
@@ -23,7 +23,7 @@ No hay forma de envolver ambas en una sola transacción: Postgres y el broker no
 
 La idea del **outbox**: en vez de mandar el hecho al broker directamente, lo escribes en una **tabla de salientes en la misma Postgres** de Marten — dentro de la **misma transacción** que el evento. O se guardan los dos, o ninguno. Luego, un worker aparte lee esa tabla y publica al broker.
 
-Aquí hay que separar dos cosas. `IntegrateWithWolverine()` (de [Revelar Wolverine](revelar-wolverine.md)) montó la **infraestructura** del outbox: las tablas y la sesión compartida con Marten. Pero el envío sigue siendo **directo** hasta que marcas el endpoint como **durable**. `UseDurableOutbox` es lo que hace que publicar **deje una fila** en la tabla de salientes en vez de mandar al broker de una — y como esa fila se escribe en la sesión compartida, entra en la **misma transacción** que el evento (la que `AutoApplyTransactions()` confirma).
+Aquí hay que separar dos cosas. `IntegrateWithWolverine()` (de [Revelar Wolverine](revelar-wolverine.md)) montó la **infraestructura** del outbox: las tablas y la sesión compartida con Marten. Pero el envío sigue siendo **directo** hasta que marcas el endpoint como **durable**. `UseDurableOutbox` hace que publicar **deje una fila** en la tabla de salientes, en vez de mandar al broker de una. Como esa fila se escribe en la sesión compartida, entra en la **misma transacción** que el evento (la que `AutoApplyTransactions()` confirma).
 
 > 🛠️ **Inténtalo tú.** Enciende el outbox **durable** en los endpoints de salida. Quieres que publicar deje una fila en la tabla de salientes, no un envío directo.
 
@@ -33,11 +33,7 @@ Aquí hay que separar dos cosas. `IntegrateWithWolverine()` (de [Revelar Wolveri
 ```csharp
 // por política, en todos los endpoints de salida:
 opts.Policies.UseDurableOutboxOnAllSendingEndpoints();
-
-// o afinado, en la ruta de un mensaje concreto (la ruta a Rabbit la configuras en Transportes):
-opts.PublishMessage<EmpresaSuspendida>()
-    .ToRabbitExchange(nombreDelServicio)
-    .UseDurableOutbox();
+// (afinar el outbox en la ruta de un mensaje concreto se ve en Transportes, con el transporte real)
 ```
 </details>
 
@@ -50,13 +46,13 @@ Guardado el saliente, ¿quién lo manda al broker? Un **worker en segundo plano*
 
 Si el proceso muere con filas sin drenar, al reiniciar el worker las encuentra y las publica. Por eso la entrega es **al-menos-una-vez**: un mensaje puede salir **más de una vez** (drenado, caída antes de marcarlo, reintento). El receptor tiene que tolerarlo — y ahí entra el inbox.
 
-> 🔍 **¿Lo lograste?** Con Postgres arriba y el **broker apagado**, arranca (`dotnet run`) y suspende `emp-7` con el `curl` de [Revelar Wolverine](revelar-wolverine.md): `curl -X POST .../empresas/emp-7/suspender -d '{"Motivo":"impago"}'`. Consulta la tabla de salientes: `psql ... -c "select id, message_type from wolverine_outgoing_envelopes;"` — la fila del `EmpresaSuspendida` está ahí, junto al evento en `mt_events`, **en la misma base**, sin poder salir. Enciende el broker: el worker drena la fila y **desaparece**. Ese "queda guardada aunque no salga" es lo que hace que el mensaje **sobreviva** a una caída — no depende de que el proceso siga vivo para publicar.
+> 🔍 **¿Lo lograste?** Con Postgres arriba —y aún **sin broker** (lo levantas en [Transportes](transportes.md))—, arranca (`dotnet run`) y suspende `emp-7` con el `curl` de [Revelar Wolverine](revelar-wolverine.md): `curl -X POST .../empresas/emp-7/suspender -d '{"Motivo":"impago"}'`. Consulta la tabla de salientes: `docker exec -it gestion_eventstore psql -U gestion -d gestion_eventstore -c "select id, message_type from wolverine_outgoing_envelopes;"` — la fila del `EmpresaSuspendida` está ahí, junto al evento en `mt_events`, **en la misma base**, esperando. Ese "queda guardada aunque no salga" es lo que hace que el mensaje **sobreviva** a una caída: no depende de que el proceso siga vivo para publicar. (Cuando levantes el broker en Transportes, el worker drenará esa fila y desaparecerá.)
 
 ### Paso 3 · El inbox: el espejo en el receptor
 
 Facturación recibe el mensaje. Como la entrega es al-menos-una-vez, podría **recibir el mismo dos veces**. El **inbox** es el outbox al revés: el receptor escribe el mensaje entrante en una **tabla de entrantes** antes de procesarlo. ¿Cómo sabe que dos son el mismo? Cada mensaje lleva un **id único** en su sobre; el inbox registra ese id y descarta uno ya visto. Y si el proceso cae a mitad, al reiniciar retoma el pendiente.
 
-> 🛠️ **Inténtalo tú.** En el receptor, enciende el inbox **durable** al escuchar la cola.
+> 🛠️ **Inténtalo tú.** En el receptor, enciende el inbox **durable** al escuchar la cola — por política con `UseDurableInboxOnAllListeners()`, o por cola con `UseDurableInbox()`.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>

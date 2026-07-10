@@ -1,10 +1,10 @@
 # Auditoría: metadata y correlación
 
-Un evento cuenta **qué pasó**: `EmpresaSuspendida("impago")`. Pero el día que audites o depures vas a querer más: **quién** la suspendió, **cuándo**, como parte de **qué operación**, y **disparado por qué**. Eso no va en el payload —es información transversal, no del negocio—, sino en la **metadata** del evento. Marten la lleva por ti… pero apagada por defecto.
+Un evento cuenta **qué pasó**: `EmpresaSuspendida("impago")`. Para auditar o depurar necesitas también su **contexto** —quién, cuándo, por qué—, y Marten lo lleva por ti… pero apagado por defecto.
 
 ## 🎯 El Objetivo
 
-Que cada evento cargue, además de su payload, la **metadata de auditoría** —cuándo, quién (`user_id`), y la correlación/causación que lo encadenan a la operación que lo originó— y saber que hay que **encenderla**.
+Que cada evento cargue, además de su payload, su **franja de auditoría**: cuándo, quién, y con qué operación se relaciona. Y saber que hay que **encenderla**.
 
 ## 💥 El dolor: el payload no dice quién ni por qué
 
@@ -18,7 +18,10 @@ Marten ya reserva ese espacio (`Timestamp`, `CorrelationId`, `CausationId`, `Hea
 
 Tres piezas de metadata te interesan. La **correlación** (`CorrelationId`) es el hilo que une todo lo que ocurrió en una misma operación —una petición, un proceso masivo de morosos—: todo lo de esa operación comparte el mismo id. La **causación** (`CausationId`) apunta al comando o mensaje que causó *este* evento en concreto. Y los **headers** son extras libres, donde meterás el `user_id` (quién). Marten puede capturar las tres, pero vienen **apagadas**.
 
-> 🛠️ **Inténtalo tú.** En la config del store, enciende en `MetadataConfig` la captura de correlación, causación y headers.
+> 🛠️ **Inténtalo tú.** En la config del store, enciende en `MetadataConfig` la captura de correlación, causación y headers (tres flags booleanos que pones en `true`).
+
+> [!NOTE]
+> 🆕 **Metadata opt-in.** Los flags de `MetadataConfig` (`CorrelationIdEnabled`, `CausationIdEnabled`, `HeadersEnabled`) están en **`false` por defecto**. Apagados, aunque setees los valores **no se guardan**, y las columnas `correlation_id`/`causation_id`/`headers` **no existen** en `mt_events`. Es auditoría **a propósito**: la enciendes cuando la necesitas, porque tiene un costo por evento (cada fila guarda dos columnas más y un `jsonb` de headers).
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -31,12 +34,14 @@ opts.Events.MetadataConfig.HeadersEnabled       = true;   // extras: user_id, et
 ```
 </details>
 
-> [!NOTE]
-> 🆕 **Metadata opt-in.** Los cuatro flags de `MetadataConfig` (`CorrelationIdEnabled`, `CausationIdEnabled`, `HeadersEnabled`, `UserNameEnabled`) están en **`false` por defecto**. Apagados, aunque setees los valores **no se guardan**, y las columnas `correlation_id`/`causation_id`/`headers` **no existen** en `mt_events`. Es auditoría **a propósito**: la enciendes cuando la necesitas (tiene un costo por evento).
-
 ### Paso 2 · Pon el quién/por qué en la sesión
 
 La metadata no va en el evento (es transversal): va en la **sesión**, antes de `SaveChangesAsync`. Todo lo que se appende en esa sesión hereda esa metadata.
+
+> 🛠️ **Inténtalo tú.** Antes de appender, ponle a la sesión su `CorrelationId`, su `CausationId` y un header `user_id` (con `SetHeader`); luego appende el evento y guarda.
+
+> [!NOTE]
+> 🆕 **En la sesión, no en el hecho.** `CorrelationId`/`CausationId` son propiedades de la sesión; `SetHeader(clave, valor)` mete extras (aquí `user_id`; en el repo real el usuario viaja como header). Es transversal: lo pones **una vez** por operación y **todos** los eventos de esa sesión lo llevan. Correlación y causación, juntas, encadenan comando → evento → evento para **trazar** qué pasó y por qué.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -53,10 +58,9 @@ await session.SaveChangesAsync();
 ```
 </details>
 
-> [!NOTE]
-> 🆕 **En la sesión, no en el hecho.** `CorrelationId`/`CausationId` son propiedades de la sesión; `SetHeader(clave, valor)` mete extras (aquí `user_id`; en el repo real el usuario viaja como header). Es transversal: lo pones **una vez** por operación y **todos** los eventos de esa sesión lo llevan. Correlación y causación, juntas, encadenan comando → evento → evento para **trazar** qué pasó y por qué.
-
 ### Paso 3 · Léela en cada evento
+
+> 🛠️ **Inténtalo tú.** Abre el stream de `emp-7`, recorre sus eventos e imprime de cada uno el payload, el `Timestamp`, el `user_id` de los headers y la causación/correlación.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -64,6 +68,7 @@ await session.SaveChangesAsync();
 ```csharp
 using JasperFx.Events;   // IEvent vive aquí en Marten 9 (no en Marten.Events)
 
+await using var query = store.QuerySession();
 var eventos = await query.Events.FetchStreamAsync("emp-7");
 foreach (var e in eventos)
 {

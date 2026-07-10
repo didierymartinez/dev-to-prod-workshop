@@ -1,6 +1,6 @@
 # El TestStore: probar el dominio sin Postgres
 
-El vaivén de [la unidad de trabajo](el-almacen-de-la-plantilla.md) —crear, rehidratar, acumular, volcar— merece pruebas **rápidas**, sin levantar Postgres, como las que recuperaste en [El almacén abstracto](el-almacen-abstracto.md) con tu `TestStore`. La plantilla trae el suyo, con un truco: aplica los hechos **por reflexión**, así el mismo `TestStore` sirve para **cualquier** agregado sin conocer su `switch`. Y encima trae una base de escenarios que afirma, además de los hechos, **cuáles cruzan la frontera**.
+El vaivén de [la unidad de trabajo](el-almacen-de-la-plantilla.md) —crear, rehidratar, acumular, volcar— merece pruebas **rápidas**, sin levantar Postgres, como las que recuperaste en [El almacén abstracto](el-almacen-abstracto.md) con tu `TestStore`. La plantilla trae el suyo — y una base de escenarios que afirma, además de los hechos, **cuáles cruzan la frontera**.
 
 ## 🎯 El Objetivo
 
@@ -14,7 +14,10 @@ Tu `TestStore` de [El almacén abstracto](el-almacen-abstracto.md) tenía que **
 
 ### Paso 1 · Aplicar el `Apply` correcto por reflexión
 
-> 🛠️ **Inténtalo tú.** Escribe el corazón del `TestStore`: dado un agregado y un hecho, encuentra en el agregado el método `Apply` cuyo **único parámetro** sea del tipo del hecho, e **invócalo**. Cachea el hallazgo para no buscar cada vez.
+> 🛠️ **Inténtalo tú.** Escribe el corazón del `TestStore`: dado un agregado y un hecho, encuentra en el agregado el método `Apply` cuyo **único parámetro** sea del tipo del hecho, e **invócalo**. Cachea el hallazgo en un `ConcurrentDictionary` por `(agregado, evento)` con `GetOrAdd`, para no buscar cada vez.
+
+> [!NOTE]
+> 🆕 **Aplicar por reflexión.** Es la misma reflexión que ya usaste en [El almacén abstracto](el-almacen-abstracto.md): en vez de un `switch` por agregado, el `TestStore` **busca** el método `Apply(TEvento)` que coincide con el tipo del hecho (`GetMethods` + el `Apply` de un solo parámetro de ese tipo) y lo invoca (`MethodInfo.Invoke`, pasándole el hecho). Lo nuevo es el **caché**: guarda el método hallado en un `ConcurrentDictionary` (concurrente porque los tests pueden correr en paralelo) por `(agregado, evento)`, con `GetOrAdd` que **busca una vez y reutiliza**. Resultado: un doble que rehidrata **cualquier** agregado sin conocerlo — no lo tocas al agregar un agregado nuevo.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -42,14 +45,17 @@ private static void ApplyEvent<T>(T aggregateRoot, object @event) where T : Aggr
 ```
 </details>
 
-> [!NOTE]
-> 🆕 **Aplicar por reflexión.** Es la misma reflexión que ya usaste en [El almacén abstracto](el-almacen-abstracto.md): en vez de un `switch` por agregado, el `TestStore` **busca** el método `Apply(TEvento)` que coincide con el tipo del hecho (`GetMethods` + el `Apply` de un solo parámetro de ese tipo) y lo invoca (`MethodInfo.Invoke`, pasándole el hecho). Lo nuevo es el **caché**: guarda el método hallado en un `ConcurrentDictionary` (concurrente porque los tests pueden correr en paralelo) por `(agregado, evento)`, con `GetOrAdd` que **busca una vez y reutiliza**. Resultado: un doble que rehidrata **cualquier** agregado sin conocerlo — no lo tocas al agregar un agregado nuevo.
-
 ### Paso 2 · Given-When-Then que afirma la frontera
 
-El `TestStore` es el motor; encima va una base de escenarios, `CommandHandlerTestBase`, que es la versión de librería de tu `HandlerTest<TCommand>` de [Blindar el motor: Given-When-Then](given-when-then.md) — con un verbo nuevo. **No la construyes**: viene en el paquete `Testing.Utilities`; tú escribes la **subclase** con tu escenario.
+El `TestStore` es el motor; encima va una base de escenarios, `CommandHandlerTestBase`, que es la versión de librería de tu `HandlerTest<TCommand>` de [Blindar el motor: Given-When-Then](given-when-then.md) — con verbos nuevos. **No la construyes**: viene en el paquete `Testing.Utilities`; tú escribes la **subclase** con tu escenario. Fíjate que ya **no** declara `CrearHandler`: la base **descubre** el handler de tu comando por convención (como Wolverine), y por eso tampoco necesita el genérico `<TCommand>` — cada `[Fact]` pasa su comando concreto a `When`.
 
-> 🛠️ **Inténtalo tú.** Escribe un escenario: **Given** unos hechos previos, **When** el comando, **Then** los hechos emitidos, y afirma cuáles se **publican** hacia afuera.
+> 🛠️ **Inténtalo tú.** Escribe un escenario: **Given** unos hechos previos, **When** el comando, **Then** los hechos emitidos, afirma cuáles se **publican** hacia afuera (`ThenIsPublishedPublicly`), y de paso comprueba el **estado** del agregado tras el comando (`And<TAgg,TResult>`).
+
+> [!NOTE]
+> 🆕 **`Given` / `When` / `Then` / `And`.** `Given` siembra los hechos previos (los aplica por reflexión al agregado). `When` corre el handler contra el `TestStore` (es tu verbo de siempre; async porque el handler lo es). `Then` afirma los **hechos emitidos** (comparados por valor, no filas). `And<TAgg,TResult>(sel, esperado)` afirma una propiedad del agregado que la base **ya tiene rehidratado** tras el `When`, sin que lo cargues de nuevo en cada test.
+
+> [!NOTE]
+> 🆕 **`ThenIsPublished…` afirma la intención.** ¿Cómo sabe un doble en memoria qué se "publica", si en [Público vs privado](publico-privado.md) viste que el ruteo real lo decide el arranque de Wolverine? No lo adivina: mira los **marcadores** del agregado. `ThenIsPublishedPublicly` compara los esperados contra `agregado.GetPublicEvents()` (los `IPublicEvent` emitidos); `…Privately`, contra `GetPrivateEvents()`. El marcador **es** la intención de cruzar la frontera, así que afirmarlo en el test es afirmar esa intención — no la entrega por el bus. Tu base casera no lo distinguía porque los marcadores aún no existían.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -69,12 +75,6 @@ public class SuspenderEmpresaTests : CommandHandlerTestBase
 }
 ```
 </details>
-
-> [!NOTE]
-> 🆕 **`Given` / `When` / `Then` / `And`.** `Given` siembra los hechos previos (los aplica por reflexión al agregado). `When` corre el handler contra el `TestStore` (es tu verbo de siempre; async porque el handler lo es). `Then` afirma los **hechos emitidos** (comparados por valor, no filas). `And<TAgg,TResult>(sel, esperado)` afirma una propiedad del agregado que la base **ya tiene rehidratado** tras el `When`, sin que lo cargues de nuevo en cada test.
-
-> [!NOTE]
-> 🆕 **`ThenIsPublished…` afirma la intención.** ¿Cómo sabe un doble en memoria qué se "publica", si en [Público vs privado](publico-privado.md) viste que el ruteo real lo decide el arranque de Wolverine? No lo adivina: mira los **marcadores** del agregado. `ThenIsPublishedPublicly` compara los esperados contra `agregado.GetPublicEvents()` (los `IPublicEvent` emitidos); `…Privately`, contra `GetPrivateEvents()`. El marcador **es** la intención de cruzar la frontera, así que afirmarlo en el test es afirmar esa intención — no la entrega por el bus. Tu base casera no lo distinguía porque los marcadores aún no existían.
 
 > 🔍 **¿Lo lograste?** `dotnet test` corre el escenario en **milisegundos**, sin Docker ni Postgres: `Given` siembra `EmpresaRegistrada`, `When` suspende, y `Then` + `ThenIsPublishedPublicly` verifican el `EmpresaSuspendida` emitido y marcado como público. Compáralo con los tests de integración de [Tests de integración](tests-de-integracion.md): mismos escenarios, sin la lentitud de la red.
 

@@ -1,6 +1,6 @@
 # API + Inyección de dependencias: la app se vuelve un servicio
 
-En [El daemon](daemon-proyecciones.md) apareció un **host** por primera vez (para que el worker viviera en algún lado). Y desde el swap vienes cableando todo **a mano**: `new SuspenderHandler(new MartenEventStore(session))`, y antes, un `new` por store, despachador y handler. Un servicio HTTP real no puede `new`-ear eso en cada petición — el store es de toda la app, la sesión es de **cada petición**. Es hora de convertir la app en un **servicio**: un contenedor cablea las piezas por ti, y ahí, por fin, `async` cobra sentido.
+En [El daemon](daemon-proyecciones.md) apareció un **host** por primera vez. Y desde el swap vienes cableando todo **a mano** con `new` (`new SuspenderHandler(new MartenEventStore(session))`). Un servicio HTTP real no puede seguir así.
 
 ## 🎯 El Objetivo
 
@@ -16,7 +16,10 @@ Recuerda la semilla de [El despachador](el-despachador.md): cada pieza se cablea
 
 Pasas de un host de consola a un **host web** (`WebApplication`), y registras cada pieza **una vez**, diciendo cuánto vive. Ese *cuánto vive* es el **tiempo de vida** de la pieza: `Scoped` = una instancia **por petición** (nace con el request, muere al responder); *singleton* = una sola para toda la app. La **sesión** de Marten la quieres `Scoped` (una unidad de trabajo por petición); el `DocumentStore`, singleton.
 
-> 🛠️ **Inténtalo tú.** Con `WebApplication.CreateBuilder`: `AddMarten` (+ `UseLightweightSessions` para que la sesión sea **por petición**), registra `IEventStore → MartenEventStore` y el handler como **`Scoped`**, y (del daemon) mantén `AddAsyncDaemon`.
+> 🛠️ **Inténtalo tú.** Con `WebApplication.CreateBuilder`: `AddMarten` (+ `UseLightweightSessions` para que la sesión sea **por petición**), registra `IEventStore → MartenEventStore` y el handler como **`Scoped`** con `builder.Services.AddScoped<...>()`, y (del daemon) mantén `AddAsyncDaemon`.
+
+> [!NOTE]
+> 🆕 **El contenedor.** `builder.Services` es el **contenedor de inyección de dependencias**: la lista de "cómo construir cada pieza". `AddScoped<...>()` registra las tuyas con tiempo de vida **por petición** (el handler también es `Scoped` porque arrastra la sesión de esa petición: si fuera singleton, retendría una sesión ya muerta entre peticiones). `UseLightweightSessions` es el **gemelo-de-registro** del `store.LightweightSession()` que ya usabas: hace que el contenedor entregue una `IDocumentSession` por petición; el `DocumentStore` (la fábrica) queda **singleton**. Nadie hace `new`: el contenedor construye el grafo.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -45,9 +48,6 @@ builder.Services.AddScoped<SuspenderHandler>();               // el handler
 var app = builder.Build();
 ```
 </details>
-
-> [!NOTE]
-> 🆕 **El contenedor.** `builder.Services` es el **contenedor de inyección de dependencias**: la lista de "cómo construir cada pieza". `AddScoped` registra las tuyas con el tiempo de vida por petición, y `UseLightweightSessions` registra así la `IDocumentSession` (la sesión por petición); el `DocumentStore` (la fábrica) queda **singleton**. Nadie hace `new`: el contenedor construye el grafo.
 
 ### Paso 2 · El endpoint pide su handler (y ya no hay `new`)
 

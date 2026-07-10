@@ -1,10 +1,10 @@
 # El daemon de proyecciones: async y consistencia eventual
 
-Tu proyección corre **inline**: en la **misma transacción** que cada evento. Para una proyección liviana, bien. Pero cada escritura carga ahora con ese trabajo extra — y con cinco proyecciones, cinco veces. Y reconstruir una proyección (rejugar **todo** el historial para rellenarla de cero) bloquearía la escritura mientras corre. Marten tiene otro modo: **async**, con un **daemon** que hace ese trabajo aparte.
+Tu proyección corre **inline**: en la **misma transacción** que cada evento. Marten tiene otro modo, **async**, con un **daemon** que hace ese trabajo aparte.
 
 ## 🎯 El Objetivo
 
-Correr la proyección en modo **async**: la escritura no espera por ella; un **worker en segundo plano** (el daemon) alimenta el read model justo después. A cambio, aceptas **consistencia eventual**.
+Correr la proyección en modo **async**: la escritura no espera por ella; un **worker en segundo plano** (el daemon) alimenta el read model justo después. A cambio, una consulta justo después de escribir puede no ver el cambio todavía (lo llamaremos **consistencia eventual**).
 
 ## 💥 El dolor: inline acopla la escritura a la proyección
 
@@ -20,6 +20,12 @@ Cambias el ciclo de vida de la proyección a `Async`. Pero una proyección async
 > 🆕 **El esqueleto de un host (idioma nuevo, te lo muestro).** Un host se arma siempre igual: `Host.CreateApplicationBuilder(args)` → registras servicios en `builder.Services` → `builder.Build()` → `await app.StartAsync()` (queda corriendo, y con él el daemon). Es la primera vez que lo ves; cópialo tal cual. Lo tuyo en el reto es solo el cableado de Marten.
 
 > 🛠️ **Inténtalo tú.** Sobre ese esqueleto: `AddMarten` con tu misma config pero con la proyección en `ProjectionLifecycle.Async`, y encadena `.AddAsyncDaemon(DaemonMode.Solo)`.
+
+> [!NOTE]
+> 🆕 **`AddMarten` mete Marten en el contenedor.** Registra Marten en `builder.Services` (el *contenedor*), en vez de tu `DocumentStore.For` a mano — la **inyección de dependencias**, que verás a fondo en la próxima sección. El daemon lo **necesita**: es un servicio en segundo plano que vive dentro del host. Y cuando quieras el store de vuelta, se lo **pides** al contenedor con `GetRequiredService<IDocumentStore>()` (lo usarás en el checkpoint). Este host es mínimo, solo para el daemon; crecerá cuando conviertas la app en un servicio.
+
+> [!NOTE]
+> 🆕 **`AddAsyncDaemon(DaemonMode.Solo)`.** Enciende el **daemon**: un worker que, en segundo plano, lee el stream de eventos y alimenta las proyecciones `Async`. `Solo` = un único daemon corriendo todas las proyecciones (hay otros modos para varias instancias; los dejas para después).
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -48,17 +54,11 @@ await app.StartAsync();             // el daemon queda corriendo
 ```
 </details>
 
-> [!NOTE]
-> 🆕 **`AddMarten` mete Marten en el contenedor.** Es la **inyección de dependencias**: `AddMarten` registra Marten en `builder.Services`, en vez de tu `DocumentStore.For` a mano. El daemon lo **necesita**: es un servicio en segundo plano que vive dentro del host. Y cuando quieras el store de vuelta, se lo **pides** al contenedor con `GetRequiredService<IDocumentStore>()` (lo usarás en el checkpoint). Este host es mínimo, solo para el daemon; crecerá cuando conviertas la app en un servicio.
-
-> [!NOTE]
-> 🆕 **`AddAsyncDaemon(DaemonMode.Solo)`.** Enciende el **daemon**: un worker que, en segundo plano, lee el stream de eventos y alimenta las proyecciones `Async`. `Solo` = un único daemon corriendo todas las proyecciones (hay otros modos para varias instancias; los dejas para después).
-
 ### Paso 2 · Consistencia eventual: la escritura ya no espera
 
 Con `Async`, guardar un evento **no** corre la proyección. El `SaveChangesAsync` vuelve enseguida; el daemon **alcanza** el read model un instante después. Eso significa que una consulta **justo después** de escribir podría **no ver el cambio todavía** — el read model va un pelín atrás. Eso es **consistencia eventual**, y es el precio de no bloquear la escritura.
 
-> 🔍 **¿Lo lograste?** Con el host corriendo (`await app.StartAsync()`), saca el store del host (`var store = app.Services.GetRequiredService<IDocumentStore>()`): abre una sesión, siembra `emp-7` (`EmpresaRegistrada` + `EmpresaSuspendida`) y `SaveChangesAsync` — vuelve al instante, y una consulta **inmediata** aún **no** ve el `ResumenEmpresa`. Espera a que el daemon alcance (`await app.WaitForNonStaleProjectionDataAsync(TimeSpan.FromSeconds(5))`, con `using Marten.Events;`), consulta `LoadAsync<ResumenEmpresa>("emp-7")` y **ahora sí**: `Suspendida = true`. La proyección se llenó **fuera** de tu transacción de escritura.
+> 🔍 **¿Lo lograste?** Con el host corriendo (`await app.StartAsync()`), saca el store del host (`var store = app.Services.GetRequiredService<IDocumentStore>()`): abre una sesión, siembra `emp-7` (`EmpresaRegistrada` + `EmpresaSuspendida`) y `SaveChangesAsync` — vuelve al instante, y una consulta **inmediata** aún **no** ve el `ResumenEmpresa`. Espera a que el daemon alcance (`await app.WaitForNonStaleProjectionDataAsync(TimeSpan.FromSeconds(5))` —bloquea hasta que las proyecciones estén al día o expire el timeout; solo para pruebas, con `using Marten.Events;`—), consulta `LoadAsync<ResumenEmpresa>("emp-7")` y **ahora sí**: `Suspendida = true`. La proyección se llenó **fuera** de tu transacción de escritura.
 
 ### Paso 3 · Checkpoints: retomar y reconstruir
 

@@ -1,6 +1,6 @@
 # El almacén: un cajón por empresa
 
-Ya tienes un **`Despachador`** que rutea cualquier comando a su handler ([El despachador](el-despachador.md)). Al usarlo aparece un dolor apenas nace la **segunda** empresa. Ese dolor es lo que resolvemos aquí.
+Ya tienes un **`Despachador`** que rutea cualquier comando a su handler ([El despachador](el-despachador.md)).
 
 ## 💥 El dolor: ¿y cuando nace la segunda empresa?
 
@@ -22,7 +22,7 @@ despachador.Registrar(new SuspenderHandler(stream2));   // 💥 MISMA llave: typ
 
 El despachador rutea por **tipo del comando**, así que este `Registrar` **pisa** al de la empresa 1 (misma entrada del diccionario). No caben dos empresas en un mismo despachador.
 
-La causa de fondo no es el despachador. Es que el handler está **atado a un stream**, o sea a **una** empresa (`new SuspenderHandler(stream1)`). Por eso te haría falta uno por empresa. En cambio, si el handler recibiera un **almacén con todas** las empresas y abriera la correcta **por su `id`** (que viaja en el comando), **un solo** handler serviría a **todas**. Y lo registrarías **una vez**. Ese **almacén central por id** es la pieza que falta.
+La causa de fondo no es el despachador. Es que el handler está **atado a un stream**, o sea a **una** empresa (`new SuspenderHandler(stream1)`). Por eso te haría falta uno por empresa. En cambio, si el handler recibiera un **almacén con todas** las empresas y abriera la correcta **por su `id`** (que haremos viajar en el comando en un momento), **un solo** handler serviría a **todas**. Y lo registrarías **una vez**. Ese **almacén central por id** es la pieza que falta.
 
 ## 🎯 El Objetivo
 
@@ -133,7 +133,7 @@ public EventStream<T> AbrirStream<T>(string aggregateId) where T : AggregateRoot
 
 > 🔍 **¿Lo lograste?** Corre el ejemplo de arriba: si imprime `Constructora Andes`, la pieza más difícil ya está.
 
-## El handler ya no carga un stream suelto: lo busca por id
+## El handler ya no recibe un stream suelto: lo busca por id
 
 Ahora el handler recibe el **almacén** (no un stream fijo) y abre el stream de la empresa que el comando indica. Y por eso **el comando recupera su `EmpresaId`**:
 
@@ -183,7 +183,7 @@ Console.WriteLine($"emp-7: suspendida={andes.Suspendida}");
 
 `dotnet run`: dos empresas en el mismo almacén, cada una en su cajón, con handlers que se registraron **una sola vez**.
 
-Con esto, el id es **uno solo** que entregas **una vez**: se lo das al **almacén** al pedir el stream (`AbrirStream(id)`), y el **stream** se lo pasa en cada `GetEvents`/`AppendEvent` como la **llave del cajón**. No son varios ids; es uno que entregas una vez y viaja solo.
+Con esto, el id es **uno solo** que entregas **una vez**: se lo das al **almacén** al pedir el stream (`AbrirStream(id)`), y el **stream** se lo pasa en cada `GetEvents`/`AppendEvent` como la **llave del cajón**.
 
 > [!NOTE]
 > 🌱 **Semilla — este `EventStream` es un andamio.** Nos sirve para ver el ciclo (cargar → escribir). Pero el almacén de verdad (el que adoptaremos) **no te entrega un objeto así**: te da **directamente la empresa** rehidratada. Cuando lleguemos ahí, el `EventStream` **desaparece** (lo verás en [El swap](el-swap.md)). Es un peldaño, no la meta.
@@ -202,7 +202,7 @@ EventStore
 ```
 
 > [!NOTE]
-> 🌱 **Semilla — reconstruir el estado es solo UNA vista de los eventos.** `Get()` recorre los hechos para armar la `Empresa`. Pero de **esos mismos** hechos podrías derivar otras vistas: un *listado por estado*, un *conteo de suspensiones por mes*… A cada vista derivada se le llama **proyección**, y a separar escritura (eventos) de lectura (proyecciones), **CQRS**. Lo verás a fondo más adelante.
+> 🌱 **Semilla — reconstruir el estado es solo UNA vista de los eventos.** `Get()` recorre los hechos para armar la `Empresa`. Pero de **esos mismos** hechos podrías derivar otras vistas: un *listado por estado*, un *conteo de suspensiones por mes*… A cada vista derivada se le llama **proyección**, y a separar escritura (eventos) de lectura (proyecciones), **CQRS**. Lo verás en [Proyecciones](proyecciones.md).
 
 Pero falta un peligro que aparece justo cuando hay **muchos escritores** sobre el mismo cajón: dos peticiones que tocan la misma empresa a la vez. Eso —y su cura— es la próxima sección.
 
@@ -212,7 +212,7 @@ Pero falta un peligro que aparece justo cuando hay **muchos escritores** sobre e
 
 - [ ] `dotnet run` escribe y lee **dos** empresas distintas (`emp-7`, `emp-9`) **siempre a través del stream**, nunca tocando el `store` directo.
 - [ ] Los handlers se registran **una sola vez** (reciben el `EventStore`, no un stream), y el comando trae su `EmpresaId`.
-- [ ] Confirma que el id es **uno solo**: el que pasas a `AbrirStream` es la **misma llave** del cajón en el diccionario.
+- [ ] Sigue el id con la vista: `AbrirStream(id)` → `store.AppendEvent(id, …)` → `_cajones[id]` — es el **mismo** string, sin transformarse en el camino.
 - [ ] Explica por qué el diseño de [El despachador](el-despachador.md) no escalaba a dos empresas (pista: la llave del despachador es el **tipo** del comando).
 
 ---

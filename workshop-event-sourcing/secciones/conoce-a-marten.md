@@ -48,7 +48,7 @@ Console.WriteLine(nota.Id);             // Marten le asignó un Guid al guardarl
 ```
 
 > [!NOTE]
-> 🆕 **`session.Store(objeto)` + `SaveChangesAsync()`.** `Store` marca el objeto para guardar; `SaveChangesAsync` lo persiste (una unidad de trabajo: puedes `Store` varios y confirmarlos juntos). No creaste ninguna tabla ni escribiste SQL: Marten se encarga.
+> 🆕 **`session.Store(objeto)` + `SaveChangesAsync()`.** `Store` marca el objeto para guardar; `SaveChangesAsync` lo persiste (una unidad de trabajo: puedes `Store` varios y confirmarlos juntos). No creaste ninguna tabla ni escribiste SQL: Marten se encarga. (La `LightweightSession` es la sesión de trabajo **ligera** de Marten para leer y escribir; hay otras variantes que verás más adelante.)
 
 > [!NOTE]
 > 🆕 **Idioma de C#: `async`/`await`.** Es la primera vez que aparece un `await` en el taller, y tiene un motivo.
@@ -85,7 +85,7 @@ Console.WriteLine(recuperada!.Texto);   // "mi primer documento"
 ```
 
 > [!NOTE]
-> 🆕 **`LoadAsync<Nota>(id)`.** Marten lee la fila y **deserializa el JSON de vuelta a tu tipo** `Nota`. ¿Recuerdas ese `switch (type)` a mano para reconstruir el `object` correcto? Marten lo hace por ti, porque él guardó el tipo y sabe volver a él.
+> 🆕 **`QuerySession` + `LoadAsync<Nota>(id)`.** Para **solo leer** abres una `QuerySession` (sesión de solo lectura); la `LightweightSession` del Paso 2 es la que además **escribe**. `LoadAsync` lee la fila y **deserializa el JSON de vuelta a tu tipo** `Nota`. ¿Recuerdas ese `switch (type)` a mano para reconstruir el `object` correcto? Marten lo hace por ti, porque él guardó el tipo y sabe volver a él.
 
 ---
 

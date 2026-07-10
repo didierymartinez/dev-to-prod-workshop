@@ -29,6 +29,9 @@ Console.WriteLine(stream.Get().Suspendida ? "suspendida" : "activa");   // suspe
 
 > 🛠️ **Inténtalo tú.** Crea `EmpresaCommandHandlers` que reciba el `EventStream<Empresa>` por **constructor**. Dale **un método por operación, con sus parámetros sueltos** —`CambiarPlan(string nuevoPlan)` y `Suspender(string motivo)`—: cada uno **carga** (`Get`), pide a la empresa que **decida**, y **guarda** (`Append`) el hecho. **Ojo:** `Suspender` puede devolver `null` (idempotencia, [Decidir el futuro](decidir-el-futuro.md)) → en ese caso **no** guardes nada.
 
+> [!NOTE]
+> 🆕 **Idioma de C#: el constructor primario.** `public class EmpresaCommandHandlers(EventStream<Empresa> stream)` declara el parámetro `stream` **en la cabecera de la clase** (un *constructor primario*, C# 12+): queda disponible en todos los métodos sin que escribas un campo ni un constructor aparte. Es azúcar para el clásico `private readonly EventStream<Empresa> _stream; public EmpresaCommandHandlers(EventStream<Empresa> stream) { _stream = stream; }`. Es la misma idea posicional del `record`, ahora en una `class` — y la verás en todos los handlers de aquí en adelante.
+
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
@@ -51,16 +54,13 @@ public class EmpresaCommandHandlers(EventStream<Empresa> stream)
 ```
 </details>
 
-> [!NOTE]
-> 🆕 **Idioma de C#: el constructor primario.** `public class EmpresaCommandHandlers(EventStream<Empresa> stream)` declara el parámetro `stream` **en la cabecera de la clase** (un *constructor primario*, C# 12+): queda disponible en todos los métodos sin que escribas un campo ni un constructor aparte. Es azúcar para el clásico `private readonly EventStream<Empresa> _stream; public EmpresaCommandHandlers(EventStream<Empresa> stream) { _stream = stream; }`. Es la misma idea posicional del `record`, ahora en una `class` — y la verás en todos los handlers de aquí en adelante.
-
 El `if (hecho is not null)` respeta la idempotencia que decidió el agregado ([Decidir el futuro](decidir-el-futuro.md)): la regla la pone la `Empresa`; el handler solo la **obedece**.
 
 Funciona — pero **todo en una sola clase** no escala.
 
 ## 🔧 Una clase por comando (rompe el súper-secretario)
 
-Esa clase es un **súper-secretario**: hoy 2 operaciones, mañana 20, todas amontonadas y tocadas por todos. Por **responsabilidad única**, cada operación merece su **propia clase** —un especialista, no un secretario que hace de todo—.
+Esa clase es un **súper-secretario**: hoy 2 operaciones, mañana 20, todas amontonadas. Y lo que viene enseguida —un **despachador** que manda cada comando a su handler **por su tipo**— necesita justo lo contrario: **un handler por comando**. Por eso, por **responsabilidad única**, cada operación pasa a su **propia clase** —un especialista, no un secretario que hace de todo—.
 
 > 🛠️ **Inténtalo tú.** **🔁 Rompe `EmpresaCommandHandlers`** —y **bórrala**— en **una clase por comando**: `CambiarPlanHandler` y `SuspenderHandler`. Cada una recibe el `EventStream<Empresa>` por constructor y tiene un método `Handle(...)` —con sus **parámetros sueltos**, como antes— que hace **cargar → decidir → guardar** (respetando el `null` de `Suspender`).
 
