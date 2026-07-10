@@ -82,15 +82,13 @@ La primera pieza que se repetirá en todo test: **sembrar los hechos previos**. 
 
 > [!NOTE]
 > 🆕 **`params object[]` y `abstract`/herencia.** `Given(params object[])` —y más adelante `Then`— deja pasar **varios** hechos sin armar un array (`Given(a, b)`): un escenario puede tener más de un hecho previo, y un comando puede emitir más de uno. Y la base es `abstract` —como `AggregateRoot` en [Refactorizando el motor](refactorizando-el-motor.md)—: lo **compartido** por todos los tests vive arriba; cada test hereda.
->
-> Dos cosas que quizá notes: la base **aún no** lleva `<TCommand>` —nada aquí usa el comando; ese tipo llega en el Paso 3, con `When`/`Handler`—; y el `<Empresa>` de `AbrirStream` está *quemado* porque hoy tienes **un** agregado. Sembrar solo apila hechos por id, así que al cambiar el motor el sembrado pasará a ser **por id** y ese `<Empresa>` desaparece — no se parametriza.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```csharp
 // Empresas.Historia.Tests/HandlerTest.cs — la BASE (nace con el motor + Given)
-public abstract class HandlerTest   // aún SIN tipo: Given no usa el comando
+public abstract class HandlerTest
 {
     protected readonly EventStore Store = new();   // el MOTOR — lo único que cambiará al reemplazar el almacén
     protected string AggregateId = "emp-7";
@@ -109,7 +107,7 @@ public abstract class HandlerTest   // aún SIN tipo: Given no usa el comando
 // Empresas.Historia.Tests/SuspenderEmpresaTests.cs — ahora HEREDA; el resto sigue a pelo POR AHORA
 using Xunit;
 
-public class SuspenderEmpresaTests : HandlerTest      // aún sin tipo
+public class SuspenderEmpresaTests : HandlerTest
 {
     [Fact]
     public void Suspender_una_empresa_activa_emite_EmpresaSuspendida()
