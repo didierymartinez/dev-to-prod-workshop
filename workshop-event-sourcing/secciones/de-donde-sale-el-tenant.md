@@ -1,10 +1,10 @@
 # ¿De dónde sale el tenant?
 
-En [De un cliente a muchos](de-un-cliente-a-muchos.md) abriste la sesión con `"cliente-acme"` escrito a mano. En un servicio real, ¿de dónde sale ese "acme" en **cada** petición? No puedes creerle al cliente si lo pone en el cuerpo (mentiría, o se haría pasar por otro). Y no quieres que cada endpoint lo parsee a su manera. Necesitas un **solo lugar** que responda: "¿quién es el cliente —y el usuario— de esta petición?".
+En [De un cliente a muchos](de-un-cliente-a-muchos.md) abriste la sesión con `"cliente-acme"` escrito a mano. En un servicio real, ¿de dónde sale ese "acme" en **cada** petición — sin que el cliente pueda mentir?
 
 ## 🎯 El Objetivo
 
-Resolver el tenant y el usuario de una petición HTTP leyéndolos de **headers confiables** (`X-Tenant-Id` / `X-User-Id`) que pone un gateway, tras una interfaz `ITenantResolver`, y **fallar ruidoso** si faltan.
+Resolver el cliente y el usuario de una petición HTTP desde **headers ya validados** (`X-Tenant-Id` / `X-User-Id`), siempre desde un **solo lugar** — y **fallar ruidoso** si faltan.
 
 ## 💥 El dolor: adivinar el tenant es una fuga de datos
 
@@ -45,7 +45,10 @@ public interface ITenantResolver
 
 ### Paso 2 · Leer de headers confiables
 
-> 🛠️ **Inténtalo tú.** Implementa `TrustedHeadersTenantResolver`: lee `X-Tenant-Id` / `X-User-Id` del `HttpContext` y **lanza** si el header falta o está vacío.
+> 🛠️ **Inténtalo tú.** Implementa `TrustedHeadersTenantResolver`: pide `IHttpContextAccessor` por el constructor para llegar a la petición en curso, lee `X-Tenant-Id` / `X-User-Id` de sus headers y **lanza** si el header falta o está vacío.
+
+> [!NOTE]
+> 🆕 **`IHttpContextAccessor`.** Da acceso a la petición HTTP en curso desde una clase que **no** es el endpoint. Necesitas `AddHttpContextAccessor()` para que exista. El resolver se registra **`Scoped`**: uno por petición, porque el tenant es de la petición.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -74,9 +77,6 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITenantResolver, TrustedHeadersTenantResolver>();
 ```
 </details>
-
-> [!NOTE]
-> 🆕 **`IHttpContextAccessor`.** Da acceso a la petición HTTP en curso desde una clase que **no** es el endpoint. Necesitas `AddHttpContextAccessor()` para que exista. El resolver se registra **`Scoped`**: uno por petición, porque el tenant es de la petición.
 
 > [!NOTE]
 > 🆕 **Momento-criterio — headers confiables + fallar ruidoso.** Un **gateway** es un proceso que se planta **delante** de tu app: recibe la petición, autentica al usuario, y la reenvía con `X-Tenant-Id` / `X-User-Id` ya validados. (En el taller **lo simulas** poniendo esos headers a mano con `curl`; en producción los pone él.) Dos decisiones de criterio caen de ahí: (1) el tenant sale del gateway, **no** de parsear el token en tu app — separas la autenticación (gateway) de la tenancy (app), y por eso los headers son "confiables" (no los re-validas, confías en él). (2) Si el header **falta**, no adivinas un default: **lanzas**. Un default silencioso escribiría en el cliente equivocado — el peor bug de un multi-tenant.

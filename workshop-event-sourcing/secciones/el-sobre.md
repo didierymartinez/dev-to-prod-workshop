@@ -1,10 +1,10 @@
 # El sobre: lo que viaja junto al hecho
 
-En [Público vs privado](publico-privado.md) marcaste `EmpresaSuspendida` como pública: cruza a **facturación**. Pero el hecho solo dice *"la empresa emp-7 fue suspendida por impago"*. Facturación atiende a **muchos clientes** a la vez: ¿de cuál de ellos es esta empresa? Y para su auditoría, ¿**quién** la suspendió? Eso no es dato del dominio, es **contexto**: no va dentro del evento. Viaja en un **sobre** alrededor del mensaje. Es el mismo sobre que envolviste en [Concurrencia optimista](concurrencia-optimista.md) para la versión, ahora para la mensajería.
+En [Público vs privado](publico-privado.md) marcaste `EmpresaSuspendida` como pública: cruza a **facturación**. Pero el hecho llega solo, y del otro lado hace falta algo que el evento no dice: **contexto**. Ese contexto viaja en un **sobre** —el mismo que envolviste en [Concurrencia optimista](concurrencia-optimista.md) para la versión, ahora para la mensajería.
 
 ## 🎯 El Objetivo
 
-Envolver cada hecho publicado en un **sobre** (`DeliveryOptions`) que lleve el **cliente** (`TenantId`) y el **usuario** (`user_id`) — y ver que cada uno viaja por un camino distinto: uno **nativo**, otro como **header**.
+Envolver cada hecho publicado en un **sobre** que lleve el **cliente** y el **usuario**, y ver que cada dato viaja por un camino distinto según lo que Wolverine ya sabe propagar.
 
 ## 💥 El dolor: el hecho solo no basta para el receptor
 
@@ -44,7 +44,7 @@ await bus.PublishAsync(hecho, sobre);
 
 El `user_id` que en [Auditoría](auditoria.md) pusiste en la sesión de Marten (`SetHeader("user_id", …)`) ahora tiene que **acompañar al hecho** hasta el otro servicio. El sobre no tiene casilla nativa para el usuario, así que lo agregas como **header**.
 
-> 🛠️ **Inténtalo tú.** **🔁** Al mismo sobre, agrégale el `user_id` como header. Usa una constante para el nombre del header (no un string suelto repetido).
+> 🛠️ **Inténtalo tú.** **🔁** Al mismo sobre, agrégale el `user_id` como header con `.WithHeader(nombre, valor)`. Usa una constante para el nombre del header (no un string suelto repetido).
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -103,7 +103,7 @@ await bus.PublishAsync(hecho, TenancyDelivery.Build(tenantResolver));
 Envolviste el hecho publicado en un **sobre** (`DeliveryOptions`) que lleva **contexto**, no dominio: el **cliente** (`TenantId`, en casilla nativa que Wolverine propaga) y el **usuario** (`user_id`, como header manual). Es el mismo patrón del sobre `EventoAlmacenado(Version, …)` de [Concurrencia optimista](concurrencia-optimista.md): un envoltorio con metadata alrededor del dato. Y reusa el `user_id` de [Auditoría](auditoria.md): lo que ahí quedó en el evento guardado, aquí acompaña al mensaje en vuelo. Y lo centralizaste en `TenancyDelivery.Build`, para que cada publicación arme el sobre igual.
 
 > [!NOTE]
-> 🌱 **Semilla — ¿de dónde sale el cliente?** Aquí `tenantResolver` fue una caja negra que "sabe" el cliente y el usuario actuales. ¿Quién lo sabe, y cómo? En una petición HTTP sale de un header (`X-Tenant-Id`); en el daemon que drena la cola, sale del propio sobre del mensaje que acaba de llegar. Eso es **multi-tenancy**, y el sobre que armaste aquí es justo el vehículo. Lo construyes en el Bloque H.
+> 🌱 **Semilla — ¿de dónde sale el cliente?** Aquí `tenantResolver` fue una caja negra que "sabe" el cliente y el usuario actuales. ¿Quién lo sabe, y cómo? En una petición HTTP sale de un header (`X-Tenant-Id`); en el daemon que drena la cola, sale del propio sobre del mensaje que acaba de llegar. Eso es **multi-tenancy**, y el sobre que armaste aquí es justo el vehículo. Lo construyes en [De dónde sale el tenant](de-donde-sale-el-tenant.md).
 
 ---
 

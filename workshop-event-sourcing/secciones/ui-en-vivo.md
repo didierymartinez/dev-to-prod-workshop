@@ -7,7 +7,7 @@ El [transporte](transportes.md) ya lleva `EmpresaSuspendida` a otros servicios, 
 
 ## 🎯 El Objetivo
 
-Que cuando la **suscripción** reciba `EmpresaSuspendida`, lo **empuje** al navegador por SignalR y la pantalla lo muestre **al instante**, sin recargar.
+Que cuando la **suscripción** reciba `EmpresaSuspendida`, lo **empuje** al navegador por una conexión abierta (SignalR) y la pantalla lo muestre **al instante**, sin recargar.
 
 ## 💥 El dolor: el polling llega tarde y cuesta caro
 
@@ -17,7 +17,10 @@ Un panel que pregunta "¿algo nuevo?" cada 3 segundos tiene dos problemas: **lat
 
 ### Paso 1 · El Hub: el canal hacia los navegadores
 
-> 🛠️ **Inténtalo tú.** Crea un **Hub** de SignalR y publícalo en una ruta. Los navegadores se conectarán ahí y se **agruparán** por empresa, para que cada uno reciba solo lo suyo.
+> 🛠️ **Inténtalo tú.** Crea un **Hub** de SignalR y publícalo en una ruta. Los navegadores se conectarán ahí y se **agruparán** por empresa, para que cada uno reciba solo lo suyo. (SignalR es idioma nuevo; la 🆕 de abajo te muestra la API.)
+
+> [!NOTE]
+> 🆕 **SignalR y el Hub.** SignalR mantiene una conexión **abierta** (WebSocket) entre servidor y navegador, para que el servidor pueda **empujar** mensajes cuando quiera —no solo responder preguntas—. Un **Hub** es el punto donde los navegadores se conectan (`app.MapHub<T>("/ruta")` lo publica; `builder.Services.AddSignalR()` lo registra). Un **grupo** junta las conexiones interesadas en lo mismo: aquí, todos los que miran `emp-7` se unen al grupo `"emp-7"` (`Groups.AddToGroupAsync`), y un push a ese grupo llega solo a ellos.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -38,14 +41,14 @@ app.MapHub<EmpresasHub>("/hub/empresas");
 ```
 </details>
 
-> [!NOTE]
-> 🆕 **SignalR y el Hub.** SignalR mantiene una conexión **abierta** (WebSocket) entre servidor y navegador, para que el servidor pueda **empujar** mensajes cuando quiera —no solo responder preguntas—. Un **Hub** es el punto donde los navegadores se conectan. Un **grupo** junta las conexiones interesadas en lo mismo: aquí, todos los que miran `emp-7` se unen al grupo `"emp-7"`, y un push a ese grupo llega solo a ellos.
-
 ### Paso 2 · La suscripción empuja al Hub
 
 El hecho lo entrega una **suscripción** (de [Suscripciones](suscripciones.md)): hereda de `SubscriptionBase`, filtra `EmpresaSuspendida` y corre en el daemon. Su ventaja aquí es que cada evento trae su `StreamKey` —el id de la empresa—, justo lo que necesitas para elegir el grupo.
 
-> 🛠️ **Inténtalo tú.** Escribe una suscripción que reciba `EmpresaSuspendida` y, por cada uno, empuje al grupo de **su** empresa (`e.StreamKey`). El acceso al Hub llega **por el constructor** (`IHubContext<EmpresasHub>`).
+> 🛠️ **Inténtalo tú.** Escribe una suscripción que reciba `EmpresaSuspendida` y, por cada uno, empuje al grupo de **su** empresa (`e.StreamKey`). El acceso al Hub llega **por el constructor** (`IHubContext<EmpresasHub>`); regístrala con `AddSubscriptionWithServices<T>(...)` para que Marten le inyecte ese `IHubContext`.
+
+> [!NOTE]
+> 🆕 **La suscripción con dependencias.** Una suscripción normal se registra con `Subscribe(new …())`. Cuando necesita algo del contenedor —aquí el `IHubContext`— se registra con `AddSubscriptionWithServices<T>(...)`: Marten la **crea desde el contenedor** e inyecta sus dependencias por el constructor, igual que a un handler. El `e.StreamKey` es el id de la empresa (el mismo que usaste como llave del stream), así eliges el grupo sin que el id tenga que viajar dentro del evento.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -90,9 +93,6 @@ builder.Services.AddMarten(/* tu config */)
 ```
 </details>
 
-> [!NOTE]
-> 🆕 **La suscripción con dependencias.** Una suscripción normal se registra con `Subscribe(new …())`. Cuando necesita algo del contenedor —aquí el `IHubContext`— se registra con `AddSubscriptionWithServices<T>(...)`: Marten la **crea desde el contenedor** e inyecta sus dependencias por el constructor, igual que a un handler. El `e.StreamKey` es el id de la empresa (el mismo que usaste como llave del stream), así eliges el grupo sin que el id tenga que viajar dentro del evento.
-
 ### Paso 3 · El navegador escucha y pinta
 
 > 🛠️ **Inténtalo tú.** Conéctate al Hub, escucha el evento `"empresaSuspendida"` y únete al grupo de tu empresa con `Seguir`.
@@ -101,10 +101,11 @@ builder.Services.AddMarten(/* tu config */)
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```javascript
+// (en tu página HTML, carga antes el cliente de SignalR: el script de @microsoft/signalr)
 const conn = new signalR.HubConnectionBuilder().withUrl("/hub/empresas").build();
 
 conn.on("empresaSuspendida", (motivo) => {
-    mostrarBanner(`Suspendida: ${motivo}`);   // se pinta al instante
+    alert(`Suspendida: ${motivo}`);   // tu UI real pintaría un banner; aquí, un alert simple
 });
 
 await conn.start();

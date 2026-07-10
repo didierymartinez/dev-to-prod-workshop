@@ -71,6 +71,12 @@ Mira el `foreach` que recorre la historia: *"toma la lista de hechos y aplícalo
 
 > 🛠️ **Inténtalo tú.** Crea una clase base **`AggregateRoot`** con un método público `Load(IEnumerable<object>)` que haga el `foreach`; deja el "qué hace cada hecho" para las hijas. Haz que `Empresa` **herede** de ella y conserve solo su `Aplicar`. *(Pista: la base **no sabe** aplicar un hecho concreto —eso es de cada hija—; en C# ese método "obligatorio pero sin cuerpo aquí" es `protected abstract`.)*
 
+> [!NOTE]
+> 🆕 **Idioma de C#: herencia con `abstract` / `protected` / `override`.** `abstract class AggregateRoot` es una **clase base incompleta** —no se crea con `new`, solo se hereda—. `protected abstract void Aplicar(object hecho);` declara un método **obligatorio pero sin cuerpo** (`abstract`): la base exige que exista, pero no sabe implementarlo. `protected` lo hace visible **solo dentro de la base y sus hijas** (ni público ni privado). Cada hija da el cuerpo con `protected override void Aplicar(...)` (`override` = "estoy reemplazando el método de la base"). `Empresa : AggregateRoot` significa "`Empresa` **hereda de** `AggregateRoot`": recibe gratis el `Load` y solo aporta su `Aplicar`.
+
+> [!NOTE]
+> 🆕 **Idioma de C#: cuerpo de expresión (`=>`).** `public Empresa(...) => Load(historia);` es la forma corta de un método/constructor de **una sola línea**: `=> expresión;` equivale a `{ expresión; }`. Es solo azúcar sintáctica; el clásico sería `public Empresa(...) { Load(historia); }`.
+
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
@@ -118,17 +124,11 @@ Ahora, crear una `Factura` event-sourced es heredar de `AggregateRoot` y escribi
 </details>
 
 > [!NOTE]
-> 🆕 **Idioma de C#: herencia con `abstract` / `protected` / `override`.** `abstract class AggregateRoot` es una **clase base incompleta** —no se crea con `new`, solo se hereda—. `protected abstract void Aplicar(object hecho);` declara un método **obligatorio pero sin cuerpo** (`abstract`): la base exige que exista, pero no sabe implementarlo. `protected` lo hace visible **solo dentro de la base y sus hijas** (ni público ni privado). Cada hija da el cuerpo con `protected override void Aplicar(...)` (`override` = "estoy reemplazando el método de la base"). `Empresa : AggregateRoot` significa "`Empresa` **hereda de** `AggregateRoot`": recibe gratis el `Load` y solo aporta su `Aplicar`.
-
-> [!NOTE]
-> 🆕 **Idioma de C#: cuerpo de expresión (`=>`).** `public Empresa(...) => Load(historia);` es la forma corta de un método/constructor de **una sola línea**: `=> expresión;` equivale a `{ expresión; }`. Es solo azúcar sintáctica; el clásico sería `public Empresa(...) { Load(historia); }`.
-
-> [!NOTE]
 > **¿Y por qué una clase abstracta, no una interfaz?**
-> Las dos sirven para estandarizar ("toda entidad sabe cargar su historia"). La diferencia que importa **aquí**: una **clase abstracta** lleva **código real compartido** (el bucle `Load`, escrito una vez) y puede guardar **estado** (🌱 pronto le pondremos un **`Id`**); además es "incompleta" — no se crea sola con `new`. Una **interfaz** es ante todo un **contrato**: aunque el C# moderno le permite traer métodos *por defecto*, **no guarda estado de instancia**, y una clase puede implementar muchas. Como nuestro motor es **el mismo para todos** y pronto tendrá estado, encaja una clase abstracta: lo escribes **una vez** y cada hija lo hereda. (Con una interfaz, en la práctica, acabarías **repitiendo** el motor en cada clase.)
+> Las dos sirven para estandarizar ("toda entidad sabe cargar su historia"). La diferencia que importa **aquí**: una **clase abstracta** lleva **código real compartido** (el bucle `Load`, escrito una vez) y puede guardar **estado**; además es "incompleta" — no se crea sola con `new`. Una **interfaz** —la **lista de lo que una clase promete tener**, sin código propio— es ante todo un **contrato**: aunque el C# moderno le permite traer métodos *por defecto*, **no guarda estado de instancia**, y una clase puede implementar muchas. Como nuestro motor es **el mismo para todos** y pronto tendrá estado, encaja una clase abstracta: lo escribes **una vez** y cada hija lo hereda. (Con una interfaz, en la práctica, acabarías **repitiendo** el motor en cada clase.)
 
 > [!NOTE]
-> 🌱 **Semilla — este motor que escribes a mano, luego lo automatiza el framework.** El ciclo "cargar la historia → aplicar hecho por hecho" es tan universal que **las librerías que adoptaremos lo hacen por ti** (lo llaman el *Aggregate Handler Workflow*). Lo construyes a mano ahora para que ese atajo, más adelante, **no sea magia**: sabrás exactamente qué hace por debajo, porque lo escribiste.
+> 🌱 **Semilla — este motor que escribes a mano, luego lo automatiza el framework.** El ciclo "cargar la historia → aplicar hecho por hecho" es tan universal que **las librerías que adoptaremos lo hacen por ti** (lo llaman el *Aggregate Handler Workflow*); lo verás al [conocer a Marten](conoce-a-marten.md). Lo construyes a mano ahora para que ese atajo, más adelante, **no sea magia**: sabrás exactamente qué hace por debajo, porque lo escribiste.
 
 ## 🔧 Refactor 3: del `if` encadenado al `switch`
 
@@ -188,7 +188,7 @@ Cada `case` es "si el hecho es de **este tipo**, recíbelo ya convertido (`r`, `
 > ```
 > Funciona, y se parece a lo que un framework hace por dentro (un `Aplicar` por tipo, enrutado solo). **Pero** `(dynamic)` enruta en ejecución y **el compilador deja de verificarte los tipos**: si te falta un `Aplicar`, el error sale al correr el programa, no al compilar (y es más lento). Por eso **nos quedamos con el `switch`** de arriba: la misma idea, pero tipada.
 >
-> 🌱 Guarda eso sí la **forma** —un `Aplicar` por tipo—: es la que usan las herramientas que adoptaremos, y a la que el motor convergirá (con un enrutador seguro, no `dynamic`).
+> 🌱 Guarda eso sí la **forma** —un `Aplicar` por tipo—: es la que usan las herramientas que adoptaremos, y a la que el motor convergirá cuando adoptes [Marten](conoce-a-marten.md) (con un enrutador seguro, no `dynamic`).
 
 ---
 

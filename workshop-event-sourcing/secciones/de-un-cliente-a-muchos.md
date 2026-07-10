@@ -1,6 +1,6 @@
 # De un cliente a muchos: aislar los datos por tenant
 
-El [sobre](el-sobre.md) viene cargando un `TenantId`, y [Serverless](serverless.md) cerró preguntando qué es un cliente. Aquí lo respondes. Hoy tu almacén tiene **una** base para todos: `emp-7` es `emp-7`, global. Pero la plataforma es **multi-cliente**: `cliente-acme` y `cliente-globex` pueden tener cada uno **su** `emp-7`, y ninguno debe ver jamás los datos del otro. El cliente —el **tenant**— tiene que volverse parte de la llave.
+El [sobre](el-sobre.md) viene cargando un `TenantId`, y [Serverless](serverless.md) cerró preguntando qué es un cliente. Aquí lo respondes: el cliente —el **tenant**— tiene que volverse parte de la llave.
 
 ## 🎯 El Objetivo
 
@@ -14,7 +14,10 @@ Que Marten **aísle** los datos por cliente: la llave pasa de `id` a `(tenant, i
 
 ### Paso 1 · Marca todo como multi-tenant
 
-> 🛠️ **Inténtalo tú.** En tu `AddMarten`, di que los **eventos** y los **documentos** (proyecciones) son multi-tenant estilo *conjoined*.
+> 🛠️ **Inténtalo tú.** En tu `AddMarten`, di que los **eventos** y los **documentos** (proyecciones) son multi-tenant estilo *conjoined* — con `opts.Events.TenancyStyle` y una policy en `opts.Policies`.
+
+> [!NOTE]
+> 🆕 **`TenancyStyle.Conjoined`.** Todos los tenants comparten el **mismo esquema y las mismas tablas**; Marten agrega una columna `tenant_id` y la mete en la llave. "Conjoined" = conviven en una base, discriminados por esa columna. La alternativa —una base o esquema por tenant— da aislamiento **físico** pero multiplica la operación. (Gotcha: `TenancyStyle` vive en `JasperFx.MultiTenancy`, no en un namespace de Marten.)
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -28,8 +31,6 @@ opts.Policies.AllDocumentsAreMultiTenanted();        // …y en la de todos los 
 </details>
 
 > [!NOTE]
-> 🆕 **`TenancyStyle.Conjoined`.** Todos los tenants comparten el **mismo esquema y las mismas tablas**; Marten agrega una columna `tenant_id` y la mete en la llave. "Conjoined" = conviven en una base, discriminados por esa columna. La alternativa —una base o esquema por tenant— da aislamiento **físico** pero multiplica la operación. (Gotcha: `TenancyStyle` vive en `JasperFx.MultiTenancy`, no en un namespace de Marten.)
-
 ### Paso 2 · Abre la sesión CON el tenant
 
 La llave dejó de ser `id`; ahora es `(tenant, id)`. Por eso ya no abres una sesión "a secas": la abres **para un tenant**, y todo lo que leas o escribas en ella queda marcado con él.
@@ -53,7 +54,7 @@ await using var qs = store.QuerySession("cliente-acme");              // lee sol
 > [!NOTE]
 > **Ojo — esto cambia el esquema.** Activar Conjoined agrega la columna `tenant_id` a `mt_events` y a los documentos. Parte de una **base limpia** (o deja que Marten recree el esquema): tus datos viejos de `emp-7` sin tenant no aparecerán bajo ningún cliente, y está bien. Esa es la "migración" del trade-off — en el taller se resuelve recreando el esquema, no a mano.
 
-> 🔍 **¿Lo lograste?** Con Postgres arriba, siembra la misma id en un solo tenant y comprueba que el otro no la ve (reusa el arnés de [Tests de integración](tests-de-integracion.md)):
+> 🔍 **¿Lo lograste?** Con Postgres arriba, siembra la misma id en un solo tenant y comprueba que el otro no la ve (reusa el arnés de [Tests de integración](tests-de-integracion.md); `store` es el `IDocumentStore` del `MartenFixture`):
 >
 > ```csharp
 > // sembrar emp-7 SOLO en cliente-acme

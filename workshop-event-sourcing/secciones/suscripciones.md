@@ -1,10 +1,10 @@
 # Suscripciones: reaccionar a los hechos
 
-El daemon ya te construye read models (proyecciones). Pero muchas veces, cuando un hecho ocurre, quieres **hacer algo hacia afuera**: al suspender una empresa, avisar a facturación, mandar un correo, publicar el hecho a otro servicio. Eso no es un read model: es un **efecto**. No debería colgar de la transacción de escritura, porque si el correo falla no querrías deshacer la suspensión. Para eso Marten tiene **suscripciones**: código tuyo al que el daemon le entrega los hechos, con catch-up y reintentos.
+El daemon ya te construye read models (proyecciones). Pero muchas veces, cuando un hecho ocurre, quieres **hacer algo hacia afuera**: avisar a facturación, mandar un correo, publicar el hecho a otro servicio. Eso no es un read model: es un **efecto**. Para eso Marten tiene **suscripciones**.
 
 ## 🎯 El Objetivo
 
-Reaccionar a un tipo de hecho con un **efecto secundario** (avisar/publicar/integrar) vía una **suscripción** que corre en el daemon — desacoplada de la escritura, con catch-up y semántica **al-menos-una-vez**.
+Reaccionar a un tipo de hecho con un **efecto secundario** (avisar/publicar/integrar) vía una **suscripción** que corre en el daemon — desacoplada de la escritura, que se pone al día si estuvo caída y no se salta ningún hecho aunque tenga que reintentar.
 
 ## 💥 El dolor: el efecto no cabe en el handler
 
@@ -14,9 +14,12 @@ Si mandas el correo **dentro** del handler, atas dos cosas que no deberían ir j
 
 ### Paso 1 · La suscripción
 
-Marten te da una clase base para esto, `SubscriptionBase`. Heredas de ella, le pones un `Name` (su identidad, donde guarda su checkpoint), filtras qué hechos te importan con `IncludeType<T>()`, y sobrescribes `ProcessEventsAsync`, al que el daemon te entrega los hechos en **lotes** (`page.Events`, cada uno un `IEvent` con su `Data`).
+Marten te da una clase base, `SubscriptionBase`. Heredas de ella y, **en el constructor**, le pones un `Name` (su identidad, donde guarda su checkpoint) y filtras qué hechos te importan con `IncludeType<T>()`. Luego sobrescribes `ProcessEventsAsync`: el daemon te entrega los hechos en **lotes** (`page.Events`, cada uno un `IEvent` con su `Data`).
 
-> 🛠️ **Inténtalo tú.** Escribe esa clase: hereda de `SubscriptionBase`, ponle `Name`, filtra `EmpresaSuspendida` con `IncludeType<T>()`, y en `ProcessEventsAsync` recorre el lote y ejecuta tu efecto.
+> 🛠️ **Inténtalo tú.** Escribe esa clase: hereda de `SubscriptionBase`, y en el constructor ponle `Name` y filtra `EmpresaSuspendida` con `IncludeType<EmpresaSuspendida>()`. Sobrescribe `ProcessEventsAsync` (su **firma es fija —cópiala de Marten—**; de sus parámetros solo usarás `page`): recorre `page.Events` y ejecuta tu efecto; al final devuelve `NullChangeListener.Instance`.
+
+> [!NOTE]
+> 🆕 **El lote, la firma y el retorno.** La firma de `ProcessEventsAsync` te la da Marten (`EventRange page, ISubscriptionController controller, IDocumentOperations operations, CancellationToken token`): cópiala tal cual; ahora solo usarás `page` (los demás son parte del contrato del daemon). Cada `e` de `page.Events` es un `IEvent`: su `Data` es el hecho (`EmpresaSuspendida`), más su metadata (`StreamKey`, versión, …). Devuelves `NullChangeListener.Instance` salvo que necesites un gancho justo antes/después del commit del lote.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -51,9 +54,6 @@ public class EmailAlSuspender : SubscriptionBase
 ```
 </details>
 
-> [!NOTE]
-> 🆕 **El lote y el retorno.** Cada `e` de `page.Events` es un `IEvent`: su `Data` es el hecho (`EmpresaSuspendida`), más su metadata (`StreamKey`, versión, …). Devuelves `NullChangeListener.Instance` salvo que necesites un gancho justo antes/después del commit del lote.
-
 ### Paso 2 · Regístrala en el daemon
 
 <details>
@@ -79,7 +79,7 @@ Dos comportamientos que definen a una suscripción:
 - **Catch-up.** Si la registras cuando ya hay hechos viejos —o si el servicio estuvo caído—, la suscripción **rebobina** y procesa lo que se perdió desde su checkpoint (guardado como `EmailAlSuspender:All` en `mt_event_progression`). No pierdes avisos por haber estado abajo.
 - **Al-menos-una-vez.** Si tu `ProcessEventsAsync` **lanza**, el daemon **reintenta el mismo lote** (el checkpoint solo avanza cuando el lote **tuvo éxito**). Eso garantiza que no se salte un hecho — pero significa que tu efecto puede ejecutarse **más de una vez**. Por eso tu efecto debe ser **idempotente** o tolerar la reentrega (mandar el correo dos veces no debería cobrar dos veces).
 
-> 🔍 **¿Lo lograste?** Con el daemon corriendo, suspende un par de empresas: la suscripción imprime `[EMAIL] …` por cada una. Apaga el servicio, suspende otra, vuelve a encender: al arrancar, **procesa la que se perdió** (catch-up). Y `mt_event_progression` muestra `EmailAlSuspender:All` avanzando.
+> 🔍 **¿Lo lograste?** Con el daemon corriendo, suspende un par de empresas: la suscripción imprime `[EMAIL] …` por cada una. Apaga el servicio (`Ctrl+C`), suspende otra, y vuelve a encender (`dotnet run`): al arrancar, **procesa la que se perdió** (catch-up). Y `mt_event_progression` muestra `EmailAlSuspender:All` avanzando.
 
 ---
 

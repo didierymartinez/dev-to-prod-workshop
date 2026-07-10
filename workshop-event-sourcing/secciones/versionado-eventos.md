@@ -1,6 +1,6 @@
 # Versionado y upcasting: el esquema evoluciona, la historia no
 
-Desde [El diario de una empresa](el-diario-de-una-empresa.md) la promesa fue: el diario **no se reescribe** — un `UPDATE` destruye el pasado. Pero el negocio **evoluciona**: un día `EmpresaRegistrada` necesita un campo que no existía cuando lo diseñaste, y tienes miles de eventos viejos sin él. Reescribirlos para meterles el campo es la amnesia que Event Sourcing evita: prohibido. La salida es traducir los eventos viejos a la forma nueva **al leerlos**, dejando la historia intacta: **upcasting**.
+Desde [El diario de una empresa](el-diario-de-una-empresa.md) la promesa fue: el diario **no se reescribe**. ¿Y qué pasa el día que el negocio necesita un **campo nuevo** en un evento viejo?
 
 ## 🎯 El Objetivo
 
@@ -21,7 +21,10 @@ Necesitas **traducir** lo viejo a lo nuevo al leer, sin tocar lo guardado.
 
 Conservas la forma vieja como un `record` aparte, y registras un **upcaster** que Marten aplica al leer.
 
-> 🛠️ **Inténtalo tú.** Declara `EmpresaRegistradaV1` (la forma vieja) y `EmpresaRegistrada` (la actual, con `Pais`). Registra `opts.Events.Upcast<vieja, nueva>(...)` que rellene `Pais` con el valor legado.
+> 🛠️ **Inténtalo tú.** Declara `EmpresaRegistradaV1` (la forma vieja) y `EmpresaRegistrada` (la actual, con `Pais`), y registra `opts.Events.Upcast<vieja, nueva>(...)` (de `using Marten.Services.Json.Transformations`) que rellene `Pais` con el valor legado. Para **verlo traducir**, primero siembra una empresa con la forma vieja —en una sesión: `StartStream("emp-9", new EmpresaRegistradaV1("Vieja SAS", "Básico"))` + `SaveChangesAsync`—: eso deja filas `empresa_registrada_v1` en la tabla; luego rehidrata `emp-9` con el upcaster ya registrado.
+
+> [!NOTE]
+> 🆕 **`Upcast<TVieja, TNueva>(func)`.** Marten, al leer un evento viejo, lo deserializa a `TVieja` y aplica tu función para producir `TNueva`. **Casa por el nombre del evento guardado**: con `EventNamingStyle.SmarterTypeName`, `EmpresaRegistradaV1` se guardó como `empresa_registrada_v1` — Marten **no** le quita el `V1`, y ese sufijo es tu **marca de versión** (distinto de `empresa_registrada`, el actual). El `"Colombia"` es el **valor legado**: sabes que todas las empresas viejas eran colombianas; el JSON no lo sabía, tú sí.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -38,14 +41,16 @@ opts.Events.Upcast<EmpresaRegistradaV1, EmpresaRegistrada>(
 ```
 </details>
 
-> [!NOTE]
-> 🆕 **`Upcast<TVieja, TNueva>(func)`.** Marten, al leer un evento viejo, lo deserializa a `TVieja` y aplica tu función para producir `TNueva`. **Casa por el nombre del evento guardado**: con `EventNamingStyle.SmarterTypeName`, `EmpresaRegistradaV1` se guardó como `empresa_registrada_v1` — Marten **no** le quita el `V1`, y ese sufijo es tu **marca de versión** (distinto de `empresa_registrada`, el actual). El `"Colombia"` es el **valor legado**: sabes que todas las empresas viejas eran colombianas; el JSON no lo sabía, tú sí.
-
-> 🔍 **¿Lo lograste?** Mira `mt_events` en psql: las filas viejas siguen **idénticas** (`type = 'empresa_registrada_v1'`, sin `Pais`). Pero al rehidratar con `AggregateStreamAsync`, tu `Empresa` recibe un `EmpresaRegistrada` **con `Pais = "Colombia"`**. La historia intacta; la traducción, solo al leer.
+> 🔍 **¿Lo lograste?** En psql, `SELECT DISTINCT type FROM mt_events` te muestra el nombre guardado tal cual: `empresa_registrada_v1` (con el `V1` que Marten conserva). Esa fila sigue **idéntica**, sin `Pais`. Pero al rehidratar `emp-9` con `AggregateStreamAsync`, tu `Empresa` recibe un `EmpresaRegistrada` **con `Pais = "Colombia"`**. La historia intacta; la traducción, solo al leer.
 
 ### Paso 2 · Renombrar sin conservar la clase vieja
 
-La misma función tipada también **renombra** campos (`new EmpresaRegistrada(Nombre: vieja.RazonSocialAntigua, …)`). Pero si ya **borraste** la clase vieja del código, usas un upcaster de **JSON crudo**, que trabaja directo sobre lo guardado: recibe el `JsonDocument` del evento, lees sus campos con `RootElement.GetProperty("Campo").GetString()` y construyes la forma nueva a mano. Como ya no hay clase vieja de la que partir, le pasas el **nombre viejo del evento como texto**:
+La misma función tipada también **renombra** campos (`new EmpresaRegistrada(Nombre: vieja.RazonSocialAntigua, …)`). Pero si ya **borraste** la clase vieja del código, usas un upcaster de **JSON crudo**, que trabaja directo sobre lo guardado.
+
+> 🛠️ **Inténtalo tú.** Borra la clase `EmpresaRegistradaV1` y registra un upcaster de **JSON crudo**: recibe el `JsonDocument` del evento, lees sus campos con `RootElement.GetProperty("Campo").GetString()` y construyes la forma nueva; como ya no hay clase vieja de la que derivar el nombre, le pasas el **nombre viejo del evento como texto** (`"empresa_registrada_v1"`).
+
+> [!NOTE]
+> 🆕 **Upcaster de JSON crudo.** Lees el `JsonDocument` guardado y construyes la forma nueva a mano. No necesitas conservar el `record` viejo — lo puedes **borrar del código**, y aún así lees su historia. Es la prueba más pura del mensaje: *traduces al leer, nunca reescribes*. *(Necesitas un alias en el `using` porque hay **dos** clases `JsonTransformations` en colisión —una general, otra para System.Text.Json—; el alias `StjTransforms` elige la de STJ.)*
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -63,9 +68,6 @@ opts.Events.Upcast<EmpresaRegistrada>(
             Pais: "Colombia")));
 ```
 </details>
-
-> [!NOTE]
-> 🆕 **Upcaster de JSON crudo.** Lees el `JsonDocument` guardado y construyes la forma nueva a mano. No necesitas conservar el `record` viejo — lo puedes **borrar del código**, y aún así lees su historia. Es la prueba más pura del mensaje: *traduces al leer, nunca reescribes*. *(El alias del `using` evita un choque de nombres entre dos `JsonTransformations`.)*
 
 ---
 

@@ -1,10 +1,10 @@
 # El tenant viaja con el mensaje
 
-[¿De dónde sale el tenant?](de-donde-sale-el-tenant.md) lo resolvió de un header HTTP. Pero el **daemon** que drena el outbox y corre las suscripciones no atiende peticiones: no tiene `HttpContext`. Cuando un handler corre ahí —disparado por un mensaje del bus—, `TrustedHeadersTenantResolver` lanzaría "no hay HttpContext". Y sin embargo el tenant **sí llegó**: lo estampaste en el [sobre](el-sobre.md) (`DeliveryOptions.TenantId`). Falta leerlo de ahí, y que el **mismo** `ITenantResolver` sirva en los dos mundos.
+[¿De dónde sale el tenant?](de-donde-sale-el-tenant.md) lo resolvió de un header HTTP. Pero el **daemon** que corre los handlers no atiende peticiones: no hay dónde leer ese header. Y sin embargo el tenant **sí llegó** — en el [sobre](el-sobre.md) del mensaje.
 
 ## 🎯 El Objetivo
 
-Resolver el tenant fuera de HTTP —desde el sobre del mensaje (`IMessageContext.TenantId` + header `user_id`)— y elegir automáticamente entre el resolver HTTP y el de mensajería con un `ProxyTenantResolver`.
+Resolver el tenant fuera de HTTP leyéndolo del **sobre del mensaje**, y que un **mismo** `ITenantResolver` sirva tanto si atiende HTTP como si corre en el daemon.
 
 ## 💥 El dolor: el handler del daemon no tiene HttpContext
 
@@ -17,6 +17,12 @@ El handler que corre en el daemon necesita el tenant para abrir la sesión de Ma
 Cierra el círculo de [El sobre](el-sobre.md): lo que **estampaste**, ahora lo **lees**.
 
 > 🛠️ **Inténtalo tú.** Implementa `WolverineMessageContextTenantResolver`: lee el `TenantId` de `IMessageContext` y el `user_id` del header del `Envelope`, y **lanza** si faltan.
+
+> [!NOTE]
+> 🆕 **`IMessageContext.TenantId` cierra el sobre.** En [El sobre](el-sobre.md) estampaste `DeliveryOptions.TenantId`; Wolverine lo propaga **nativo** hasta el receptor, donde reaparece como `IMessageContext.TenantId`. El `user_id`, que mandaste como **header**, se lee del `Envelope`. Ambos se leen fallando ruidoso si faltan.
+
+> [!NOTE]
+> 🆕 **El `Envelope`.** Es el sobre **físico** que Wolverine adjunta a cada mensaje: lleva la metadata de entrega, incluidos los `Headers` donde viaja el `user_id`. Se accede con `?` (`ctx.Envelope?`) porque **fuera** de un mensaje en curso puede no haberlo; si falta el header, el `GetValueOrDefault` devuelve `null` y caes en la excepción de "sin header".
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -45,17 +51,14 @@ public class WolverineMessageContextTenantResolver(IMessageContext ctx) : ITenan
 ```
 </details>
 
-> [!NOTE]
-> 🆕 **`IMessageContext.TenantId` cierra el sobre.** En [El sobre](el-sobre.md) estampaste `DeliveryOptions.TenantId`; Wolverine lo propaga **nativo** hasta el receptor, donde reaparece como `IMessageContext.TenantId`. El `user_id`, que mandaste como **header**, se lee del `Envelope`. Ambos se leen fallando ruidoso si faltan.
-
-> [!NOTE]
-> 🆕 **El `Envelope`.** Es el sobre **físico** que Wolverine adjunta a cada mensaje: lleva la metadata de entrega, incluidos los `Headers` donde viaja el `user_id`. Se accede con `?` (`ctx.Envelope?`) porque **fuera** de un mensaje en curso puede no haberlo; si falta el header, el `GetValueOrDefault` devuelve `null` y caes en la excepción de "sin header".
-
 ### Paso 2 · Un resolver que se adapta: `ProxyTenantResolver`
 
 Quieres inyectar **un** `ITenantResolver` en todas partes y que él decida de dónde leer.
 
 > 🛠️ **Inténtalo tú.** Escribe `ProxyTenantResolver`: si hay `HttpContext`, usa el de headers; si no, el de mensajería.
+
+> [!NOTE]
+> 🆕 **`IMessageContext` se inyecta por constructor.** Wolverine registra `IMessageContext` en el contenedor (scoped): puedes pedirlo por el constructor, y te da el del **mensaje en curso**. El proxy lo pide **siempre**, también en una petición HTTP donde no hay mensaje — y es seguro: ahí `HttpContext` no es null, el proxy construye el resolver de headers y **nunca lee** ese `ctx`. Existe, pero no se toca.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -75,9 +78,6 @@ public class ProxyTenantResolver(IMessageContext ctx, IHttpContextAccessor acces
 }
 ```
 </details>
-
-> [!NOTE]
-> 🆕 **`IMessageContext` se inyecta por constructor.** Wolverine registra `IMessageContext` en el contenedor (scoped): puedes pedirlo por el constructor, y te da el del **mensaje en curso**. El proxy lo pide **siempre**, también en una petición HTTP donde no hay mensaje — y es seguro: ahí `HttpContext` no es null, el proxy construye el resolver de headers y **nunca lee** ese `ctx`. Existe, pero no se toca.
 
 > [!NOTE]
 > 🆕 **Momento-criterio — proxy, no cadena.** Un intento anterior de la plantilla (`CompositeTenantResolver`) encadenaba varios resolvers con *fallbacks*: probaba uno, si fallaba probaba el siguiente. Se reemplazó por este **proxy**, que decide con **una sola condición** (¿hay `HttpContext`?). El fallback encadenado ensuciaba los logs con excepciones "esperadas" de los intentos fallidos; la pregunta directa no los ensucia.
@@ -100,7 +100,7 @@ builder.Services.AddScoped<ITenantResolver, ProxyTenantResolver>();   // 🔁 an
 > [!NOTE]
 > 🆕 **La librería lo empaqueta.** En `Cosmos.BuildingBlocks` este registro vive en una extensión, `AgregarTenantResolverHibrido()`, que hace exactamente esto: registra el proxy como el `ITenantResolver` público. Ahora todo el código —endpoints y handlers del daemon— inyecta `ITenantResolver` y obtiene el tenant correcto según dónde corra, sin cambiar una línea.
 
-> 🔍 **¿Lo lograste?** Dos comprobaciones. (1) **Ya observable:** repite el `curl -H "X-Tenant-Id: cliente-acme" …` de la sección anterior — sigue funcionando, porque el proxy ve el `HttpContext` y elige el resolver de headers. (2) **Cuando montes el servicio consumidor** (un handler corriendo en el daemon): un mensaje publicado con `TenantId = "cliente-acme"` en el sobre hace que, dentro del handler, `ITenantResolver.TenantId` → `"cliente-acme"` (vía el proxy → mensajería); abres la sesión con él y el evento cae en acme — verificable en la columna `tenant_id` de `mt_events`.
+> 🔍 **¿Lo lograste?** Dos comprobaciones. (1) **Ya observable:** repite el `curl -H "X-Tenant-Id: cliente-acme" …` de la sección anterior — sigue funcionando, porque el proxy ve el `HttpContext` y elige el resolver de headers. (2) **La ruta de mensajería no se ejercita aquí** —esta sección solo corre la ruta HTTP; el resolver de mensajería es una pieza de la plantilla que aún no tiene un consumidor montado—. Así se verificará cuando montes un handler en el daemon: un mensaje publicado con `TenantId = "cliente-acme"` en el sobre hace que, dentro del handler, `ITenantResolver.TenantId` → `"cliente-acme"` (vía el proxy → mensajería); abres la sesión con él y el evento cae en acme — verificable en la columna `tenant_id` de `mt_events`.
 
 > [!NOTE]
 > **Caso avanzado — `InvokeForTenantAsync`.** Es una extensión de Wolverine con la que un handler invoca a otro **fijando** un tenant distinto en el sobre interno. Como el proxy lee el sobre **actual**, el handler interno ve ese tenant nuevo, no el del externo. Es una garantía que te evitará un bug el día que encadenes handlers entre tenants; por ahora, basta saber que el proxy siempre resuelve del mensaje en curso.

@@ -35,7 +35,14 @@ var store = DocumentStore.For(opts =>
 
 Tu handler dejaba así el ciclo: `AbrirStream → Get → decidir → Append`. Con Marten es el mismo ciclo, con sus comandos:
 
-> 🛠️ **Inténtalo tú.** **🔁** Reescribe `SuspenderHandler`: en vez de recibir el `EventStore`, recibe una `IDocumentSession` de Marten (el contrato que cumple la `LightweightSession` que ya abriste: una sesión para leer y escribir). Rehidrata con `session.Events.AggregateStreamAsync<Empresa>(id)`, decide con el mismo `Suspender(...)`, y si hay hecho, `session.Events.Append(id, hecho)` + `SaveChangesAsync`. El `Handle` se vuelve `async` (Marten habla con Postgres) — y al volverse async cambia también el **contrato**: renombra `void Handle(T)` a `Task HandleAsync(T)`, tanto en el handler como en la interfaz `ICommandHandler<T>`.
+> 🛠️ **Inténtalo tú.** **🔁** Reescribe `SuspenderHandler`: en vez de recibir el `EventStore`, recibe una `IDocumentSession` de Marten (el contrato que cumple la `LightweightSession` que ya abriste: una sesión para leer y escribir; pides la interfaz, no la clase concreta, para no atarte a un tipo). Rehidrata con `session.Events.AggregateStreamAsync<Empresa>(id)`, decide con el mismo `Suspender(...)`, y si hay hecho, `session.Events.Append(id, hecho)` + `SaveChangesAsync`. El `Handle` se vuelve `async` porque Marten habla con Postgres. Eso cambia el **contrato**: renombra `void Handle(T)` a `Task HandleAsync(T)`, en el handler y en la interfaz `ICommandHandler<T>`. *(Haz lo mismo con `CambiarPlanHandler`.)*
+
+> [!NOTE]
+> 🆕 **Los comandos de Marten, uno a uno.**
+> - `session.Events.AggregateStreamAsync<Empresa>(id)` — lee el stream y **reconstruye** la `Empresa`. Es tu `stream.Get()`.
+> - `session.Events.Append(id, hecho)` — añade el hecho al stream. Es tu `stream.Append(hecho)`.
+> - `await session.SaveChangesAsync()` — persiste (aquí espera de verdad: viaja a Postgres). Tu `EventStore` guardaba al instante en RAM; ahora hay que ir hasta la base y esperar.
+> - `session.Events.StartStream(id, hecho)` — abre un stream **nuevo** con su primer hecho (es el `Append` del primerísimo evento de una empresa; lo usarás al sembrar).
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -57,13 +64,6 @@ public class SuspenderHandler(IDocumentSession session) : ICommandHandler<Suspen
 }
 ```
 </details>
-
-> [!NOTE]
-> 🆕 **Los comandos de Marten, uno a uno.**
-> - `session.Events.AggregateStreamAsync<Empresa>(id)` — lee el stream y **reconstruye** la `Empresa`. Es tu `stream.Get()`.
-> - `session.Events.Append(id, hecho)` — añade el hecho al stream. Es tu `stream.Append(hecho)`.
-> - `await session.SaveChangesAsync()` — persiste (aquí espera de verdad: viaja a Postgres). Tu `EventStore` guardaba al instante en RAM; ahora hay que ir hasta la base y esperar.
-> - `session.Events.StartStream(id, hecho)` — abre un stream **nuevo** con su primer hecho (es el `Append` del primerísimo evento de una empresa; lo usarás al sembrar).
 
 **`async` se propaga.** La regla de C# que viste en [Conoce a Marten](conoce-a-marten.md): un método que usa `await` dentro debe ser `async` y devolver un `Task`. Tu `SuspenderHandler` llama a Marten y lo `await`ea, así que tu `void Handle` se volvió `async Task HandleAsync`. Y con él cambia el **contrato**: el `ICommandHandler<T>` que declaraste en [El despachador](el-despachador.md) pasa de `void Handle(TCommand)` a `Task HandleAsync(TCommand)`. *(`CambiarPlanHandler` cambia igual, y por lo mismo.)*
 

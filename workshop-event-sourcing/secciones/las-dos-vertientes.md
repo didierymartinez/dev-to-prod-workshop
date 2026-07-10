@@ -1,6 +1,6 @@
 # Las dos vertientes: dominio puro, infraestructura enchufable
 
-Ya viste **todas** las piezas nativas: event sourcing a mano, Marten, proyecciones, el daemon, Wolverine, EDA, multi-tenancy. Ahora abres la librería real, `Cosmos.BuildingBlocks`, y encuentras algo que **reconoces**: no usa Marten y Wolverine crudos por todas partes. Los envuelve detrás de **abstracciones propias** —`AggregateRoot`, `IEventStore`, `IProjectionStore`, `ITenantResolver`— exactamente como la costura `IEventStore` que tú construiste en [El almacén abstracto](el-almacen-abstracto.md). Esta sección explica **por qué las envuelve**, y por qué a propósito **no** usa `FetchForWriting`.
+Ya viste **todas** las piezas nativas: event sourcing a mano, Marten, proyecciones, el daemon, Wolverine, EDA, multi-tenancy. Ahora abres la librería real, `Cosmos.BuildingBlocks`, y encuentras algo que **reconoces**: no usa Marten y Wolverine crudos por todas partes. Los envuelve detrás de **abstracciones propias** —`AggregateRoot`, `IEventStore`, `IProjectionStore`, `ITenantResolver`— exactamente como la costura `IEventStore` que tú construiste en [El almacén abstracto](el-almacen-abstracto.md).
 
 ## 🎯 El Objetivo
 
@@ -16,21 +16,21 @@ Si tus agregados, handlers y eventos llaman a `IDocumentSession` directo, tu **d
 
 > 🛠️ **Inténtalo tú.** Antes de mirar la solución, empareja cada pieza tuya con su contraparte en la plantilla. ¿Cuál es tu `IEventStore`? ¿Tu `MartenEventStore`? ¿Tu `TestStore`? ¿Tu `Empresa : AggregateRoot`?
 
+> [!NOTE]
+> 🆕 **Dos vertientes = dos paquetes.** La librería parte cada área en dos ensamblados: `Cosmos.EventSourcing.**Abstractions**` (contratos **puros**: `AggregateRoot`, `IEventStore`, los marcadores de evento — **sin** dependencia de Marten) y `Cosmos.EventSourcing.**CritterStack**` (las **implementaciones** con Marten/Wolverine: `MartenEventStore`, los routers). Lo mismo en tenancy: `Cosmos.MultiTenancy` (el `ITenantResolver` puro) vs `Cosmos.MultiTenancy.CritterStack` (el `ProxyTenantResolver`).
+
 <details>
 <summary>👉 Muéstrame el mapeo</summary>
 
 | Lo que construiste | En `Cosmos.BuildingBlocks` | Vertiente |
 | --- | --- | --- |
-| `IEventStore` (la costura) | `IEventStore : IAggregateRootReader` | **Abstractions** |
+| `IEventStore` (la costura) | `IEventStore` | **Abstractions** |
 | `AggregateRoot` (con `Id`) | `AggregateRoot` (con `_uncommittedEvents`, `Version`) | **Abstractions** |
 | Marcadores de evento | `IEvent` / `IPublicEvent` / `IPrivateEvent` | **Abstractions** |
 | `MartenEventStore` | `MartenEventStore` | **CritterStack** |
 | `TestStore` | `TestStore` | **Testing.Utilities** |
-| Tu `Despachador` | `WolverineCommandRouter` | **CritterStack** |
+| Tu `Despachador` | Wolverine (`IMessageBus.InvokeAsync`) | **CritterStack** |
 </details>
-
-> [!NOTE]
-> 🆕 **Dos vertientes = dos paquetes.** La librería parte cada área en dos ensamblados: `Cosmos.EventSourcing.**Abstractions**` (contratos **puros**: `AggregateRoot`, `IEventStore`, los marcadores de evento — **sin** dependencia de Marten) y `Cosmos.EventSourcing.**CritterStack**` (las **implementaciones** con Marten/Wolverine: `MartenEventStore`, los routers). Lo mismo en tenancy: `Cosmos.MultiTenancy` (el `ITenantResolver` puro) vs `Cosmos.MultiTenancy.CritterStack` (el `ProxyTenantResolver`).
 
 ### Paso 2 · La flecha de dependencia apunta a los contratos
 
