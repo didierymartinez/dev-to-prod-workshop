@@ -1,0 +1,133 @@
+@page "/progreso/{Alumno}/{TallerSlug}"
+@rendermode InteractiveServer
+@using Academia.Dominio
+@using Academia.Web.Servicios
+@using Cosmos.EventSourcing.Abstractions.Commands
+@inject CatalogoDeTalleres Catalogo
+@inject IEventStore Store
+@inject SincronizadorDeAvance Sincronizador
+
+<PageTitle>Progreso de @Alumno</PageTitle>
+
+@if (_taller is null)
+{
+    <p>Taller no encontrado.</p>
+}
+else if (_inscripcion is null && _cargado)
+{
+    <p>No hay inscripción de <strong>@Alumno</strong> a este taller. <a href="/">Inscríbete aquí.</a></p>
+}
+else if (_inscripcion is not null)
+{
+    <h1>@Alumno · @_taller.Nombre</h1>
+    <p>
+        Repo: <a href="@_inscripcion.RepoUrl" target="_blank">@_inscripcion.RepoUrl</a> ·
+        <strong>@_inscripcion.SeccionesCompletadas.Count / @_enCadena.Count</strong> secciones
+        (@Porcentaje%)
+    </p>
+    <progress max="100" value="@Porcentaje" style="width: 100%"></progress>
+
+    <p style="margin: 1rem 0;">
+        <button @onclick="Sincronizar" disabled="@_sincronizando">
+            @(_sincronizando ? "Sincronizando…" : "🔄 Sincronizar con mi repo")
+        </button>
+        @if (_resumen is not null)
+        {
+            <span style="margin-left: .75rem; color: #2a7">
+                +@_resumen.SeccionesNuevas sección(es), @_resumen.ReflexionesEvaluadas reflexión(es) evaluada(s)
+            </span>
+        }
+        @if (_error is not null)
+        {
+            <span style="margin-left: .75rem; color: crimson">@_error</span>
+        }
+    </p>
+
+    <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="text-align: left; border-bottom: 2px solid #ccc;">
+                <th style="padding: .4rem">Sección</th>
+                <th style="padding: .4rem">Estado</th>
+                <th style="padding: .4rem">La IA sobre tu reflexión</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var seccion in _enCadena)
+            {
+                var completada = _inscripcion.Completo(seccion.Slug);
+                var evaluacion = _inscripcion.Evaluaciones.GetValueOrDefault(seccion.Slug);
+                <tr style="border-bottom: 1px solid #eee; @(completada ? "" : "color: #999;")">
+                    <td style="padding: .4rem">
+                        <a href="/seccion/@TallerSlug/@seccion.Slug">@seccion.Titulo</a>
+                    </td>
+                    <td style="padding: .4rem">@(completada ? "✅" : "⏳")</td>
+                    <td style="padding: .4rem; font-size: .9rem;">
+                        @if (evaluacion is not null)
+                        {
+                            <strong>@Etiqueta(evaluacion.Veredicto)</strong> <span>@evaluacion.Feedback</span>
+                        }
+                        else if (completada)
+                        {
+                            <em>pendiente de evaluar</em>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [Parameter] public string Alumno { get; set; } = "";
+    [Parameter] public string TallerSlug { get; set; } = "";
+
+    private Academia.Contenido.Taller? _taller;
+    private List<Academia.Contenido.Seccion> _enCadena = [];
+    private Inscripcion? _inscripcion;
+    private bool _cargado;
+    private bool _sincronizando;
+    private ResumenDeSincronizacion? _resumen;
+    private string? _error;
+
+    private int Porcentaje => _enCadena.Count == 0 ? 0 :
+        (int)Math.Round(100.0 * (_inscripcion?.SeccionesCompletadas.Count ?? 0) / _enCadena.Count);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _taller = Catalogo.PorSlug(TallerSlug);
+        _enCadena = _taller?.Secciones.Where(s => s.Orden >= 0).ToList() ?? [];
+        await Recargar();
+        _cargado = true;
+    }
+
+    private async Task Recargar() =>
+        _inscripcion = _taller is null ? null :
+            await Store.GetAggregateRootAsync<Inscripcion>(
+                Inscripcion.IdDe(Alumno, TallerSlug), CancellationToken.None);
+
+    private async Task Sincronizar()
+    {
+        _sincronizando = true;
+        _error = null;
+        _resumen = null;
+        StateHasChanged();
+        try
+        {
+            _resumen = await Sincronizador.SincronizarAsync(Alumno, TallerSlug);
+            await Recargar();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally { _sincronizando = false; }
+    }
+
+    private static string Etiqueta(string veredicto) => veredicto switch
+    {
+        "entendio" => "🟢 Entendió.",
+        "parcial" => "🟡 Parcial.",
+        "no_entendio" => "🔴 Revisar.",
+        _ => veredicto,
+    };
+}

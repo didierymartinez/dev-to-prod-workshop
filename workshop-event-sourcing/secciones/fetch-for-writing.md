@@ -1,10 +1,10 @@
 # FetchForWriting: recuperar la concurrencia con criterio
 
-Vuelve a la deuda que arrastras. En [Concurrencia optimista](concurrencia-optimista.md) construiste **a mano** el control de versión: cada hecho declaraba su posición, y el almacén rechazaba un `Append` cuya posición ya estaba tomada. Luego, en [el swap](el-swap.md), lo dejaste **fuera** a propósito: tu `MartenEventStore` lee con `AggregateStreamAsync` y añade con `Append`, sin verificar versión (el `WARNING` de esa sección). Es hora de recuperar esa red — pero **bien**, con la herramienta que la doc de Marten recomienda: **`FetchForWriting`**. Este es, exactamente, el cambio que querías hacer con criterio.
+En [el swap](el-swap.md) dejaste **fuera** el control de versión a propósito (el `WARNING` de esa sección). Toca recuperar esa red — pero **bien**, con la herramienta que la doc de Marten recomienda: **`FetchForWriting`**. Este es, exactamente, el cambio que querías hacer con criterio.
 
 ## 🎯 El Objetivo
 
-Cambiar cómo escribe tu `MartenEventStore` de *"leer y añadir sin control"* a **`FetchForWriting`**, que recupera la concurrencia optimista — **sin tocar el handler ni la interfaz `IEventStore`**.
+Hacer que tu `MartenEventStore` lea y escriba **comprobando la versión** en un solo paso, para que dos escritores simultáneos no se pisen — **sin tocar el handler ni la interfaz `IEventStore`**.
 
 ## 💥 El dolor: read-modify-write no atómico
 
@@ -13,11 +13,18 @@ Mira el ciclo que dejó el swap: `GetAggregateRootAsync` (lee en la versión N) 
 ## 🔧 `FetchForWriting`: leer y controlar en un solo paso
 
 `FetchForWriting<Empresa>(id)` hace dos cosas a la vez: te da el agregado rehidratado (`.Aggregate`) **y captura la versión** en que lo leíste. Añades con `.AppendOne(hecho)`, y al `SaveChangesAsync` Marten **exige** que el stream siga en esa versión. Si otro escribió mientras decidías, **lanza** en vez de sobrescribir.
+
 ### Paso 1 · `MartenEventStore` adopta `FetchForWriting`
 
 Lo bonito: el cambio vive **dentro** de `MartenEventStore`. Tu handler sigue pidiendo `GetAggregateRootAsync` → decidir → `AppendEvent` → `SaveChangesAsync`, igual que en [El almacén abstracto](el-almacen-abstracto.md). Ese es el pago de la costura `IEventStore`: cambias el motor de escritura sin tocar el dominio.
 
-> 🛠️ **Inténtalo tú.** **🔁** En `MartenEventStore`: que `GetAggregateRootAsync` use `FetchForWriting` (en vez de `AggregateStreamAsync`) y **recuerde** cómo añadir a *ese* stream; que `AppendEvent` añada por ahí; `SaveChangesAsync` igual.
+> 🛠️ **Inténtalo tú.** **🔁** En `MartenEventStore`: en `GetAggregateRootAsync`, abre el stream con `FetchForWriting` (en vez de `AggregateStreamAsync`), **guarda en un campo la acción de añadir a ese stream** (una clausura, como en [El despachador](el-despachador.md)) y devuelve `.Aggregate`; `AppendEvent` llama a esa acción; `SaveChangesAsync` no cambia.
+
+> [!NOTE]
+> 🆕 **`FetchForWriting<T>(id)` → `IEventStream<T>`.** Devuelve un *stream para escritura*: `.Aggregate` es el agregado rehidratado (o `null` si no existe todavía — sirve para **crear** también), y por dentro guarda la **versión** con la que lo leíste. `.AppendOne(hecho)` encola un hecho en ese stream. El control de versión se cobra en `SaveChangesAsync`.
+
+> [!NOTE]
+> 🆕 **La clausura — el truco del `Despachador`, otra vez.** `FetchForWriting<T>` es genérico, pero `AppendEvent` recibe un `object`. Como en [El despachador](el-despachador.md), capturas el stream en una **clausura** (`_append`) al leer, y la reutilizas al añadir — sin que `MartenEventStore` tenga que ser genérico. *(Aquí guardas un stream, el de la empresa del handler; el caso **crear** —`.Aggregate` null— se aprovecha en la plantilla. La plantilla real guarda varios, uno por stream.)*
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -44,17 +51,27 @@ public class MartenEventStore(IDocumentSession session) : IEventStore
 ```
 </details>
 
-> [!NOTE]
-> 🆕 **`FetchForWriting<T>(id)` → `IEventStream<T>`.** Devuelve un *stream para escritura*: `.Aggregate` es el agregado rehidratado (o `null` si no existe todavía — sirve para **crear** también), y por dentro guarda la **versión** con la que lo leíste. `.AppendOne(hecho)` encola un hecho en ese stream. El control de versión se cobra en `SaveChangesAsync`.
-
-> [!NOTE]
-> 🆕 **La clausura — el truco del `Despachador`, otra vez.** `FetchForWriting<T>` es genérico, pero `AppendEvent` recibe un `object`. Como en [El despachador](el-despachador.md), capturas el stream en una **clausura** (`_append`) al leer, y la reutilizas al añadir — sin que `MartenEventStore` tenga que ser genérico. *(Aquí guardas un stream, el de la empresa del handler. La plantilla real guarda varios, uno por stream.)*
-
 ### Paso 2 · Ahora el choque se nota (de nuevo)
 
-Repite el escenario de dos escritores de [Concurrencia optimista](concurrencia-optimista.md): dos handlers hacen `FetchForWriting` de `emp-7` en la **misma** versión, ambos deciden y añaden, ambos guardan. El **segundo lanza**.
+Repite el escenario de dos escritores de [Concurrencia optimista](concurrencia-optimista.md): dos sesiones abren `emp-7` con `FetchForWriting` en la **misma** versión, ambas añaden y ambas guardan. El **segundo `SaveChangesAsync` lanza**:
 
-> 🛠️ **Inténtalo tú.** Envuelve el `SaveChangesAsync` (o la llamada al handler) en un `try/catch` de `JasperFx.ConcurrencyException`: al chocar, **recarga, redecide y reintenta** — igual que planteaste a mano en §9.
+```csharp
+await using var s1 = store.LightweightSession();
+await using var s2 = store.LightweightSession();
+var a = await s1.Events.FetchForWriting<Empresa>("emp-7");   // ambas leen la MISMA versión
+var b = await s2.Events.FetchForWriting<Empresa>("emp-7");
+a.AppendOne(new EmpresaSuspendida("falta de pago"));
+b.AppendOne(new PlanCambiado("Enterprise"));
+await s1.SaveChangesAsync();   // entra
+await s2.SaveChangesAsync();   // 💥 la versión ya avanzó → ConcurrencyException
+```
+
+La cura es la misma de §9: **no pisar en silencio; fallar y reintentar**.
+
+> [!NOTE]
+> 🆕 **`ConcurrencyException` (de `JasperFx`).** El conflicto de versión implícita lanza `EventStreamUnexpectedMaxEventIdException`, que hereda de **`JasperFx.ConcurrencyException`** — atrapa la base y cubres el caso. Es la misma idea que tu `ConcurrencyException` casera de §9: no pisar en silencio, **fallar y reintentar**.
+
+> 🛠️ **Inténtalo tú.** Envuelve la ejecución del comando en un **reintento acotado**: al capturar `ConcurrencyException`, vuelve a intentar (cada intento con una **sesión nueva**, así el `FetchForWriting` relee la versión al día), hasta N veces; sal al primer éxito.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -62,24 +79,55 @@ Repite el escenario de dos escritores de [Concurrencia optimista](concurrencia-o
 ```csharp
 using JasperFx;   // ConcurrencyException
 
-try
+for (var intento = 1; intento <= 3; intento++)
 {
-    await despachar(comando);   // FetchForWriting → decide → AppendOne → SaveChanges
-}
-catch (ConcurrencyException)
-{
-    // otro escribió mientras decidías: el estado que viste ya no es cierto.
-    // recarga (FetchForWriting de nuevo trae la versión fresca), redecide, reintenta.
+    await using var session = store.LightweightSession();               // sesión nueva por intento
+    var handler = new SuspenderHandler(new MartenEventStore(session));
+    try
+    {
+        await handler.HandleAsync(comando);   // FetchForWriting relee la versión al día → decide → guarda
+        break;                                // guardó sin choque → listo
+    }
+    catch (ConcurrencyException) when (intento < 3)
+    {
+        // otro escribió mientras decidías; reintenta: la próxima vuelta relee la versión fresca
+    }
 }
 ```
 </details>
 
-> [!NOTE]
-> 🆕 **`ConcurrencyException` (de `JasperFx`).** El conflicto de versión implícita lanza `EventStreamUnexpectedMaxEventIdException`, que hereda de **`JasperFx.ConcurrencyException`** — atrapa la base y cubres el caso. Es la misma idea que tu `ConcurrencyException` casera de §9: no pisar en silencio, **fallar y reintentar**.
-
 ### Paso 3 · Pruébalo (integración)
 
-Como es control de concurrencia real de Postgres, se prueba con un test de **integración** (de los pocos): dos sesiones, `FetchForWriting` del mismo stream en la misma versión, ambas guardan → la segunda debe lanzar `ConcurrencyException`. Con Postgres arriba, `dotnet test` en verde confirma que la red volvió.
+Como es control de concurrencia real de Postgres, se prueba con un test de **integración** (de los pocos).
+
+> 🛠️ **Inténtalo tú.** Reusa el `MartenFixture` de [Tests de integración](tests-de-integracion.md): en un `[Fact]`, siembra `emp-7`, abre **dos** sesiones, `FetchForWriting` de `emp-7` en ambas (misma versión), `AppendOne` en ambas, guarda la primera, y afirma que la segunda lanza el conflicto con `Assert.ThrowsAnyAsync<ConcurrencyException>` (**`ThrowsAny`**, no `Throws`: lo que se lanza es una **subclase** de `ConcurrencyException`).
+
+<details>
+<summary>👉 Muéstrame una forma de hacerlo</summary>
+
+```csharp
+using JasperFx;   // ConcurrencyException
+
+[Fact]
+public async Task Dos_escritores_en_la_misma_version_el_segundo_choca()
+{
+    await using var s1 = Store.LightweightSession();   // Store viene del MartenFixture
+    await using var s2 = Store.LightweightSession();
+    s1.Events.StartStream("emp-7", new EmpresaRegistrada("Constructora Andes", "Básico"));
+    await s1.SaveChangesAsync();
+
+    var a = await s1.Events.FetchForWriting<Empresa>("emp-7");   // ambas leen la misma versión
+    var b = await s2.Events.FetchForWriting<Empresa>("emp-7");
+    a.AppendOne(new EmpresaSuspendida("falta de pago"));
+    b.AppendOne(new PlanCambiado("Enterprise"));
+    await s1.SaveChangesAsync();                                  // entra
+
+    await Assert.ThrowsAnyAsync<ConcurrencyException>(() => s2.SaveChangesAsync());   // 💥
+}
+```
+</details>
+
+Con Postgres arriba, `dotnet test` en verde confirma que la red volvió.
 
 ---
 

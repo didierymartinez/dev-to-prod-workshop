@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- xUnit v3, alineado con Cosmos.BuildingBlocks (evita el choque v2/v3) -->
+    <PackageReference Include="xunit.v3.mtp-v2" Version="3.2.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Academia.Dominio\Academia.Dominio.csproj" />
+    <ProjectReference Include="..\Academia.Contenido\Academia.Contenido.csproj" />
+    <ProjectReference Include="..\..\..\Cosmos.BuildingBlocks\Cosmos.EventSourcing.Testing.Utilities\Cosmos.EventSourcing.Testing.Utilities.csproj" />
+  </ItemGroup>
+
+</Project>

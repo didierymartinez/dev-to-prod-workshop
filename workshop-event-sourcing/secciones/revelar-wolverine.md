@@ -1,10 +1,10 @@
 # Revelar Wolverine: el mediador
 
-Vuelve a [El despachador](el-despachador.md): construiste una tabla `tipo → handler` con `Registrar` (llenarla) y `Enviar` (rutear). Lo jubilaste en el swap (se volvió `async`), y en [API + DI](api-inyeccion.md) volviste a cablear **un handler por endpoint** a mano, y a llamar `SaveChangesAsync` tú mismo. **Wolverine** —la otra mitad de la Critter Stack— industrializa las tres cosas: **descubre** tus handlers (tu `Registrar`), **rutea** los comandos (tu `Enviar`), y **confirma la transacción** por ti. Es el reveal que sembraste en El despachador.
+En [El despachador](el-despachador.md) construiste una tabla `tipo → handler` con `Registrar` (llenarla) y `Enviar` (rutear). **Wolverine** —la otra mitad de la Critter Stack— hace eso mismo, industrializado. Es el reveal que sembraste ahí.
 
 ## 🎯 El Objetivo
 
-Reemplazar el cableado manual —el `Despachador` jubilado, el handler-por-endpoint, y el `SaveChanges` a mano— por Wolverine: **discovery** + **`InvokeAsync`** + **`AutoApplyTransactions`**.
+Reemplazar el cableado manual por Wolverine: que **descubra** tus handlers, **rutee** los comandos y **confirme la transacción** por ti.
 
 ## 💥 El dolor: lo que aún cableas a mano
 
@@ -14,7 +14,13 @@ Cada endpoint de [API + DI](api-inyeccion.md) inyecta **su** handler concreto y 
 
 ### Paso 1 · Enciende Wolverine
 
-> 🛠️ **Inténtalo tú.** En el host, `UseWolverine`: que descubra los handlers de tu ensamblado (`Discovery.IncludeAssembly`), integre Marten (`IntegrateWithWolverine`), confirme las transacciones solo (`AutoApplyTransactions`), y —clave en Wolverine 6— habilite la compilación en runtime.
+Encender Wolverine es **scaffolding** —config que se copia, no se adivina—, así que aquí te la muestro; lo tuyo viene en los pasos 2 y 3. En el host, `UseWolverine` descubre los handlers de tu **ensamblado** (la unidad compilada de tu proyecto, el `.dll`; `typeof(unHandler).Assembly` le dice en cuál buscar), integra Marten y confirma las transacciones por ti:
+
+> [!NOTE]
+> 🆕 **Wolverine 6 no trae el compilador.** Wolverine genera código por debajo; en la 6.x el core **ya no incluye el compilador Roslyn en runtime**, y sin él la app **crashea al arrancar** (`no IAssemblyGenerator registered`). Para desarrollo, añade el paquete **`WolverineFx.RuntimeCompilation`** y llama `opts.UseRuntimeCompilation()`. En producción se prefiere *codegen* estático (generar el código en el build). Es un gotcha de criterio: sin esto, no arranca.
+
+> [!NOTE]
+> 🆕 **`IntegrateWithWolverine` + `AutoApplyTransactions`.** `IntegrateWithWolverine()` hace que Wolverine y Marten **compartan la misma sesión** (y prepara el *outbox* durable, que verás en EDA). `AutoApplyTransactions()` hace que Wolverine **confirme esa sesión** al terminar el handler — el `SaveChangesAsync` que llamabas a mano lo hace **él**. (Marten se registra **dentro** de `opts.Services`, el contenedor visto desde Wolverine, para que pueda integrarlo.)
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -27,7 +33,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseWolverine(opts =>
 {
-    opts.Discovery.IncludeAssembly(typeof(SuspenderEmpresaHandler).Assembly);  // dónde buscar handlers
+    opts.Discovery.IncludeAssembly(typeof(SuspenderHandler).Assembly);  // dónde buscar handlers
     opts.UseRuntimeCompilation();                                              // Wolverine 6: obligatorio (ver nota)
 
     opts.Services
@@ -43,12 +49,6 @@ builder.Services.AddScoped<IEventStore, MartenEventStore>();
 var app = builder.Build();
 ```
 </details>
-
-> [!NOTE]
-> 🆕 **Wolverine 6 no trae el compilador.** Wolverine genera código por debajo; en la 6.x el core **ya no incluye el compilador Roslyn en runtime**, y sin él la app **crashea al arrancar** (`no IAssemblyGenerator registered`). Para desarrollo, añade el paquete **`WolverineFx.RuntimeCompilation`** y llama `opts.UseRuntimeCompilation()`. En producción se prefiere *codegen* estático (generar el código en el build). Es un gotcha de criterio: sin esto, no arranca.
-
-> [!NOTE]
-> 🆕 **`IntegrateWithWolverine` + `AutoApplyTransactions`.** `IntegrateWithWolverine()` hace que Wolverine y Marten **compartan la misma sesión** (y prepara el *outbox* durable, que verás en EDA). `AutoApplyTransactions()` hace que Wolverine **confirme esa sesión** al terminar el handler — el `SaveChangesAsync` que llamabas a mano lo hace **él**.
 
 > [!WARNING]
 > **Choque de nombres.** La config de Marten usa `using JasperFx.Events;` (ahí viven `StreamIdentity`/`EventNamingStyle`), y ese ensamblado define **su propio `IEventStore`** — colisiona con el tuyo (`CS0104`). Si te pasa, alíaslo (`using IEventStore = TuEspacio.IEventStore;`) o califica los enums (`JasperFx.Events.StreamIdentity.AsString`). Es exactamente el tipo de fricción que un mantenedor de la plantilla debe reconocer.

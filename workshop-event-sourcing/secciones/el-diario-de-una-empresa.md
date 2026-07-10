@@ -75,7 +75,7 @@ Y arranca tu repo poniendo **tu** respuesta como mensaje (reemplaza el placehold
 ```bash
 git init
 git commit --allow-empty -m "ES · El diario de una empresa" -m "<aquí TU respuesta, con tus palabras>"
-# crea el repo vacío en GitHub y enlázalo (cambia la URL por la tuya):
+# primero crea un repo VACÍO en github.com (New repository, sin README), igual que en el taller Básico; luego enlázalo (cambia la URL por la tuya):
 git remote add origin https://github.com/TU-USUARIO/TU-REPO.git
 git push -u origin main
 ```

@@ -1,6 +1,6 @@
 # El despachador: dado un comando, encuentra su handler
 
-En [El Command Handler](el-command-handler.md) quedó **una clase por comando** —`CambiarPlanHandler`, `SuspenderHandler`—, cada una con su `Handle`. Pero para ejecutar uno **eliges la clase y la llamas a mano**: `new SuspenderHandler(stream).Handle("falta de pago")`. Eres **tú** quien sabe, para cada comando, qué clase crear. Vamos a quitarte ese trabajo — y, al hacerlo, van a **nacer** las piezas que faltaban.
+En [El Command Handler](el-command-handler.md) quedó **una clase por comando** —`CambiarPlanHandler`, `SuspenderHandler`—, cada una con su `Handle`. Ahora vamos a quitarte el trabajo de **elegir cuál llamar** — y, al hacerlo, van a **nacer** las piezas que faltaban.
 
 ## 🎯 El Objetivo
 
@@ -105,6 +105,7 @@ Con las dos piezas en mano, el despachador es una **tabla** que mapea **el tipo 
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```csharp
+var stream = new EventStream<Empresa>();   // el mismo stream de las secciones anteriores
 var cambiarPlan = new CambiarPlanHandler(stream);
 var suspender   = new SuspenderHandler(stream);
 
@@ -121,7 +122,7 @@ handlers[comando.GetType()](comando);                     // → SuspenderHandle
 ```
 </details>
 
-Lee cada entrada: la lambda recibe `comando` como `object` (la tabla guarda funciones **uniformes** `Action<object>`), lo **castea** al comando concreto y se lo pasa al handler que ya instanciaste. Despachar es `handlers[comando.GetType()](comando)`: busca la función por el tipo y la ejecuta. Funciona — y poblarla a mano una vez es el mejor modo de *ver* qué guardará el despachador.
+Lee cada entrada: la lambda recibe `comando` como `object` (la tabla guarda funciones **uniformes** `Action<object>`), lo **castea** al comando concreto y se lo pasa al handler que ya creaste. Despachar es `handlers[comando.GetType()](comando)`: busca la función por el tipo y la ejecuta. Funciona.
 
 ### 💥 El dolor: repites el tipo, y puedes desalinearlo
 

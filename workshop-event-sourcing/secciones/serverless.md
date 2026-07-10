@@ -1,6 +1,6 @@
 # Serverless: cuando el proceso se apaga entre invocaciones
 
-Todo lo del bloque EDA asumió un servicio **siempre encendido**: un host con su [daemon](daemon-proyecciones.md) drenando el [outbox](outbox-inbox.md), su Hub abierto, su nodo en un clúster. Pero parte de la plataforma corre en **Azure Functions**: procesos que **se apagan** entre invocaciones y arrancan de cero en la siguiente. Ahí, tres supuestos del "siempre encendido" se rompen — y la plantilla tiene una variante `Serverless` de la config que los resuelve uno por uno. Verla es entender **por qué** cada pieza estaba como estaba.
+Todo lo del bloque EDA asumió un servicio **siempre encendido**: un host con su [daemon](daemon-proyecciones.md) drenando el [outbox](outbox-inbox.md), su Hub abierto, su nodo en un clúster. Pero parte de la plataforma corre en **Azure Functions**, en el modelo `dotnet-isolated`: tu código en un proceso **aparte** del host de Functions, que se **apaga** entre invocaciones. Ahí la config de Wolverine cambia — y verla es entender **por qué** cada pieza estaba como estaba.
 
 ## 🎯 El Objetivo
 
@@ -14,7 +14,12 @@ Un **outbox durable** guarda el saliente en Postgres y confía en que un **worke
 
 ### Paso 1 · Discovery manual: no escanees lo que no está
 
-> 🛠️ **Inténtalo tú.** En vez de `UseWolverine` (que auto-descubre extensiones), usa `AddWolverine` con **discovery manual** y dile a mano dónde buscar handlers.
+En Azure Functions no hay `builder.Host` (el host lo controla el runtime de Functions), así que registras Wolverine sobre el `IServiceCollection` que Functions te da (`serviceCollection`), con `AddWolverine` en vez de `UseWolverine`. Y la compilación en runtime, que en [Revelar Wolverine](revelar-wolverine.md) encendías con `opts.UseRuntimeCompilation()`, aquí se registra sobre ese `serviceCollection` con `AddWolverineRuntimeCompilation()`.
+
+> 🛠️ **Inténtalo tú.** Sobre el `serviceCollection` de Functions, usa `AddWolverine` con **discovery manual** (`ExtensionDiscovery.ManualOnly`) y dile a mano dónde buscar handlers (`Discovery.IncludeAssembly`).
+
+> [!NOTE]
+> 🆕 **`ExtensionDiscovery.ManualOnly`.** Por defecto Wolverine busca extensiones marcadas con `[WolverineModule]` por **todos** los ensamblados. En `dotnet-isolated` no todos están disponibles (se daña al tocar `Microsoft.Azure.WebJobs`), y el escaneo **rompe el arranque**. `ManualOnly` apaga ese descubrimiento automático: tú declaras el ensamblado de dominio con `Discovery.IncludeAssembly`, y nada más se escanea. (Ojo: `ManualOnly` es de `ExtensionDiscovery`, un parámetro de `AddWolverine` — no es un modo de durabilidad.)
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -30,12 +35,12 @@ serviceCollection.AddWolverine(ExtensionDiscovery.ManualOnly, options =>
 ```
 </details>
 
-> [!NOTE]
-> 🆕 **`ExtensionDiscovery.ManualOnly`.** Por defecto Wolverine busca extensiones marcadas con `[WolverineModule]` por **todos** los ensamblados. En `dotnet-isolated` no todos están disponibles (se daña al tocar `Microsoft.Azure.WebJobs`), y el escaneo **rompe el arranque**. `ManualOnly` apaga ese descubrimiento automático: tú declaras el ensamblado de dominio con `Discovery.IncludeAssembly`, y nada más se escanea. (Ojo: `ManualOnly` es de `ExtensionDiscovery`, un parámetro de `AddWolverine` — no es un modo de durabilidad.)
-
 ### Paso 2 · Durabilidad `Solo`: un nodo que no hace clúster
 
 > 🛠️ **Inténtalo tú.** **🔁** Pon el modo de durabilidad en `Solo`.
+
+> [!NOTE]
+> 🆕 **`DurabilityMode.Solo`.** El modo por defecto (`Balanced`) hace que los nodos se **repartan** trabajo de durabilidad y elijan líder — útil entre varias instancias de un servicio siempre encendido. Un Function efímero no participa de ese baile: arranca, atiende, se apaga. `Solo` le dice "eres tú solo, no coordines con nadie", evitando que intente recuperar envelopes de endpoints que este nodo ni registra.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -45,12 +50,12 @@ options.Durability.Mode = DurabilityMode.Solo;
 ```
 </details>
 
-> [!NOTE]
-> 🆕 **`DurabilityMode.Solo`.** El modo por defecto (`Balanced`) hace que los nodos se **repartan** trabajo de durabilidad y elijan líder — útil entre varias instancias de un servicio siempre encendido. Un Function efímero no participa de ese baile: arranca, atiende, se apaga. `Solo` le dice "eres tú solo, no coordines con nadie", evitando que intente recuperar envelopes de endpoints que este nodo ni registra.
-
 ### Paso 3 · Publicar inline, no por outbox
 
 > 🛠️ **Inténtalo tú.** **🔁** Al declarar la ruta de publicación, cambia `UseDurableOutbox()` por `SendInline()`.
+
+> [!NOTE]
+> 🆕 **`SendInline` vs. outbox durable.** `SendInline()` manda el mensaje al bus **durante** la invocación, de forma síncrona, sin pasar por la tabla de salientes. Pierde la garantía "sobrevive a la muerte del proceso" del outbox durable — pero un Function que **se va a apagar** no puede hospedar al worker que drena esa tabla, así que la garantía sería falsa de todos modos. `SendInline` es la elección **honesta** para un proceso efímero: publica antes de morir, o falla la invocación (y el llamador reintenta).
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -63,9 +68,6 @@ opts.PublishMessage<EmpresaSuspendida>().ToAzureServiceBusTopic(topic).UseDurabl
 opts.PublishMessage<EmpresaSuspendida>().ToAzureServiceBusTopic(topic).SendInline();
 ```
 </details>
-
-> [!NOTE]
-> 🆕 **`SendInline` vs. outbox durable.** `SendInline()` manda el mensaje al bus **durante** la invocación, de forma síncrona, sin pasar por la tabla de salientes. Pierde la garantía "sobrevive a la muerte del proceso" del outbox durable — pero un Function que **se va a apagar** no puede hospedar al worker que drena esa tabla, así que la garantía sería falsa de todos modos. `SendInline` es la elección **honesta** para un proceso efímero: publica antes de morir, o falla la invocación (y el llamador reintenta).
 
 > 🔍 **¿Lo lograste?** Compara las dos rutas. En la **dockerizada**, justo tras `SaveChanges` el mensaje está en `wolverine_outgoing_envelopes` y **aún no** en el broker (el daemon lo drenará). En la **serverless** con `SendInline`, cuando la invocación **retorna** el mensaje ya está en el broker y **no hay** fila de outbox: salió inline, sin daemon de por medio.
 

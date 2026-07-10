@@ -31,7 +31,13 @@ El concepto, entonces, es la **historia**. Lo que nos falta es el **código para
 
 ## 🔧 Refactor 1: el envoltorio para `Empresa`
 
-Empecemos por lo obvio: una clase que sea dueña de la historia de una `Empresa` y la deje leer y escribir.
+Empecemos por lo obvio. La meta es usarla así —anotar hechos y pedir la empresa ya rehidratada, sin tocar una lista suelta:
+
+```csharp
+var stream = new EventStreamDeEmpresa();
+stream.Append(new EmpresaRegistrada("Constructora Andes", "Básico"));
+var empresa = stream.Get();   // Empresa ya rehidratada
+```
 
 > 🛠️ **Inténtalo tú.** Crea una clase `EventStreamDeEmpresa` con su **propia** `List<object>` escondida (nace **vacía**). Dale dos métodos: `Append(object hecho)` que **anote** un hecho nuevo en esa lista, y `Get()` que cree una `Empresa` **vacía** y la rehidrate llamando a `Load(...)` (el motor que escribiste en [Refactorizando el motor](refactorizando-el-motor.md)). *(Para eso `Empresa` necesita un constructor **sin parámetros** —el envoltorio la crea vacía y luego la rehidrata—; añádeselo y quita el que recibía la historia.)*
 
@@ -88,7 +94,7 @@ public class EventStream<T> where T : AggregateRoot, new()
 
     public void Append(object hecho) => _historia.Add(hecho);   // ESCRIBIR: anota un hecho
 
-    public T Get()                                              // LEER: instancia y rehidrata
+    public T Get()                                              // LEER: crea y rehidrata
     {
         var entidad = new T();
         entidad.Load(_historia);   // reproduce la historia
@@ -107,7 +113,7 @@ var stream = new EventStream<Empresa>();
 stream.Append(new EmpresaRegistrada("Constructora Andes", "Básico"));   // anota
 stream.Append(new PlanCambiado("Premium"));                            // anota
 
-var empresa = stream.Get();   // lee: instancia y rehidrata
+var empresa = stream.Get();   // lee: crea y rehidrata
 Console.WriteLine($"{empresa.Nombre}: plan {empresa.Plan}");
 ```
 
@@ -117,7 +123,7 @@ Console.WriteLine($"{empresa.Nombre}: plan {empresa.Plan}");
 > ```
 > (Esta historia es corta —solo registro y cambio de plan—, por eso no aparece "suspendida".) Y revisa que ya **no** quede ni `EventStreamDeEmpresa` ni la `new List<object>{ … }` armada a mano: ahora los hechos entran **uno a uno por `Append`**.
 
-Quien consume ya **no sabe ni le importa** cómo se guarda ni cómo se rehidrata: `Append` para anotar, `.Get()` para recibir la `Empresa` lista — la lista cruda nunca sale a la luz. Ese patrón —un envoltorio que esconde la **lista de eventos** y te entrega el objeto— se llama **Repositorio**. `EventStream<T>` y "Repositorio" son el **mismo objeto** con dos nombres: *event stream* por la historia que envuelve, *repositorio* por cómo la esconde y te entrega la empresa.
+Quien consume ya **no sabe ni le importa** cómo se guarda ni cómo se rehidrata: `Append` para anotar, `.Get()` para recibir la `Empresa` lista — la lista cruda nunca sale a la luz. Ese patrón —un envoltorio que esconde la **lista de eventos** y te entrega el objeto— se llama **Repositorio**. `EventStream<T>` y "Repositorio" son el **mismo objeto** con dos nombres: *event stream* por la historia que envuelve, *repositorio* por cómo la esconde y te entrega la empresa. No es una pieza nueva ni cambia tu código: es solo el nombre que le dan los libros de diseño.
 
 > [!NOTE]
 > 🌱 **Semilla — los genéricos no son solo "ahorrar código".** Sin `<T>` tendrías que devolver `object` y andar casteando por todos lados (con riesgo de reventar en ejecución). Con `EventStream<Empresa>`, el compilador **sabe** que `Get()` devuelve una `Empresa`: autocompletado, seguridad de tipos, cero sorpresas. Esta misma firma —genérico con restricción a `AggregateRoot`— es **exactamente** la que usan las librerías que adoptaremos para cargar agregados. La estás construyendo a mano.
@@ -165,7 +171,7 @@ git push
 
 ## 🧠 En una frase
 
-La historia de una empresa se envuelve en un **`EventStream<T>`** genérico (un **Repositorio**) que es **dueño** de la lista de hechos: anotas con `Append` y lees con `.Get()` (que instancia y rehidrata), sin que la lista cruda ande suelta.
+La historia de una empresa se envuelve en un **`EventStream<T>`** genérico (un **Repositorio**) que es **dueño** de la lista de hechos: anotas con `Append` y lees con `.Get()` (que crea y rehidrata), sin que la lista cruda ande suelta.
 
 ---
 
