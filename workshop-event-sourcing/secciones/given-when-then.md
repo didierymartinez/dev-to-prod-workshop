@@ -78,10 +78,10 @@ Funciona. Pero mira el cuerpo: seis líneas de andamiaje —crear el store, semb
 
 La primera pieza que se repetirá en todo test: **sembrar los hechos previos**. Súbela a una clase base. La base y tus tests son **clases separadas, en archivos separados**, las dos dentro del proyecto de tests; tu `Program.cs` de producción **no se toca**.
 
-> 🛠️ **Inténtalo tú.** Quieres que el test abra diciendo *dados estos hechos previos*: `Given(new EmpresaRegistrada(...))`. Sube el sembrado a una base `HandlerTest` (ponla en el proyecto de tests — mismo archivo del test u otro, da igual). La base guarda el `EventStore` y el id del agregado (`AggregateId`, `"emp-7"` por ahora); su método `Given(params object[])` **abre el stream de `AggregateId`, le agrega los hechos** que recibe y **recuerda cuántos había** (para después aislar los nuevos). Haz que tu test **herede** de la base y cambia el sembrado por `Given(...)`.
+> 🛠️ **Inténtalo tú.** Quieres que el test abra diciendo *dados estos hechos previos*: `Given(new EmpresaRegistrada(...))`. Sube el sembrado a una base `HandlerTest` (ponla en el proyecto de tests — mismo archivo del test u otro, da igual). La base guarda el `EventStore` y el id del agregado (`AggregateId`, `"emp-7"` por ahora); su método `Given` recibe **uno o varios** hechos previos sueltos (sin que armes una lista), **abre el stream de `AggregateId`, se los agrega** y **recuerda cuántos había** (para después aislar los nuevos). Haz que tu test **herede** de la base y cambia el sembrado por `Given(...)`.
 
 > [!NOTE]
-> 🆕 **`params object[]` y herencia.** `Given(params object[])` deja pasar **varios** hechos sin armar un array (`Given(a, b)`): un escenario puede tener más de un hecho previo. Y la base es una **clase compartida** que cada test **hereda** —lo común vive arriba, cada test aporta lo suyo—, igual que `Empresa` heredó de `AggregateRoot` en [Refactorizando el motor](refactorizando-el-motor.md).
+> 🆕 **`params object[]` — recibir varios sueltos.** Eso de "uno o varios sin armar una lista" es la firma `Given(params object[] eventos)`: C# empaqueta en el array `eventos` lo que le pases (`Given(a)`, `Given(a, b)`). La **herencia** ya la conoces (`Empresa : AggregateRoot` en [Refactorizando el motor](refactorizando-el-motor.md)): la base es una **clase compartida** que cada test hereda —lo común arriba, cada test lo suyo—.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -130,7 +130,7 @@ public class SuspenderEmpresaTests : HandlerTest
 
 La segunda pieza repetida: **ejecutar el handler**. Solo cambia **cuál** handler. Súbelo a `When`, y deja que cada test diga cuál es el suyo.
 
-> 🛠️ **Inténtalo tú.** **🔁** Ahora la línea de en medio: `When(new SuspenderEmpresa(...))`. Para que `When` llame al handler **sin que la base sepa cuál es** (cada comando tiene el suyo), la base lo pide como una propiedad `abstract` que cada test rellena. **Aquí, por fin, la base gana su tipo y se vuelve `abstract`:** parametrízala como `HandlerTest<TCommand>`, márcala `abstract` y añádele `When(TCommand)` y `abstract Handler`; en el test, hereda ahora de `HandlerTest<SuspenderEmpresa>`, declara `Handler => new SuspenderHandler(Store)` y cambia la ejecución por `When(...)`. Haz las **dos** ediciones antes de correr: un `abstract` en la base sin su `override` en el test no compila.
+> 🛠️ **Inténtalo tú.** **🔁** Ahora la línea de en medio: `When(new SuspenderEmpresa(...))`. Quieres que `When` ejecute el handler **sin que la base sepa cuál es** — cada test provee **el suyo**. Así que la base declara un `Handler` que **cada test rellena** (y, hasta que lo rellenen, la base queda **incompleta**: no se crea sola), y necesita saber **de qué comando** habla. Añade `When` y ese `Handler` a la base; en el test, provee tu handler (`new SuspenderHandler(Store)`) y cambia la ejecución por `When(...)`. Haz las **dos** ediciones (base y test) antes de correr: una sin la otra no compila.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -166,7 +166,7 @@ public class SuspenderEmpresaTests : HandlerTest<SuspenderEmpresa>   // 🔁 ant
 </details>
 
 > [!NOTE]
-> 🆕 **Es tu `ICommandHandler<T>`, otra vez.** Ese `abstract Handler` es el contrato de [El despachador](el-despachador.md) ganando su sueldo: `When` hace `Handler.Handle(comando)` sin conocer la clase concreta. Y **por eso** la base recién ahora gana su tipo `<TCommand>` **y** se vuelve `abstract`: ni el tipo del comando ni un miembro `abstract` hacían falta hasta que `When`/`Handler` los pidieron. (`abstract` = clase incompleta que no se crea sola y obliga a cada test a dar su `Handler` con `override`.)
+> 🆕 **El `Handler` a-rellenar: `abstract` + genérico.** "El handler que cada test rellena" es una **propiedad `abstract`**: `protected abstract ICommandHandler<TCommand> Handler { get; }` —tu contrato de [El despachador](el-despachador.md), otra vez—, y el test la cumple con `override`. Como la base tiene un miembro `abstract`, la **clase** se marca `abstract` (incompleta, no se crea sola). Y para que `Handler`/`When` sepan el tipo del comando, la base se parametriza: `HandlerTest<TCommand>`. Ni el `abstract` ni el `<TCommand>` hacían falta hasta ahora — nacen con `When`/`Handler`.
 
 > 🔍 `dotnet test` → **verde**. Ya solo queda cruda la última pieza: la comparación.
 
@@ -177,7 +177,7 @@ La última pieza: **comparar los hechos nuevos con los que esperas**. Como usa `
 > [!NOTE]
 > 🆕 **AwesomeAssertions (`BeEquivalentTo`).** Podrías comparar con `Assert.Equal`, pero al fallar su mensaje sobre listas es difícil de leer. `BeEquivalentTo` compara **campo por campo** (tus eventos son `record`, iguales por valor) y te dice **cuál** dato difiere. Instálalo en el proyecto de tests: `dotnet add Empresas.Historia.Tests package AwesomeAssertions`.
 
-> 🛠️ **Inténtalo tú.** **🔁** La última línea: `Then(new EmpresaSuspendida(...))`. Añade a la base `Then(...)` que tome los hechos **nuevos** (los que hay después de `_previos`) y los compare **por valor** con los que esperas (`BeEquivalentTo`). En el test, cambia toda la cola de `Assert` por `Then(...)`.
+> 🛠️ **Inténtalo tú.** **🔁** La última línea: `Then(new EmpresaSuspendida(...))`. Añade a la base `Then(...)` que tome los hechos **nuevos** (los que hay después de `_previos`) y los compare **por valor** con los que esperas. En el test, cambia toda la cola de `Assert` por `Then(...)`.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
