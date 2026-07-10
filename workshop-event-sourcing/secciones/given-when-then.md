@@ -78,17 +78,19 @@ Funciona. Pero mira el cuerpo: seis líneas de andamiaje —crear el store, semb
 
 La primera pieza que se repetirá en todo test: **sembrar los hechos previos**. Súbela a una clase base. La base y tus tests son **clases separadas, en archivos separados**, las dos dentro del proyecto de tests; tu `Program.cs` de producción **no se toca**.
 
-> 🛠️ **Inténtalo tú.** Quieres que el test abra diciendo *dados estos hechos previos*: `Given(new EmpresaRegistrada(...))`. Sube el sembrado a una base `HandlerTest<TCommand>` (ponla en el proyecto de tests — mismo archivo del test u otro, da igual). La base guarda el `EventStore` y el id del agregado (`AggregateId`, `"emp-7"` por ahora); su método `Given(params object[])` **abre el stream de `AggregateId`, le agrega los hechos** que recibe y **recuerda cuántos había** (para después aislar los nuevos). Haz que tu test **herede** de la base y cambia el sembrado por `Given(...)`.
+> 🛠️ **Inténtalo tú.** Quieres que el test abra diciendo *dados estos hechos previos*: `Given(new EmpresaRegistrada(...))`. Sube el sembrado a una base `HandlerTest` (ponla en el proyecto de tests — mismo archivo del test u otro, da igual). La base guarda el `EventStore` y el id del agregado (`AggregateId`, `"emp-7"` por ahora); su método `Given(params object[])` **abre el stream de `AggregateId`, le agrega los hechos** que recibe y **recuerda cuántos había** (para después aislar los nuevos). Haz que tu test **herede** de la base y cambia el sembrado por `Given(...)`.
 
 > [!NOTE]
 > 🆕 **`params object[]` y `abstract`/herencia.** `Given(params object[])` —y más adelante `Then`— deja pasar **varios** hechos sin armar un array (`Given(a, b)`): un escenario puede tener más de un hecho previo, y un comando puede emitir más de uno. Y la base es `abstract` —como `AggregateRoot` en [Refactorizando el motor](refactorizando-el-motor.md)—: lo **compartido** por todos los tests vive arriba; cada test hereda.
+>
+> Dos cosas que quizá notes: la base **aún no** lleva `<TCommand>` —nada aquí usa el comando; ese tipo llega en el Paso 3, con `When`/`Handler`—; y el `<Empresa>` de `AbrirStream` está *quemado* porque hoy tienes **un** agregado. Sembrar solo apila hechos por id, así que al cambiar el motor el sembrado pasará a ser **por id** y ese `<Empresa>` desaparece — no se parametriza.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```csharp
 // Empresas.Historia.Tests/HandlerTest.cs — la BASE (nace con el motor + Given)
-public abstract class HandlerTest<TCommand>
+public abstract class HandlerTest   // aún SIN tipo: Given no usa el comando
 {
     protected readonly EventStore Store = new();   // el MOTOR — lo único que cambiará al reemplazar el almacén
     protected string AggregateId = "emp-7";
@@ -96,7 +98,7 @@ public abstract class HandlerTest<TCommand>
 
     protected void Given(params object[] eventos)
     {
-        var stream = Store.AbrirStream<Empresa>(AggregateId);
+        var stream = Store.AbrirStream<Empresa>(AggregateId);   // Empresa: tu único agregado por ahora
         foreach (var hecho in eventos) stream.Append(hecho);
         _previos = Store.GetEvents(AggregateId).Count;   // recuerda dónde termina "lo previo"
     }
@@ -107,7 +109,7 @@ public abstract class HandlerTest<TCommand>
 // Empresas.Historia.Tests/SuspenderEmpresaTests.cs — ahora HEREDA; el resto sigue a pelo POR AHORA
 using Xunit;
 
-public class SuspenderEmpresaTests : HandlerTest<SuspenderEmpresa>
+public class SuspenderEmpresaTests : HandlerTest      // aún sin tipo
 {
     [Fact]
     public void Suspender_una_empresa_activa_emite_EmpresaSuspendida()
@@ -130,20 +132,24 @@ public class SuspenderEmpresaTests : HandlerTest<SuspenderEmpresa>
 
 La segunda pieza repetida: **ejecutar el handler**. Solo cambia **cuál** handler. Súbelo a `When`, y deja que cada test diga cuál es el suyo.
 
-> 🛠️ **Inténtalo tú.** **🔁** Ahora la línea de en medio: `When(new SuspenderEmpresa(...))`. Para que `When` llame al handler **sin que la base sepa cuál es** (cada comando tiene el suyo), la base lo pide como una propiedad `abstract` que cada test rellena. Añade a la base `When(TCommand)` y `abstract Handler`; en el test, declara `Handler => new SuspenderHandler(Store)` y cambia la ejecución por `When(...)`. Haz las **dos** ediciones antes de correr: un `abstract` en la base sin su `override` en el test no compila.
+> 🛠️ **Inténtalo tú.** **🔁** Ahora la línea de en medio: `When(new SuspenderEmpresa(...))`. Para que `When` llame al handler **sin que la base sepa cuál es** (cada comando tiene el suyo), la base lo pide como una propiedad `abstract` que cada test rellena. **Aquí, por fin, la base gana su tipo:** parametrízala como `HandlerTest<TCommand>` y añádele `When(TCommand)` y `abstract Handler`; en el test, hereda ahora de `HandlerTest<SuspenderEmpresa>`, declara `Handler => new SuspenderHandler(Store)` y cambia la ejecución por `When(...)`. Haz las **dos** ediciones antes de correr: un `abstract` en la base sin su `override` en el test no compila.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```csharp
-// + en la BASE:
-protected abstract ICommandHandler<TCommand> Handler { get; }
-protected void When(TCommand comando) => Handler.Handle(comando);
+// la BASE gana su tipo <TCommand> (el comando que When ejecuta) y dos miembros:
+public abstract class HandlerTest<TCommand>   // 🔁 antes: HandlerTest, sin tipo
+{
+    // … Store, AggregateId, _previos, Given: sin cambios …
+    protected abstract ICommandHandler<TCommand> Handler { get; }
+    protected void When(TCommand comando) => Handler.Handle(comando);
+}
 ```
 
 ```csharp
 // el test provee SU handler y usa When:
-public class SuspenderEmpresaTests : HandlerTest<SuspenderEmpresa>
+public class SuspenderEmpresaTests : HandlerTest<SuspenderEmpresa>   // 🔁 antes: HandlerTest
 {
     protected override ICommandHandler<SuspenderEmpresa> Handler => new SuspenderHandler(Store);
 
@@ -162,7 +168,7 @@ public class SuspenderEmpresaTests : HandlerTest<SuspenderEmpresa>
 </details>
 
 > [!NOTE]
-> 🆕 **Es tu `ICommandHandler<T>`, otra vez.** Ese `abstract Handler` es el contrato de [El despachador](el-despachador.md) ganando su sueldo: `When` hace `Handler.Handle(comando)` sin conocer la clase concreta.
+> 🆕 **Es tu `ICommandHandler<T>`, otra vez.** Ese `abstract Handler` es el contrato de [El despachador](el-despachador.md) ganando su sueldo: `When` hace `Handler.Handle(comando)` sin conocer la clase concreta. Y **por eso** la base recién ahora se hace `HandlerTest<TCommand>`: el tipo del comando no hacía falta hasta que `When`/`Handler` lo pidieron.
 
 > 🔍 `dotnet test` → **verde**. Ya solo queda cruda la última pieza: la comparación.
 
