@@ -1,10 +1,10 @@
 # Empaquetar y publicar: el oficio del mantenedor
 
-Consumiste versiones (`0.1.8`) de [Cosmos.BuildingBlocks](consumir-cosmos-buildingblocks.md). Ahora ponte del otro lado: eres **mantenedor** y tienes que **publicar** una versión nueva. Aquí hay dos trampas que muerden en silencio: una de MSBuild que rompe a los consumidores en runtime, y una de criterio —clasificar el cambio— que, mal hecha, rompe su código. Esta sección es el oficio de publicar bien.
+Consumiste versiones (`0.1.8`) de [Cosmos.BuildingBlocks](consumir-cosmos-buildingblocks.md). Ahora ponte del otro lado: eres **mantenedor** y tienes que **publicar** una versión nueva sin romper a quien consume.
 
 ## 🎯 El Objetivo
 
-Entender cómo se publica la librería: versionado **lockstep** (una versión para todo el repo, inyectada al empacar), la `AssemblyVersion` fijada a `0.0.0.0`, y la regla de **clasificar el cambio** (mayor / menor / parche).
+Publicar una versión nueva sin romper a quien consume: una sola versión para todo el repo, y clasificar bien el cambio (mayor / menor / parche).
 
 ## 💥 El dolor: dos formas de romper al que consume
 
@@ -17,7 +17,10 @@ Publicar mal rompe a otros, no a ti:
 
 ### Paso 1 · `Directory.Build.props`: desacoplar la `AssemblyVersion`
 
-> 🛠️ **Inténtalo tú.** En un `Directory.Build.props` en la raíz (props que MSBuild aplica a **todos** los proyectos), fija la `AssemblyVersion` en el piso `0.0.0.0` y deja la versión real fuera de los `.csproj` (se inyecta al empacar).
+Primero, cómo se empaca: el release corre `dotnet pack -p:Version=1.2.3`, que produce los `.nupkg`. `-p:Version` es una propiedad de MSBuild que, por defecto, alimenta **tanto** la versión del paquete **como** la `AssemblyVersion` de cada dll — y ahí está la trampa. Lo que sigue es **andamiaje de MSBuild** (inguessable): te lo muestro.
+
+> [!NOTE]
+> 🆕 **`Directory.Build.props` + `AssemblyVersion` en el piso.** `Directory.Build.props` es un archivo que MSBuild aplica a **todos** los proyectos bajo su carpeta, sin repetir config en cada `.csproj`. Aquí hace una cosa clave: fija `AssemblyVersion = 0.0.0.0`. Sin ese piso, la `X` de `dotnet pack -p:Version=X` se hornearía como la `AssemblyVersion` de las referencias internas, apuntando a versiones inexistentes. Con el piso `0.0.0.0`, la referencia horneada es la **mínima** —la satisface cualquier versión desplegada— y el contrato SemVer real lo lleva la **versión del paquete** en NuGet. La otra propiedad, `FileVersion`, sí refleja el número real (para diagnóstico); su regex recorta el sufijo *prerelease* (como `1.2.3-beta`), que `FileVersion` no admite.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -36,9 +39,6 @@ Publicar mal rompe a otros, no a ti:
 ```
 </details>
 
-> [!NOTE]
-> 🆕 **`Directory.Build.props` + `AssemblyVersion` en el piso.** `Directory.Build.props` es un archivo que MSBuild aplica a **todos** los proyectos bajo su carpeta, sin repetir config en cada `.csproj`. Aquí hace una cosa clave: fija `AssemblyVersion = 0.0.0.0`. Como el release empaqueta con `dotnet pack -p:Version=X` (una propiedad global), sin este piso esa `X` se hornearía como la `AssemblyVersion` de las referencias internas, apuntando a versiones inexistentes. Con el piso `0.0.0.0`, la referencia horneada es la **mínima** —la satisface cualquier versión desplegada— y el contrato SemVer real lo lleva la **versión del paquete** en NuGet, no la del assembly.
-
 ### Paso 2 · Lockstep: una versión para todo el repo
 
 > [!NOTE]
@@ -46,7 +46,7 @@ Publicar mal rompe a otros, no a ti:
 
 ### Paso 3 · Clasificar el cambio (el criterio)
 
-> 🛠️ **Inténtalo tú.** Antes de publicar, clasifica el cambio desde el último release. Decide entre **mayor**, **menor** y **parche** — y **no** asumas "menor" por defecto.
+> 🛠️ **Inténtalo tú.** Antes de publicar, clasifica el cambio desde el último release según **Versionado Semántico** (SemVer: `MAYOR.MENOR.PARCHE`, cada número con un significado fijo en la industria). Decide entre **mayor**, **menor** y **parche** — y **no** asumas "menor" por defecto.
 
 <details>
 <summary>👉 La regla</summary>

@@ -1,0 +1,14 @@
+# Artefactos de compilación .NET
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+
+# Cachés / archivos de usuario del IDE
+.vs/
+*.user
+*.suo
+
+# Secretos locales (nunca versionar llaves)
+appsettings.*.local.json
+.env

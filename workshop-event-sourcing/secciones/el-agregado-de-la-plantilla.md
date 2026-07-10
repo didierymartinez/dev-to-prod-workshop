@@ -1,6 +1,6 @@
 # El agregado de la plantilla: recuerda sus propios hechos
 
-En [Las dos vertientes](las-dos-vertientes.md) viste que el `AggregateRoot` real vive en la vertiente `Abstractions` y es más completo que el tuyo. El tuyo solo guardaba el `Id`. El de la plantilla **recuerda los hechos que emitió y aún no se guardan**, y sabe **cuáles cruzan la frontera** (públicos) y cuáles no (privados). Tu `Empresa` tiene que adaptarse a esa forma — y al hacerlo, cambia cómo decide.
+En [Las dos vertientes](las-dos-vertientes.md) viste que el `AggregateRoot` real es más completo que el tuyo. Tu `Empresa` tiene que adaptarse a esa forma — y al hacerlo, cambia cómo decide.
 
 ## 🎯 El Objetivo
 
@@ -11,13 +11,21 @@ Adaptar tu `Empresa` al `AggregateRoot` real: que **acumule** sus eventos no con
 Hoy tu `Empresa.Suspender(...)` **devuelve** el hecho y el handler lo pasa al store, uno por uno. Funciona para un hecho. Pero si un comando produce **varios** hechos, o si necesitas **publicar** los públicos por el bus ([Público vs privado](publico-privado.md)) además de guardarlos, el handler termina cargando esa logística. El agregado —que es quien **sabe** qué hechos ocurrieron— debería **recordarlos** él mismo, ya aplicados a su estado, listos para que el almacén los guarde y el bus los publique.
 
 > [!NOTE]
-> **Modelo simplificado.** Para enfocarnos en la mecánica del `AggregateRoot`, aquí la `Empresa` se queda con `RazonSocial` y `Suspendida` (con `EmpresaRegistrada(razonSocial)`). Tu `Empresa` de secciones anteriores puede tener más campos (`Plan`, etc.); adáptala igual — lo que cambia es **cómo** emite y guarda los hechos, no cuáles.
+> **Modelo simplificado.** Para enfocarnos en la mecánica del `AggregateRoot`, aquí la `Empresa` se queda con `RazonSocial` y `Suspendida` (con `EmpresaRegistrada(razonSocial)`). Ambos hechos —`EmpresaRegistrada` y `EmpresaSuspendida`— implementan `IPublicEvent` (de [Público vs privado](publico-privado.md)). Tu `Empresa` de secciones anteriores puede tener más campos (`Plan`, etc.); adáptala igual — lo que cambia es **cómo** emite y guarda los hechos, no cuáles.
 
 ## 🔧 El `AggregateRoot` real
 
 ### Paso 1 · La forma completa
 
-> 🛠️ **Inténtalo tú.** Amplía tu `AggregateRoot`: además del `Id` y la `Version`, dale una lista de **eventos no confirmados**, y métodos para leerla, limpiarla y separarla en públicos y privados.
+Recuerda dónde quedó tu base: en [el swap](el-swap.md) borraste el `Load`/`Aplicar` de `AggregateRoot` y tu `Empresa` dejó de heredar de ella (Marten hacía el fold). Aquí la base **renace** con una forma nueva, y `Empresa` vuelve a heredar de ella.
+
+> 🛠️ **Inténtalo tú.** Amplía tu `AggregateRoot` con: el `Id`, la `Version` (el número de eventos ya guardados del stream — la base de la concurrencia de [§9](concurrencia-optimista.md)), una lista de **eventos no confirmados** marcada para que **ningún serializador la escriba** (es transitoria), y métodos para leerla, limpiarla y separarla en públicos y privados.
+
+> [!NOTE]
+> 🆕 **El agregado recuerda sus hechos.** `_uncommittedEvents` es la lista de hechos que el agregado emitió y **aún no** se han guardado. `UncommittedEvents` la expone en solo-lectura; `ClearUncommittedEvents` la vacía tras guardar. Va marcada `[JsonIgnore]` porque es **transitoria** (en memoria, pendiente de volcar): no es parte del estado persistido del agregado, así que ningún serializador debe escribirla.
+
+> [!NOTE]
+> 🆕 **Separar públicos de privados en el agregado.** `GetPublicEvents()`/`GetPrivateEvents()` filtran esa lista por los marcadores de [Público vs privado](publico-privado.md) (`OfType<IPublicEvent>()`). Así el agregado mismo dice cuáles de sus hechos cruzan la frontera y cuáles se quedan dentro — la base para que el almacén guarde todo y el bus publique solo los públicos.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -41,17 +49,14 @@ public abstract class AggregateRoot
 ```
 </details>
 
-> [!NOTE]
-> 🆕 **El agregado recuerda sus hechos.** `_uncommittedEvents` es la lista de hechos que el agregado emitió y **aún no** se han guardado. `UncommittedEvents` la expone en solo-lectura; `ClearUncommittedEvents` la vacía tras guardar. Va marcada `[JsonIgnore]` porque es **transitoria** (en memoria, pendiente de volcar): no es parte del estado persistido del agregado, así que ningún serializador debe escribirla.
-
-> [!NOTE]
-> 🆕 **Separar públicos de privados en el agregado.** `GetPublicEvents()`/`GetPrivateEvents()` filtran esa lista por los marcadores de [Público vs privado](publico-privado.md) (`OfType<IPublicEvent>()`). Así el agregado mismo dice cuáles de sus hechos cruzan la frontera y cuáles se quedan dentro — la base para que el almacén guarde todo y el bus publique solo los públicos.
-
 ### Paso 2 · `Empresa` acumula al decidir
 
 Ahora `Empresa` no **devuelve** el hecho: lo **emite y lo aplica** de una, quedando el hecho en `_uncommittedEvents` y el estado ya actualizado.
 
-> 🛠️ **Inténtalo tú.** **🔁** Cambia `Empresa`: un `Create` estático y un `Suspender` que, en vez de devolver el hecho, lo **levanten y apliquen** con un helper `RaiseAndApply`. Los `Apply(TEvento)` siguen mutando el estado.
+> 🛠️ **Inténtalo tú.** **🔁** Cambia `Empresa` (que vuelve a heredar de `AggregateRoot`): un `Create` estático y un `Suspender` que, en vez de devolver el hecho, lo **levanten y apliquen** con un helper `RaiseAndApply` (que añade a `_uncommittedEvents` **y** lo aplica al estado). Como al **decidir** estás fuera de Marten, `RaiseAndApply` rutea el hecho a su `Apply` con un `switch` por tipo (`ApplyInternal`). Los `Apply(TEvento)` siguen mutando el estado.
+
+> [!NOTE]
+> 🆕 **`RaiseAndApply` — emitir y aplicar en un gesto.** Junta dos cosas: **añade** el hecho a `_uncommittedEvents` (para guardarlo luego) y lo **aplica** ya al estado (`ApplyInternal` rutea por tipo al `Apply` correcto). ¿Por qué vuelve el `switch` que Marten te había quitado? Porque Marten rutea tus `Apply` solo al **rehidratar**; aquí, al **decidir**, el agregado se aplica el hecho a sí mismo y tiene que rutearlo a mano. Por eso, tras `Suspender`, `Suspendida` ya es `true` **antes** de guardar. Es el mismo par *decidir/aplicar* de [Decidir el futuro](decidir-el-futuro.md), ahora con el agregado guardando el rastro. `RaiseAndApply` vive en **cada agregado** (usa el `_uncommittedEvents` de la base); la base se queda mínima.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -98,9 +103,6 @@ public class Empresa : AggregateRoot
 }
 ```
 </details>
-
-> [!NOTE]
-> 🆕 **`RaiseAndApply` — emitir y aplicar en un gesto.** Junta dos cosas: **añade** el hecho a `_uncommittedEvents` (para guardarlo luego) y lo **aplica** ya al estado (`ApplyInternal` rutea por tipo al `Apply` correcto). Por eso, tras `Suspender`, `Suspendida` ya es `true` **antes** de guardar: si el mismo comando decide otra cosa a continuación, ve el estado actualizado. Es el mismo par *decidir/aplicar* de [Decidir el futuro](decidir-el-futuro.md), ahora con el agregado guardando el rastro. `RaiseAndApply` vive en **cada agregado** (usa el `_uncommittedEvents` de la base); la base se queda mínima.
 
 ### Paso 3 · Compruébalo
 

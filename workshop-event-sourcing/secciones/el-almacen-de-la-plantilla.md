@@ -1,10 +1,10 @@
 # El almacén de la plantilla: la unidad de trabajo
 
-Tu `Empresa` ahora [acumula sus hechos](el-agregado-de-la-plantilla.md) en vez de entregarlos. Alguien tiene que recorrer esos `UncommittedEvents` y volcarlos a Marten al confirmar. Y hay un matiz: un agregado **nuevo** necesita **crear** su stream; uno **modificado** —que rehidrataste de la base— necesita **añadir** a un stream que ya existe. El `MartenEventStore` real lleva esa cuenta con una **unidad de trabajo** de dos rastros — y confirma **sin que el handler llame `SaveChanges`**.
+Tu `Empresa` ahora [acumula sus hechos](el-agregado-de-la-plantilla.md) en vez de entregarlos. Alguien tiene que recorrer esos `UncommittedEvents` y volcarlos a Marten al confirmar. El `MartenEventStore` real lo hace con una **unidad de trabajo** — y sin que el handler llame `SaveChanges`.
 
 ## 🎯 El Objetivo
 
-Construir el `MartenEventStore` real: una unidad de trabajo que, al confirmar, **vuelca** los `UncommittedEvents` distinguiendo un agregado **nuevo** (`StartStream`) de uno **modificado** (`Append`).
+Construir el `MartenEventStore` real: una unidad de trabajo que **vuelca** los `UncommittedEvents` distinguiendo un agregado **nuevo** (`StartStream`) de uno **modificado** (`Append`), y un **middleware** que la dispara sin que el handler llame `SaveChanges`.
 
 ## 💥 El dolor: nuevo y modificado no se guardan igual
 
@@ -79,7 +79,13 @@ public abstract class MartenUnitOfWork
 
 ### Paso 3 · `MartenEventStore` vuelca al confirmar
 
-> 🛠️ **Inténtalo tú.** **🔁** Haz que `MartenEventStore` herede de `MartenUnitOfWork`. `StartStream` inicia el stream **y** registra el agregado como iniciado; `GetAggregateRootAsync` rehidrata **y** lo registra como modificado; `SaveChangesAsync` recorre los modificados pendientes, `Append`ea sus `UncommittedEvents`, los limpia, y confirma la sesión.
+> 🛠️ **Inténtalo tú.** **🔁** Haz que `MartenEventStore` herede de `MartenUnitOfWork` y reciba **dos** sesiones (una para escribir, otra para leer). `StartStream` inicia el stream **y** registra el agregado como iniciado; `GetAggregateRootAsync` rehidrata **y** lo registra como modificado (puedes encadenar ese registro con el helper `.Tap` del repo, o con un `await` explícito); `SaveChangesAsync` recorre los modificados pendientes, `Append`ea sus `UncommittedEvents`, los limpia, y confirma la sesión.
+
+> [!NOTE]
+> 🆕 **Dos sesiones: escribir y leer.** El store recibe **dos**: `IDocumentSession session` para **escribir** (`StartStream`, `Append`, el commit) y `IQuerySession querySession` para **leer** (`AggregateStreamAsync`). ¿Por qué leer con la de consulta y no con la de escritura? Porque rehidratar es una lectura pura, y la sesión de consulta es más ligera. La versión del stream no se pierde por eso: quien recuerda qué volcar es el **rastro** de la unidad de trabajo, no la sesión. *(Guarda este detalle: el [Capstone](capstone.md) lo reconsidera — `FetchForWriting` querría leer desde la sesión de **escritura**.)*
+
+> [!NOTE]
+> 🆕 **`.Tap` — azúcar de encadenamiento.** `.Tap(AddToModifiedAggregateRoots)` equivale a `var a = await …; AddToModifiedAggregateRoots(a); return a;`: ejecuta un efecto sobre el resultado de un `Task` y lo devuelve igual, sin desanidar. Es un helper del repo (`Cosmos.EventSourcing.CritterStack`, en `TaskAggregateRootExtensions`). Puro estilo — puedes escribirlo con `await` explícito y da lo mismo.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -117,17 +123,14 @@ public class MartenEventStore(IDocumentSession session, IQuerySession querySessi
 ```
 </details>
 
-> [!NOTE]
-> 🆕 **Dos sesiones: escribir y leer.** El store recibe **dos**: `IDocumentSession session` para **escribir** (`StartStream`, `Append`, el commit) y `IQuerySession querySession` para **leer** (`AggregateStreamAsync`). ¿Por qué leer con la de consulta y no con la de escritura? Porque rehidratar es una lectura pura, y la sesión de consulta es más ligera. La versión del stream no se pierde por eso: quien recuerda qué volcar es el **rastro** de la unidad de trabajo, no la sesión. *(Guarda este detalle: el [Capstone](capstone.md) lo reconsidera — `FetchForWriting` querría leer desde la sesión de **escritura**.)*
-
-> [!NOTE]
-> 🆕 **`.Tap` — azúcar de encadenamiento.** `.Tap(AddToModifiedAggregateRoots)` equivale a `var a = await …; AddToModifiedAggregateRoots(a); return a;`: ejecuta un efecto sobre el resultado de un `Task` y lo devuelve igual, sin desanidar. Es un helper del repo (`Cosmos.EventSourcing.CritterStack`, en `TaskAggregateRootExtensions`). Puro estilo — puedes escribirlo con `await` explícito y da lo mismo.
-
 ### Paso 4 · Confirmar sin llamar `SaveChanges`
 
 Falta cerrar el "¿por qué se guarda sin que yo llame `SaveChanges`?". Cuando el handler corre bajo Wolverine, no llamas `SaveChangesAsync` tú: lo hace un **middleware**.
 
-> 🛠️ **Inténtalo tú.** Escribe un `UnitOfWorkMiddleware` que reciba el `IEventStore` y, con dos ganchos, vuelque los hechos **después** del handler y limpie el rastro **al final**.
+> 🛠️ **Inténtalo tú.** Escribe un `UnitOfWorkMiddleware` que reciba el `IEventStore` y, con dos ganchos que Wolverine descubre **por nombre**, vuelque los hechos en `After()` (tras el handler) y limpie el rastro en `Finally()` (pase lo que pase).
+
+> [!NOTE]
+> 🆕 **Un middleware de Wolverine.** Un **middleware** es código que Wolverine corre **alrededor** de cada handler — el "guardado central" que industrializaste en [Revelar Wolverine](revelar-wolverine.md), ahora atado al rastro. Wolverine descubre sus ganchos **por convención de nombre**: `After()` corre **tras** el handler (vuelca los hechos acumulados a la sesión), y `Finally()` corre **pase lo que pase**, con o sin excepción (limpia los `UncommittedEvents` de todos los agregados y vacía el rastro, para que un segundo mensaje no reprocese lo del primero). Bajo Wolverine el handler **no** llama `SaveChangesAsync`: el volcado lo hace este `After()`, y el **commit** lo pone `AutoApplyTransactions` (confirma la sesión de Marten). El `SaveChangesAsync` que escribiste en el Paso 3 es para cuando confirmas **a mano** (la comprobación 1). Reparto: el middleware **vuelca y limpia**, `AutoApplyTransactions` **confirma**, y tu handler **solo decide**.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -152,10 +155,7 @@ public class UnitOfWorkMiddleware(IEventStore eventStore)
 ```
 </details>
 
-> [!NOTE]
-> 🆕 **Un middleware de Wolverine.** Un **middleware** es código que Wolverine corre **alrededor** de cada handler — el "guardado central" que industrializaste en [Revelar Wolverine](revelar-wolverine.md), ahora atado al rastro. Wolverine descubre sus ganchos **por convención de nombre**: `After()` corre **tras** el handler (vuelca los hechos acumulados a la sesión), y `Finally()` corre **pase lo que pase**, con o sin excepción (limpia los `UncommittedEvents` de todos los agregados y vacía el rastro, para que un segundo mensaje no reprocese lo del primero). El **commit** lo pone `AutoApplyTransactions` (confirma la sesión de Marten). Reparto: el middleware **vuelca y limpia**, `AutoApplyTransactions` **confirma**, y tu handler **solo decide**.
-
-> 🔍 **¿Lo lograste?** Dos comprobaciones, con Postgres arriba (reusa el arnés de [Tests de integración](tests-de-integracion.md)). (1) **A mano:** crea una `Empresa` nueva y `StartStream` → aparece un stream nuevo en `mt_events`; rehidrata `emp-7`, `Suspender`, y `store.SaveChangesAsync` → el `EmpresaSuspendida` se **añade** al stream existente. (2) **El auto-flush:** con el `UnitOfWorkMiddleware` registrado en Wolverine, corre un handler que suspenda `emp-7` y **no** llame `SaveChanges` — la fila **igual** aparece en `mt_events`. Esa es la prueba de que el volcado ocurre por debajo.
+> 🔍 **¿Lo lograste?** Dos comprobaciones, con Postgres arriba (reusa el arnés de [Tests de integración](tests-de-integracion.md)). (1) **A mano:** crea una `Empresa` nueva y `StartStream` → aparece un stream nuevo en `mt_events`; rehidrata `emp-7`, `Suspender`, y `store.SaveChangesAsync` → el `EmpresaSuspendida` se **añade** al stream existente. (2) **El auto-flush:** registra el middleware como política de Wolverine (`opts.Policies.AddMiddleware<UnitOfWorkMiddleware>()`), corre un handler que suspenda `emp-7` y **no** llame `SaveChanges` — la fila **igual** aparece en `mt_events`. Esa es la prueba de que el volcado ocurre por debajo.
 
 ---
 

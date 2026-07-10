@@ -1,10 +1,10 @@
 # Público vs privado: qué hecho cruza la frontera
 
-En [El handler por convención](handler-por-convencion.md) devolver un evento hizo que Wolverine lo **publicara** a otros handlers. Pero surge la pregunta: ¿a quién? Hoy todos tus hechos son iguales. Unos son **asunto interno** de tu servicio (solo tus read models los miran). Otros deben **cruzar** a otros servicios: cuando suspendes una empresa, **facturación** —otro servicio— tiene que enterarse para dejar de cobrar. Necesitas **distinguirlos**. Y hacerlo sin una bandera dentro del evento ni un `if` en el sender.
+En [El handler por convención](handler-por-convencion.md) devolver un evento hizo que Wolverine lo **publicara** a otros handlers. Pero surge la pregunta: ¿a quién? Hoy todos tus hechos son iguales. Unos son **asunto interno** de tu servicio (solo tus read models los miran). Otros deben **cruzar** a otros servicios: cuando suspendes una empresa, **facturación** —otro servicio— tiene que enterarse para dejar de cobrar. Necesitas **distinguirlos**. Y hacerlo sin una bandera dentro del evento ni un `if` en el código que publica.
 
 ## 🎯 El Objetivo
 
-Marcar cada evento como **público** (cruza a otros servicios) o **privado** (se queda dentro) con dos interfaces vacías, y entender que **el ruteo se decide en la config de arranque**, no en el código que publica el hecho.
+Marcar cada evento como **público** (cruza a otros servicios) o **privado** (se queda dentro) con dos interfaces vacías, y decidir cuáles salen a otros servicios en **un solo lugar al arrancar la app**, no en el código que publica el hecho.
 
 ## 💥 El dolor: publicar sin frontera acopla todo con todo
 
@@ -34,22 +34,26 @@ public interface IPrivateEvent : IEvent;       // se queda dentro de este servic
 </details>
 
 > [!NOTE]
-> 🆕 **Interfaz marcadora (vacía).** Una interfaz sin métodos no pide nada; solo **etiqueta** al tipo que la implementa. `EmpresaSuspendida : IPublicEvent` no gana comportamiento — gana una **intención** que el código puede consultar (`typeof(EmpresaSuspendida).IsAssignableTo(typeof(IPublicEvent))`). Es el mismo truco del `ICommand` que ya usaste: marcar sin obligar.
+> 🆕 **Interfaz marcadora (vacía).** Una interfaz sin métodos no pide nada; solo **etiqueta** al tipo que la implementa. `EmpresaSuspendida : IPublicEvent` no gana comportamiento — gana una **intención** que el código puede consultar (`typeof(EmpresaSuspendida).IsAssignableTo(typeof(IPublicEvent))`). Marcar sin obligar: la interfaz vacía solo cuelga una etiqueta que el código puede consultar.
 
 > [!NOTE]
 > 🆕 **Público = contrato; privado por defecto.** La regla de criterio: un evento es **privado** salvo que otro servicio tenga una necesidad real de verlo. Promoverlo a **público** es firmar un contrato que mantendrás **para siempre** (otros dependen de su forma). Por eso no marcas todo público "por si acaso": expones lo mínimo. `EmpresaSuspendida` cruza porque facturación debe reaccionar; `EmpresaMarcadaParaRevision` se queda porque es un detalle interno tuyo.
 
-### Paso 2 · El ruteo vive en el arranque, no en el sender
+### Paso 2 · El ruteo vive en el arranque, no en el código que publica
 
-Aquí está el giro. El código que **publica** un hecho es **el mismo** para uno público y uno privado — no dice a dónde va. Quien decide el destino es la **configuración de arranque**, que recorre tus tipos por reflexión y le declara una **ruta externa** a cada `IPublicEvent`.
+Aquí está el giro: el código que **publica** un hecho es **el mismo** para uno público y uno privado; quien decide el destino es la **config de arranque**.
 
 > 🛠️ **Inténtalo tú.** En el arranque, enumera todos los tipos que implementan `IPublicEvent` y decláreles una ruta al bus externo. Los que no la implementan **no** reciben ruta.
+
+> [!NOTE]
+> 🆕 **Escanear el ensamblado + declarar ruta.** Recorrer los tipos de un ensamblado con `GetTypes()` y filtrar por marcador con `IsAssignableTo` es hacer **a mano** el mismo escaneo que Wolverine hace para descubrir handlers. A cada tipo público le declaras una ruta con `opts.PublishMessage(tipo).ToRabbitExchange(nombre)` (el transporte real —RabbitMQ— llega en [Transportes](transportes.md); por ahora, la forma). El ensamblado de tus eventos lo obtienes como antes: `typeof(EmpresaSuspendida).Assembly`.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```csharp
 // en UseWolverine(...), al arrancar: rutea CADA IPublicEvent al bus externo, por reflexión
+var contratos = typeof(EmpresaSuspendida).Assembly;   // el ensamblado donde viven tus eventos
 var publicos = contratos.GetTypes()
     .Where(t => t.IsAssignableTo(typeof(IPublicEvent)));
 
@@ -60,7 +64,7 @@ foreach (var tipo in publicos)
 </details>
 
 > [!NOTE]
-> 🆕 **El marcador es intención; el arranque la materializa.** El sender no sabe a dónde va el hecho: solo lo publica al bus. La config de arranque, por reflexión sobre `IPublicEvent`, es la que **le pone ruta externa**. Cambiar qué cruza la frontera es cambiar un marcador — no tocar el sender ni el handler.
+> 🆕 **El marcador es intención; el arranque la materializa.** El código que publica no sabe a dónde va el hecho: solo lo publica al bus. La config de arranque, por reflexión sobre `IPublicEvent`, es la que **le pone ruta externa**. Cambiar qué cruza la frontera es cambiar un marcador — no tocar el código que publica ni el handler.
 
 > [!WARNING]
 > **"Privado = local" NO es automático.** Wolverine, si **no** encuentra ruta declarada para un evento, lo despacha a una **cola local en memoria** por defecto. Un `IPrivateEvent` se queda dentro **solo porque no le declaraste ruta externa** — no porque el marcador lo fuerce. El marcador es una **convención de intención**; la localidad sale de la config. Esta sutileza es justo lo que un mantenedor de la plantilla debe entender: nada obliga a un privado a quedarse local, y si le declaras una ruta externa, sale del proceso igual que uno público.
@@ -83,7 +87,7 @@ Partiste tus hechos en dos con **interfaces vacías**: `IPublicEvent` (cruza a o
 - [ ] Creaste `IEvent`, `IPublicEvent : IEvent`, `IPrivateEvent : IEvent` — **sin miembros**.
 - [ ] Marcaste al menos un evento como público (`EmpresaSuspendida`) y uno como privado.
 - [ ] Explicas por qué público = **contrato** y por qué privado es el **default** (expones lo mínimo).
-- [ ] Explicas que el ruteo se decide en el **arranque** (reflexión sobre el marcador), no en el sender.
+- [ ] Explicas que el ruteo se decide en el **arranque** (reflexión sobre el marcador), no en el código que publica.
 - [ ] Reconoces que "privado = local" **no** es automático: sale de no declararle ruta externa.
 
 ---
@@ -92,7 +96,7 @@ Partiste tus hechos en dos con **interfaces vacías**: `IPublicEvent` (cruza a o
 
 Piensa la respuesta a esto (es tu reflexión de la sección):
 
-> 💭 ¿Por qué marcar un evento como público es una decisión más pesada que marcarlo privado? ¿Dónde se decide realmente que un hecho cruce la frontera, y por qué eso deja el sender y el handler intactos?
+> 💭 ¿Por qué marcar un evento como público es una decisión más pesada que marcarlo privado? ¿Dónde se decide realmente que un hecho cruce la frontera, y por qué eso deja el código que publica y el handler intactos?
 
 Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
 
@@ -106,7 +110,7 @@ git push
 
 ## 🧠 En una frase
 
-Dos **interfaces vacías** —`IPublicEvent` (cruza a otros servicios) e `IPrivateEvent` (se queda dentro)— etiquetan la **intención** de cada hecho; el ruteo lo decide la **config de arranque** por reflexión sobre el marcador (no el sender), y un privado se queda local **solo** porque no le declaras ruta externa: público = contrato para siempre, así que expones lo mínimo.
+Dos **interfaces vacías** —`IPublicEvent` (cruza a otros servicios) e `IPrivateEvent` (se queda dentro)— etiquetan la **intención** de cada hecho; el ruteo lo decide la **config de arranque** por reflexión sobre el marcador (no el código que publica), y un privado se queda local **solo** porque no le declaras ruta externa: público = contrato para siempre, así que expones lo mínimo.
 
 ---
 

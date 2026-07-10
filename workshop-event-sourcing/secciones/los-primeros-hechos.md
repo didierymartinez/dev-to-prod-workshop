@@ -37,7 +37,7 @@ public record EmpresaSuspendida(string Motivo);
 public record EmpresaReactivada();
 ```
 
-Un `record` nos da, sin escribir más, justo lo que un hecho necesita: es **inmutable** (prueba `evento.Plan = "otro"` y no compila — el pasado queda en piedra) y se compara **por su contenido**, no por referencia. No usamos `record` porque esté de moda: lo usamos porque un hecho **exige** esas dos cosas.
+Un `record` nos da, sin escribir más, justo lo que un hecho necesita: es **inmutable** (prueba `evento.Plan = "otro"` y no compila — el pasado queda en piedra) y se compara **por su contenido**, no por referencia.
 
 > [!NOTE]
 > 🌱 **Semilla — los eventos son para siempre.** `EmpresaRegistrada` quedará escrito en el diario por años. ¿Qué pasa el día que el negocio quiera añadirle un campo `Sector`? No puedes editar el pasado. Ese problema tiene nombre y solución —*versionado de eventos / upcasting*— y lo veremos a fondo más adelante. Por ahora quédate con la idea: **un evento es un contrato inmutable con el futuro**; nómbralo y modélalo con cuidado.
@@ -66,7 +66,10 @@ Esa secuencia ordenada de hechos tiene nombre: es un **Stream**. Y no es "una li
 
 ¿Cómo sé cómo está la empresa **hoy**? No lo tengo guardado en ningún lado: lo **reconstruyo** leyendo el diario de principio a fin y acumulando.
 
-> 🛠️ **Inténtalo tú.** Declara cuatro variables (`nombre`, `plan`, `suspendida`, `reactivaciones`), recorre `historia` con un `foreach`, y según el **tipo** de cada hecho actualiza la variable que toque (registrada → nombre y plan; plan cambiado → plan; suspendida → suspendida=true; reactivada → suspendida=false y +1 reactivación). Al final imprime el estado. *(Pista: `if (hecho is EmpresaRegistrada r) { … r.Nombre … }` te da el hecho ya convertido en `r`.)* Corre `dotnet run`.
+> [!NOTE]
+> 🆕 **Idioma de C#: `is Tipo x` (comprueba el tipo y captura).** `hecho is EmpresaRegistrada r` pregunta *¿este hecho es un `EmpresaRegistrada`?* y, si lo es, te lo entrega ya convertido en una variable nueva `r`, lista para leer sus datos (`r.Nombre`, `r.Plan`). Es el `if` con el que vas a distinguir cada tipo de hecho.
+
+> 🛠️ **Inténtalo tú.** Recorre `historia` reconstruyendo el estado hasta imprimir esta línea: `Constructora Andes: plan Premium, suspendida, reactivada 1 vez/veces`. Para eso declara cuatro variables (`nombre`, `plan`, `suspendida`, `reactivaciones`), recórrela con un `foreach`, y según el **tipo** de cada hecho actualiza la que toque (registrada → nombre y plan; plan cambiado → plan; suspendida → suspendida=true; reactivada → suspendida=false y +1 reactivación). Corre `dotnet run`.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -111,7 +114,7 @@ Console.WriteLine($"{empresa.Nombre}: plan {empresa.Plan}, {(empresa.Suspendida 
 empresa.Plan = "Enterprise";   // ❌ error de compilación
 ```
 
-> 🛠️ **Inténtalo tú.** Crea una clase `Empresa`: mete las cuatro variables como **propiedades** (de solo-lectura desde fuera: `{ get; private set; }`), y en el **constructor** recibe `IEnumerable<object> historia` y corre adentro el mismo `foreach` que acabas de escribir. Luego, arriba, **reemplaza** las variables sueltas por `var empresa = new Empresa(historia);` e imprime su estado. **Ve e inténtalo**, y luego te muestro una forma:
+> 🛠️ **Inténtalo tú.** Crea una clase `Empresa`: mete las cuatro variables como **propiedades** (de solo-lectura desde fuera: `{ get; private set; }`), y en el **constructor** recibe `IEnumerable<object> historia` (una "cualquier cosa recorrible con `foreach`" — tu `List` lo es) y corre adentro el mismo `foreach` que acabas de escribir. Luego, arriba, **reemplaza** las variables sueltas por `var empresa = new Empresa(historia);` e imprime su estado. **Ve e inténtalo**, y luego te muestro una forma:
 
 > [!NOTE]
 > 🆕 **Idioma de C#: `{ get; private set; }`.** Una propiedad que se **lee** desde cualquier parte pero solo se **escribe** dentro de su propia clase. El `get;` es público; el `private set;` deja la asignación reservada al código de `Empresa` (su constructor, en este caso). Por eso de afuera puedes hacer `empresa.Plan`, pero `empresa.Plan = "X"` no compila. Es el equivalente a escribir un campo privado con una propiedad de solo lectura, en una sola línea — y es justo lo que protege la coherencia del agregado.

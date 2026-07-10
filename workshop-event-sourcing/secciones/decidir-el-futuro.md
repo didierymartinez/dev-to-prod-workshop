@@ -1,6 +1,6 @@
 # Decidir el futuro (emitir eventos)
 
-Ya tienes un `EventStream` con el que **lees** (`Get`) y **escribes** (`Append`) la historia de una empresa. Pero hasta ahora fabricábamos los hechos **a mano desde afuera** (`new PlanCambiado(...)` sueltos en el `Program.cs`, y los metíamos con `Append`). Eso está mal: ¿quién dice que "Constructora Andes" *puede* cambiar de plan? Esa decisión le toca a la **propia empresa**.
+Ya tienes un `EventStream` con el que **lees** (`Get`) y **escribes** (`Append`) la historia de una empresa. Pero hasta ahora fabricábamos los hechos **a mano desde afuera** (`new PlanCambiado(...)` sueltos en el `Program.cs`, y los metíamos con `Append`). Eso está mal: quién *puede* cambiar de plan lo decide la **propia empresa**, no un `new` suelto.
 
 ## 🎯 El Objetivo
 
@@ -12,7 +12,7 @@ Aquí hay un detalle sutil del event sourcing: la `Empresa` es la **dueña de la
 
 Empecemos por el camino feliz (los `record` de eventos ya existen desde [Los primeros hechos](los-primeros-hechos.md)).
 
-> 🛠️ **Inténtalo tú.** Añade a tu `Empresa` tres métodos que **devuelvan** el hecho correspondiente: `CambiarPlan(string nuevoPlan)` → un `PlanCambiado`; `Suspender(string motivo)` → un `EmpresaSuspendida`; `Reactivar()` → un `EmpresaReactivada`. **Clave:** que **no toquen ninguna propiedad** — solo **devuelven** el hecho.
+> 🛠️ **Inténtalo tú.** La meta es que pedirle una decisión a la empresa **devuelva** el hecho, sin tocar su estado: `PlanCambiado h = empresa.CambiarPlan("Enterprise");`. Añade a tu `Empresa` tres métodos así: `CambiarPlan(string nuevoPlan)` → un `PlanCambiado`; `Suspender(string motivo)` → un `EmpresaSuspendida`; `Reactivar()` → un `EmpresaReactivada`. **Clave:** que **no toquen ninguna propiedad** — solo **devuelven** el hecho.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -29,7 +29,7 @@ public class Empresa : AggregateRoot
 ```
 </details>
 
-Fíjate en algo importante: `CambiarPlan` **no** toca la propiedad `Plan`. Solo **devuelve** el hecho `PlanCambiado`. El estado cambia únicamente cuando ese hecho se **aplica** (el `switch Aplicar` que ya tienes) al reproducir la historia. Decidir y aplicar son dos cosas separadas. Recuérdalo: es la idea central de todo esto.
+Fíjate en algo importante: `CambiarPlan` **no** toca la propiedad `Plan`. Solo **devuelve** el hecho `PlanCambiado`. El estado cambia únicamente cuando ese hecho se **aplica** (el `switch Aplicar` que ya tienes) al reproducir la historia. Decidir y aplicar son dos cosas separadas.
 
 ## El ciclo de vida: cargar → actuar → guardar
 
@@ -89,7 +89,7 @@ stream.Append(orden2.Suspender("falta de pago"));   // hoy emite OTRA VEZ → el
 
 El agregado es el **guardián de las reglas**, así que la defensa nace **dentro** de la `Empresa`, mirando su estado **antes** de emitir.
 
-> 🛠️ **Inténtalo tú.** **🔁 Modifica** los dos métodos que ya escribiste (no crees otra clase): que `CambiarPlan` **lance** una excepción `ReglaDeNegocioException` si la empresa está `Suspendida` (la operación es **inválida**), y que `Suspender` **devuelva `null`** si ya está `Suspendida` (es **redundante**, no un error → su tipo de retorno pasa a `EmpresaSuspendida?`). *(`Reactivar()` queda igual.)*
+> 🛠️ **Inténtalo tú.** **🔁 Modifica** los dos métodos que ya escribiste —sin crear otra `Empresa` ni otro agregado— para que: `CambiarPlan` **lance** una `ReglaDeNegocioException` (una clase de excepción pequeña, que creas aparte como hiciste con los `record`) si la empresa está `Suspendida` (la operación es **inválida**), y `Suspender` **devuelva `null`** si ya está `Suspendida` (es **redundante**, no un error → su tipo de retorno pasa a `EmpresaSuspendida?`). *(`Reactivar()` queda igual.)*
 
 > [!NOTE]
 > 🆕 **Idioma de C#: el tipo anulable `T?`.** Escribir `EmpresaSuspendida?` (con el `?`) declara que ese valor **puede ser `null`** —aquí, "no emití ningún hecho"—. Sin el `?`, el compilador asume que un tipo de referencia **nunca** es null y te avisa si devuelves uno; con el `?`, le dices "sí puede serlo" y, a cambio, el compilador **te obliga a contemplar el caso** (a comprobar si es null antes de usarlo) en quien reciba el resultado.
@@ -168,7 +168,7 @@ if (hecho is not null) stream.Append(hecho);
 
 ```csharp
 // montamos una empresa desde su historia previa (Given) — sin base de datos, en memoria
-static Empresa Construir(params object[] historia)
+static Empresa Construir(params object[] historia)   // params: le pasas los hechos sueltos y C# los junta en el array
 {
     var empresa = new Empresa();
     empresa.Load(historia);   // Load es el motor de replay de «Refactorizando el motor»

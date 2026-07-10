@@ -1,10 +1,10 @@
 # Consumir Cosmos.BuildingBlocks
 
-Hasta aquí **reconstruiste** la plantilla para entenderla por dentro. En un proyecto real no la copias: copiarla es mantener un fork. La **instalas** como paquetes NuGet y construyes tu dominio encima. Referencias solo las vertientes que usas, y tu código (agregados, handlers, eventos) vive en **tu** proyecto, apoyado en las abstracciones. Esta sección muestra cómo se consume.
+Hasta aquí **reconstruiste** la plantilla para entenderla por dentro. Ahora la **instalas** como paquetes NuGet y construyes tu dominio encima.
 
 ## 🎯 El Objetivo
 
-Consumir `Cosmos.BuildingBlocks` como paquetes NuGet: referenciar la vertiente que cada proyecto necesita, cablear el arranque con sus extensiones, y reconocer el **idioma dual** y los **extension members** de C# 14.
+Consumir `Cosmos.BuildingBlocks` como paquetes NuGet: referenciar la vertiente que cada proyecto necesita, cablear el arranque con sus extensiones, y notar dos detalles de su estilo (que explicaremos): el arranque en español y una sintaxis nueva de C# 14.
 
 ## 💥 El dolor: copiar la plantilla es mantener un fork
 
@@ -39,7 +39,13 @@ Si pegas el `AggregateRoot`, el `MartenEventStore` y el `TestStore` en tu proyec
 
 ### Paso 2 · Cablea el arranque con las extensiones
 
-> 🛠️ **Inténtalo tú.** En el host, arma el arranque llamando a las extensiones de la librería: configurar Marten para comandos, usar Wolverine, registrar el resolver de tenant, habilitar RabbitMQ.
+> 🛠️ **Reconócelo.** Los nombres de estas extensiones los inventa la librería (no los adivinas), así que aquí **te los muestro**; tu trabajo es **emparejar** cada llamada con lo que ya cableaste a mano: `UsarWolverineParaComandos` ↔ `UseWolverine` + `Discovery`, `AgregarConfiguracionMartenComandos` ↔ `AddMarten` + `IntegrateWithWolverine`, `HabilitarRabbitMq` ↔ `UseRabbitMqUsingNamedConnection` + `AutoProvision`, `HabilitarOutboxParaEventosPublicos` ↔ el bucle de rutas `PublishMessage<T>().ToRabbitExchange(...)` de [Público vs privado](publico-privado.md).
+
+> [!NOTE]
+> 🆕 **El idioma dual.** Fíjate: tu **dominio** está en inglés (`AggregateRoot`, `IEventStore`, tus eventos y handlers), pero las extensiones de **arranque** están en español (`UsarWolverineParaComandos`, `AgregarConfiguracionMartenComandos`, `HabilitarRabbitMq`, `HabilitarOutboxParaEventosPublicos`, `AgregarTenantResolverHibrido`). Es una convención deliberada del equipo: el código técnico/portable en inglés, la **configuración de plataforma** en el idioma del equipo, para que el arranque se lea como instrucciones.
+
+> [!NOTE]
+> 🆕 **Extension members (C# 14).** Esas extensiones no son métodos estáticos sueltos: la librería las agrupa con la sintaxis nueva `extension(IServiceCollection services) { public void Agregar…() }` — un bloque que declara, de una, todos los métodos que "cuelgan" de un tipo. Tú solo las **llamas** como si fueran métodos del objeto (`services.AgregarTenantResolverHibrido()`); quien las **escribe** (la librería) usa esa forma para agruparlas legiblemente.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -47,20 +53,16 @@ Si pegas el `AggregateRoot`, el `MartenEventStore` y el `TestStore` en tu proyec
 ```csharp
 builder.Host.UsarWolverineParaComandos(typeof(Empresa).Assembly, opts =>
 {
+    // connectionString e isDevelopment vienen de tu config; "gestion" es el schema de Postgres
     opts.AgregarConfiguracionMartenComandos(connectionString, "gestion", isDevelopment);
-    opts.HabilitarRabbitMq("rabbit");
+    opts.HabilitarRabbitMq("rabbit");   // "rabbit" = la entrada de ConnectionStrings en appsettings
+    // nombre del servicio (su exchange) + el ensamblado donde viven tus eventos públicos:
     opts.HabilitarOutboxParaEventosPublicos("gestion-empresas", typeof(EmpresaSuspendida).Assembly);
 });
 
 builder.Services.AgregarTenantResolverHibrido();   // el ProxyTenantResolver de multi-tenancy
 ```
 </details>
-
-> [!NOTE]
-> 🆕 **El idioma dual.** Fíjate: tu **dominio** está en inglés (`AggregateRoot`, `IEventStore`, tus eventos y handlers), pero las extensiones de **arranque** están en español (`UsarWolverineParaComandos`, `AgregarConfiguracionMartenComandos`, `HabilitarRabbitMq`, `HabilitarOutboxParaEventosPublicos`, `AgregarTenantResolverHibrido`). Es una convención deliberada del equipo: el código técnico/portable en inglés, la **configuración de plataforma** en el idioma del equipo, para que el arranque se lea como instrucciones.
-
-> [!NOTE]
-> 🆕 **Extension members (C# 14).** Esas extensiones no son métodos estáticos sueltos: la librería las agrupa con la sintaxis nueva `extension(IServiceCollection services) { public void Agregar…() }` — un bloque que declara, de una, todos los métodos que "cuelgan" de un tipo. Tú solo las **llamas** como si fueran métodos del objeto (`services.AgregarTenantResolverHibrido()`); quien las **escribe** (la librería) usa esa forma para agruparlas legiblemente.
 
 ### Paso 3 · Tu dominio, encima
 

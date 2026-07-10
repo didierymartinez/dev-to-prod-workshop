@@ -1,10 +1,10 @@
 # El handler por convención
 
-Wolverine ya descubre tus handlers. Pero mira uno: sigue implementando `ICommandHandler<TCommand>`, la interfaz que naciste en [El despachador](el-despachador.md). ¿Para qué la creaste? Para que **tu** `Despachador` pudiera tratar a todos los handlers igual (`handler.Handle((T)comando)`). Wolverine no la necesita: los encuentra por **convención**. Así que la interfaz se vuelve **opcional** — y de paso, un handler que **devuelve** un evento abre la puerta a que los hechos fluyan entre handlers.
+Wolverine ya descubre tus handlers. Pero el tuyo aún implementa `ICommandHandler<TCommand>`, la interfaz que creaste en [El despachador](el-despachador.md) para tu propio `Despachador`. Wolverine no la necesita.
 
 ## 🎯 El Objetivo
 
-Que tu handler sea **una clase con un método `Handle`**, sin interfaz — Wolverine lo descubre y le inyecta sus dependencias por parámetro. Y ver el **cascading**: devolver un evento lo publica.
+Que tu handler sea **una clase con un método `Handle`**, sin interfaz — Wolverine lo descubre y le inyecta sus dependencias por parámetro. Y ver cómo, al **devolver** un evento desde el handler, Wolverine lo entrega solo a otros handlers (a eso se le llama *cascading*).
 
 ## 🔧 El handler, desnudo
 
@@ -20,7 +20,7 @@ Hasta ahora `IEventStore` entraba por el **constructor** del handler. Con Wolver
 ```csharp
 // antes: public class SuspenderHandler(IEventStore store) : ICommandHandler<SuspenderEmpresa>
 // ahora: una clase con un método Handle — sin interfaz, sin constructor
-public class SuspenderEmpresaHandler
+public class SuspenderHandler
 {
     public async Task Handle(SuspenderEmpresa cmd, IEventStore store)   // deps por parámetro
     {
@@ -34,17 +34,19 @@ public class SuspenderEmpresaHandler
 </details>
 
 > [!NOTE]
-> 🆕 **Discovery por convención + inyección por parámetro.** Wolverine halla el handler por su forma (una clase con un método `Handle` o `HandleAsync`), sin ninguna interfaz. El **primer parámetro es el mensaje**; los demás (`IEventStore`) los **inyecta del contenedor** en un scope por invocación. Por eso `ICommandHandler<T>` es ahora **opcional**: la creaste para que tu `Despachador` casero tratara los handlers igual; Wolverine lo hace por convención, así que puedes **borrarla**. El andamio cumplió su papel.
+> 🆕 **Discovery por convención + inyección por parámetro.** Wolverine halla el handler por su forma (una clase con un método `Handle` o `HandleAsync`), sin ninguna interfaz. El **primer parámetro es el mensaje**; los demás (`IEventStore`) los **inyecta del contenedor** en un scope por invocación. Por eso `ICommandHandler<T>` es ahora **opcional**: la creaste para que tu `Despachador` casero tratara los handlers igual; Wolverine lo hace por convención, así que puedes **borrarla**.
 
 ### Paso 2 · Cascading: devolver un evento lo publica
 
-> 🛠️ **Inténtalo tú.** Haz que el handler **devuelva** el hecho. Luego crea otro handler que reciba `EmpresaSuspendida` y reaccione. Wolverine conecta los dos.
+Podrías inyectar `NotificarSuspension` en el handler y llamarlo a mano — pero entonces el que suspende tendría que **conocer** a cada reactor, y sumar uno nuevo obliga a tocarlo. **Devolver** el evento invierte eso: el emisor no sabe quién reacciona; Wolverine reparte.
+
+> 🛠️ **Inténtalo tú.** Quieres que `InvokeAsync(new SuspenderEmpresa("emp-7","impago"))` imprima `[aviso] suspendida: impago` desde un handler que **nadie cableó**. Haz que `Handle` **devuelva** el hecho, y crea otro handler que reciba `EmpresaSuspendida` y reaccione. Wolverine conecta los dos.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```csharp
-public class SuspenderEmpresaHandler
+public class SuspenderHandler
 {
     public async Task<EmpresaSuspendida?> Handle(SuspenderEmpresa cmd, IEventStore store)
     {
@@ -64,9 +66,9 @@ public class NotificarSuspension
 </details>
 
 > [!NOTE]
-> 🆕 **Cascading messages.** Si un `Handle` **devuelve** un mensaje, Wolverine lo **publica** — lo entrega a cualquier handler que lo maneje. Si devuelve `null`, no publica nada. Aquí el mismo hecho se **persiste** (`AppendEvent`) **y se publica** (el `return`): el evento es, a la vez, el registro y el mensaje. La entrega es **asíncrona** (por una cola, no dentro del `InvokeAsync`) — en un test hay que esperar el efecto.
+> 🆕 **Cascading messages.** Si un `Handle` **devuelve** un mensaje, Wolverine lo **publica** — lo entrega a cualquier handler que lo maneje. Si devuelve `null`, no publica nada. Aquí el mismo hecho se **persiste** (`AppendEvent`) **y se publica** (el `return`): el evento es, a la vez, el registro y el mensaje. La entrega es **asíncrona** (por una cola, no dentro del `InvokeAsync`) — en un test hay que **esperar** el efecto: usa las *tracked sessions* de Wolverine (`InvokeMessageAndWaitAsync`, que esperan a que se drenen los mensajes en vuelo), o en un spike rápido un `await Task.Delay(...)`.
 
-> 🔍 **¿Lo lograste?** `InvokeAsync(new SuspenderEmpresa("emp-7","impago"))` → corre `SuspenderEmpresaHandler` (persiste el hecho), y un instante después `NotificarSuspension` imprime el aviso, sin que nadie los conectara a mano. Wolverine ruteó el evento devuelto a su handler.
+> 🔍 **¿Lo lograste?** `InvokeAsync(new SuspenderEmpresa("emp-7","impago"))` → corre `SuspenderHandler` (persiste el hecho), y un instante después `NotificarSuspension` imprime el aviso, sin que nadie los conectara a mano. Wolverine ruteó el evento devuelto a su handler.
 
 ---
 

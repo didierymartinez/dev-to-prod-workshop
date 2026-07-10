@@ -1,6 +1,6 @@
 # Persistir a mano tiene un límite
 
-Tienes el motor blindado con tests verdes. Pero fíjate **dónde viven esos hechos**: en tu `EventStore`, un `Dictionary` en **RAM**. Tu test siembra, ejecuta y verifica — y luego el proceso termina y **todo se borra**. Para un test es justo lo que quieres (empezar de cero cada vez); para una app real es letal: el diario de "Constructora Andes" no puede desaparecer al reiniciar el servidor. Los hechos necesitan una **base de datos**. Guardar uno a mano resulta fácil. Leerlo de vuelta a su tipo no lo es: ahí verás dónde hacerlo a mano deja de valer la pena.
+Tienes el motor blindado con tests verdes. Pero fíjate **dónde viven esos hechos**: en tu `EventStore`, un `Dictionary` en **RAM**. Tu test siembra, ejecuta y verifica — y luego el proceso termina y **todo se borra**. Para un test es justo lo que quieres (empezar de cero cada vez); para una app real es letal: el diario de "Constructora Andes" no puede desaparecer al reiniciar el servidor. Los hechos necesitan una **base de datos**.
 
 ## 🎯 El Objetivo
 
@@ -123,7 +123,7 @@ docker exec -it gestion_eventstore psql -U gestion -d gestion_eventstore \
 
 ## El camino de vuelta, y su límite
 
-Guardar fue fácil. Ahora el camino de vuelta en C#: lees la fila y tienes `data` como texto JSON… pero tu `EventStore` trabaja con `object` (`EventoAlmacenado.EventData`). ¿En qué tipo lo deserializas? El JSON no lo dice — por eso guardaste `type`. Para reconstruir el `object` correcto tendrías que escribir, a mano, algo así (donde `fila` es cada fila que lees de la tabla `eventos`):
+Guardar fue fácil. Ahora el camino de vuelta en C#: lees la fila y tienes `data` como texto JSON… pero tu `EventStore` trabaja con `object` (`EventoAlmacenado.EventData`). ¿En qué tipo lo deserializas? El JSON no lo dice — por eso guardaste `type`. Para reconstruir el `object` correcto tendrías que escribir, a mano, algo así (no hace falta que lo corras —imagínalo—; `fila` sería cada fila leída de la tabla `eventos`):
 
 ```csharp
 object hecho = fila.Type switch
@@ -141,7 +141,7 @@ Ese `switch` es apenas el principio. Crece con cada tipo de evento que agregues,
 - **Abrir y administrar la conexión** con Npgsql: abrirla, cerrarla, reintentar cuando falla.
 - **Crear y migrar el esquema**: la tabla `eventos` a mano, y una migración cada vez que cambie.
 - **Poner índices** para que leer un stream por `aggregate_id` no recorra la tabla entera.
-- **Traducir a SQL tu control de versión**: la [Concurrencia optimista](concurrencia-optimista.md) que ya construiste rechazaba una posición ocupada en RAM; en Postgres es una transacción que verifica la versión, escrita y probada a mano.
+- **Traducir a SQL tu control de versión**: la [Concurrencia optimista](concurrencia-optimista.md) que ya construiste rechazaba en RAM una posición ocupada; en Postgres sería un `INSERT` condicionado a `WHERE version = N` que, si otro escribió primero, no inserta ninguna fila — y tú tendrías que detectar ese 0 y lanzar tu `ConcurrencyException`.
 - **Versionar la serialización**: el día que un evento cambie de forma, los documentos viejos ya no calzan en el nuevo `record`, y esa traducción la resuelves tú.
 
 Todo eso se acumula. **Aquí es donde hacerlo a mano deja de valer la pena.** No es que sea imposible —cada pieza se puede escribir—, sino que para seguir estarías reconstruyendo, con bugs, todo un motor de persistencia de eventos que ya existe y está curtido en producción.

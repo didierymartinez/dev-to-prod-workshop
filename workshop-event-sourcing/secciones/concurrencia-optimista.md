@@ -1,6 +1,6 @@
 # Cuando dos escriben a la vez (concurrencia optimista)
 
-Ya tienes un **almacén** que guarda muchas empresas por su id, y un stream que lee y escribe la de cada una. Hasta ahora tu código corría de arriba a abajo con un solo `dotnet run`; pero una app real atiende **muchas peticiones a la vez** (dos usuarios, dos pestañas), y dos pueden abrir la **misma** empresa en el **mismo instante**. Ahí aparece un peligro silencioso.
+Ya tienes un **almacén** que guarda y lee la empresa de cada id. Hasta ahora tu código corría de arriba a abajo con un solo `dotnet run` — pero una app real atiende **muchas peticiones a la vez**, y ahí acecha un peligro que aún no has visto.
 
 ## 🎯 El Objetivo
 
@@ -20,22 +20,22 @@ a.Append(new EmpresaSuspendida("falta de pago"));   // A la suspende
 b.Append(new PlanCambiado("Enterprise"));            // B le cambia el plan
 ```
 
-Ambas entran tan tranquilas. Pero **B decidió "Enterprise" mirando una empresa que A acababa de suspender** — trabajó sobre un estado que ya no era cierto, y nadie se dio cuenta. Eso es una **actualización perdida** (*lost update*): el diario quedó incoherente y en silencio.
+Ambas entran tan tranquilas. Pero **B decidió "Enterprise" mirando una empresa que A acababa de suspender** — trabajó sobre un estado que ya no era cierto. Eso es una **actualización perdida** (*lost update*): el diario quedó incoherente, y en silencio.
 
 ## 🔧 Numerar cada hecho: el sobre
 
-Para atrapar el choque necesitas saber **en qué posición** entra cada hecho. Una vez archivado, cada hecho ocupa un lugar fijo en la historia de su empresa: el 1.º, el 2.º… Esa posición es su **versión**. La grabamos (con la fecha) envolviendo el hecho en un **sobre**:
+Para atrapar el choque necesitas saber **en qué posición** entra cada hecho. Una vez archivado, cada hecho ocupa un lugar fijo en la historia de su empresa: el 1.º, el 2.º… Esa posición es su **versión**. La grabamos envolviendo el hecho en un **sobre**:
 
 ```csharp
-// el sobre: envuelve el hecho con su POSICIÓN en el stream y cuándo se anotó
-public record EventoAlmacenado(int Version, DateTime Timestamp, object EventData);
+// el sobre: envuelve el hecho con su POSICIÓN en el stream
+public record EventoAlmacenado(int Version, object EventData);
 ```
 
-> 💡 El sobre **no** lleva quién es la empresa: el cajón **ya es** de una empresa (su id es el rótulo). Solo añade lo que el hecho por sí mismo no sabe: su **posición** y su fecha. Al leer, se desenvuelve — al agregado le interesa el hecho, no el sobre.
+> 💡 El sobre **no** lleva quién es la empresa: el cajón **ya es** de una empresa (su id es el rótulo). Solo añade lo que el hecho por sí mismo no sabe: su **posición**. Al leer, se desenvuelve — al agregado le interesa el hecho, no el sobre.
 
 Con la versión a bordo, la regla es simple: **cada hecho declara la posición que cree ocupar; si esa posición ya está tomada, alguien escribió primero → se rechaza.**
 
-> 🛠️ **Inténtalo tú.** (1) **🔁** El `EventStore` ahora guarda `List<EventoAlmacenado>` (sobres). En `AppendEvent(id, EventoAlmacenado sobre)`, **antes de aceptar**, comprueba: si esa posición **ya está tomada** (`sobre.Version <= cajon.Count`), lanza una `ConcurrencyException`. Y `GetEvents` devuelve los sobres. (2) **🔁** El `EventStream` ahora **numera**: en `Get` recuerda cuántos hechos había (la versión), y en `Append` envuelve el hecho en un sobre con la **siguiente** versión. Al rehidratar, **desenvuelve** (solo el hecho).
+> 🛠️ **Inténtalo tú.** (1) **🔁** El `EventStore` ahora guarda `List<EventoAlmacenado>` (sobres). En `AppendEvent(id, EventoAlmacenado sobre)`, **antes de aceptar**, comprueba: si esa posición **ya está tomada** (`sobre.Version <= cajon.Count`), **crea y lanza** una `ConcurrencyException` (una excepción tuya, igual que `ReglaDeNegocioException`). Y `GetEvents` devuelve los sobres. (2) **🔁** El `EventStream` ahora **numera**: en `Get` recuerda cuántos hechos había (la versión), y en `Append` envuelve el hecho en un sobre con la **siguiente** versión. Al rehidratar, **desenvuelve** (solo el hecho).
 
 > [!NOTE]
 > 🆕 **Idioma de C#: `.Select(...)`.** Para rehidratar necesitas los hechos *sin* el sobre. `sobres.Select(s => s.EventData)` recorre la lista de sobres y produce solo su contenido (el hecho) — es *proyectar* cada elemento a otra cosa (LINQ). Lo usarás para pasarle al `Load` los hechos pelados, no los sobres.
@@ -96,7 +96,7 @@ public class EventStream<T> where T : AggregateRoot, new()
     public void Append(object hecho)
     {
         _version++;                                       // este hecho ocupa la siguiente posición
-        _store.AppendEvent(_aggregateId, new EventoAlmacenado(_version, DateTime.UtcNow, hecho));
+        _store.AppendEvent(_aggregateId, new EventoAlmacenado(_version, hecho));
     }
 }
 ```
@@ -127,7 +127,7 @@ b.Append(new PlanCambiado("Enterprise"));            // también trae la versió
 
 ### El Descubrimiento
 
-Envolviste cada hecho en un **sobre `EventoAlmacenado`** con su **versión** (su posición en la historia), y el almacén **rechaza** un `Append` cuya posición ya está ocupada. Así, dos escrituras simultáneas sobre la misma empresa ya no se pisan en silencio: la segunda choca con una `ConcurrencyException`. El número que parecía decorativo resultó ser el **detector de conflictos**.
+Envolviste cada hecho en un **sobre `EventoAlmacenado`** con su **versión** (su posición en la historia), y el almacén **rechaza** un `Append` cuya posición ya está ocupada. Así, dos escrituras simultáneas sobre la misma empresa ya no se pisan en silencio: la segunda choca con una `ConcurrencyException`. La versión no es un adorno: es el **detector de conflictos**.
 
 Tienes el motor de event sourcing completo. Pero lo has probado corriendo el `Main` y leyendo la consola con los ojos — y todo vive en RAM: al reiniciar, se pierde. En las próximas secciones lo **blindas con tests** (para no volar a ciegas cuando lo refactorices) y luego lo llevas a una **base de datos real**.
 
@@ -138,7 +138,7 @@ Tienes el motor de event sourcing completo. Pero lo has probado corriendo el `Ma
 - [ ] Con **una** empresa y **un** escritor, `Append` sigue funcionando: los hechos entran en versiones 1, 2, 3…
 - [ ] Provoca el choque con **dos streams** sobre `emp-7` (ambos `Get`, ambos `Append`): el segundo lanza `ConcurrencyException`.
 - [ ] Explica, con tus palabras, por qué se llama concurrencia **optimista** (no bloquea; verifica al guardar).
-- [ ] El sobre lleva la **versión** y la fecha, pero **no** el id de la empresa. Explica por qué (pista: el cajón ya es de una empresa).
+- [ ] El sobre lleva la **versión**, pero **no** el id de la empresa. Explica por qué (pista: el cajón ya es de una empresa).
 
 ---
 

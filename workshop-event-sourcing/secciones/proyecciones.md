@@ -1,6 +1,6 @@
 # La primera proyección: el lado de lectura (CQRS)
 
-Rehidratar es perfecto para **una** empresa: pides su stream, Marten rejuega sus eventos y tienes su estado. Pero piensa en otra pregunta: *"¿cuáles empresas están suspendidas?"*. Con agregación en vivo tendrías que **rehidratar todas** —rejugar los eventos de cada stream, una por una— solo para filtrar. Eso no escala para consultas. Necesitas el **otro lado**: una tabla consultable que se mantenga al día sola.
+Rehidratar es perfecto para **una** empresa: pides su stream y Marten rejuega sus eventos. Pero *"¿cuáles empresas están suspendidas?"* pide el **otro lado** — y rehidratar no sirve para eso.
 
 ## 🎯 El Objetivo
 
@@ -17,6 +17,12 @@ Una **proyección** escucha los eventos y mantiene un documento al día. Aquí, 
 ### Paso 1 · El read model y la proyección
 
 > 🛠️ **Inténtalo tú.** (1) Un documento `ResumenEmpresa` (Id, Nombre, Plan, Suspendida). (2) Una proyección que lo **pliega** desde los eventos: hazla heredar de `SingleStreamProjection<ResumenEmpresa, string>` (marcada `partial`), con `Create` para el primer evento y `Apply(evento, doc)` para los demás. (3) Regístrala **inline** con `opts.Projections.Add<...>(ProjectionLifecycle.Inline)`.
+
+> [!NOTE]
+> 🆕 **`SingleStreamProjection<TDoc, TId>`.** Pliega los eventos de **un** stream en un documento `TDoc` (aquí `ResumenEmpresa`, con llave `string`). Es la **misma convención** que ya conoces: `Create` para el evento de nacimiento, `Apply` para los demás — pero ahora el `Apply` recibe también el `doc` a mutar (la proyección es aparte del agregado). Debe ser `partial`: Marten 9 le genera código por debajo.
+
+> [!NOTE]
+> 🆕 **`ProjectionLifecycle.Inline`.** *Inline* = la proyección corre en la **misma transacción** que el evento: al guardar `EmpresaSuspendida`, el `ResumenEmpresa` queda actualizado **al instante**. Consistente e inmediato — a cambio de sumar ese trabajo a cada escritura. (Hay otro modo, `Async`, que verás enseguida.)
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -53,15 +59,17 @@ opts.Projections.Add<ResumenEmpresaProjection>(ProjectionLifecycle.Inline);
 ```
 </details>
 
-> [!NOTE]
-> 🆕 **`SingleStreamProjection<TDoc, TId>`.** Pliega los eventos de **un** stream en un documento `TDoc` (aquí `ResumenEmpresa`, con llave `string`). Es la **misma convención** que ya conoces: `Create` para el evento de nacimiento, `Apply` para los demás — pero ahora el `Apply` recibe también el `doc` a mutar (la proyección es aparte del agregado). Debe ser `partial`: Marten 9 le genera código por debajo.
-
-> [!NOTE]
-> 🆕 **`ProjectionLifecycle.Inline`.** *Inline* = la proyección corre en la **misma transacción** que el evento: al guardar `EmpresaSuspendida`, el `ResumenEmpresa` queda actualizado **al instante**. Consistente e inmediato — a cambio de sumar ese trabajo a cada escritura. (Hay otro modo, `Async`, que verás enseguida.)
-
 ### Paso 2 · Consulta el read model
 
-Rehidratar era para **uno**. Para consultar **muchos**, Marten te da LINQ sobre los documentos. Y como en la escritura, lo pones tras una **costura**: `IProjectionStore`, el lado de lectura, gemelo del `IEventStore`.
+Rehidratar era para **uno**. Para consultar **muchos**, Marten te da LINQ sobre los documentos.
+
+> 🛠️ **Inténtalo tú.** Quieres responder *"¿cuáles están suspendidas?"* con una consulta, así:
+>
+> ```csharp
+> var suspendidas = await store.Query<ResumenEmpresa>().Where(e => e.Suspendida).ToListAsync();
+> ```
+>
+> Ponlo tras una **costura** `IProjectionStore` —el lado de lectura, gemelo del `IEventStore`— con dos operaciones: `Query<T>()` (consultar read models con LINQ) y `GetAggregateRootAsync<T>(id)` (rehidratar **uno** en vivo, que conservas del lado de escritura). Impleméntala con `MartenProjectionStore(IQuerySession querySession)` (`IQuerySession` es la sesión de **solo lectura** de Marten).
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -84,6 +92,7 @@ public class MartenProjectionStore(IQuerySession querySession) : IProjectionStor
 ```
 
 ```csharp
+// store = tu IProjectionStore (un MartenProjectionStore que envuelve una QuerySession de Marten)
 // "¿cuáles empresas están suspendidas?" — una consulta SQL, sin rejugar nada
 var suspendidas = await store.Query<ResumenEmpresa>()
     .Where(e => e.Suspendida)
@@ -98,7 +107,7 @@ var suspendidas = await store.Query<ResumenEmpresa>()
 
 Una proyección es **maquinaria de Marten** — no la corre el `TestStore` en memoria. Así que se prueba con un test de **integración** (de los pocos): siembras eventos, la proyección *inline* llena el documento, y consultas.
 
-> 🔍 **¿Lo lograste?** Con Postgres arriba: `StartStream` de una empresa + `EmpresaSuspendida` + `SaveChangesAsync`; luego `Query<ResumenEmpresa>().Where(e => e.Suspendida)` devuelve esa empresa. Mira la tabla `mt_doc_resumenempresa` en psql: hay una fila por empresa, actualizada. No rejugaste nada para consultar.
+> 🔍 **¿Lo lograste?** Con Postgres arriba: `StartStream` de una empresa + `EmpresaSuspendida` + `SaveChangesAsync`; luego `store.Query<ResumenEmpresa>().Where(e => e.Suspendida)` (vía tu `IProjectionStore`) devuelve esa empresa. Mira la tabla `mt_doc_resumenempresa` en psql: hay una fila por empresa, actualizada. No rejugaste nada para consultar.
 
 ---
 

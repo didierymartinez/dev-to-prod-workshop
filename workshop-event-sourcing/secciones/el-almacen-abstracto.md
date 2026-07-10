@@ -4,7 +4,7 @@ Los tests de integración de la sección anterior **prueban el swap**, pero pesa
 
 ## 🎯 El Objetivo
 
-Que tus handlers dependan de una **abstracción** (`IEventStore`), no de Marten: producción usa Marten, y los tests un **doble en memoria** — rápidos, sin Postgres, sin depender de Marten.
+Que tus handlers dependan de una **abstracción**, no de Marten: producción usa Marten, y los tests un **doble en memoria** — rápidos, sin Postgres, sin depender de Marten.
 
 ## La costura: ¿qué le pide el handler al almacén?
 
@@ -12,7 +12,7 @@ Mira tu `SuspenderHandler` del swap. De todo Marten, solo usa **tres** cosas: **
 
 ### Paso 1 · Define `IEventStore` y desacopla el handler
 
-> 🛠️ **Inténtalo tú.** Declara `IEventStore` con esas tres operaciones. Luego **🔁** cambia `SuspenderHandler` para que reciba un `IEventStore` en vez de la `IDocumentSession`. El cuerpo es el mismo ciclo, con los nombres del contrato.
+> 🛠️ **Inténtalo tú.** Declara `IEventStore` con esas tres operaciones (la de rehidratar necesita poder crear el agregado vacío con `new T()`, así que su firma pide `where T : class, new()`). Luego **🔁** cambia `SuspenderHandler` para que reciba un `IEventStore` en vez de la `IDocumentSession`. El cuerpo es el mismo ciclo, con los nombres del contrato.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -45,13 +45,13 @@ public class SuspenderHandler(IEventStore store) : ICommandHandler<SuspenderEmpr
 </details>
 
 > [!NOTE]
-> 🆕 **Por qué `AppendEvent` y `SaveChangesAsync` van separados.** `AppendEvent` no persiste: **encola** el hecho. `SaveChangesAsync` confirma **todo lo encolado** en una transacción. Separarlos te deja **componer**: un comando grande puede llamar a varios handlers que encolan hechos, y confirmar **una sola vez** al final. Es la idea de *unidad de trabajo* — el mismo rol del `DbContext` de Entity Framework. Tu handler ya **no menciona Marten**: solo el contrato.
+> 🆕 **Por qué `AppendEvent` y `SaveChangesAsync` van separados.** `AppendEvent` no persiste: **encola** el hecho. `SaveChangesAsync` confirma **todo lo encolado** en una transacción. Es la idea de *unidad de trabajo* (el mismo rol del `DbContext` de Entity Framework). Aquí, con un handler que emite un solo hecho, todavía no lo aprovechas; el pago real —**componer** varios handlers en una transacción— llega con el `UnitOfWorkMiddleware` de la plantilla. Por ahora quédate con que tu handler ya **no menciona Marten**: solo el contrato.
 
 ### Paso 2 · Dos implementaciones del contrato
 
 La misma interfaz, dos motores detrás: uno real (Marten) para producción, uno en memoria para los tests.
 
-> 🛠️ **Inténtalo tú.** (1) `MartenEventStore` recibe una `IDocumentSession` y traduce cada método a Marten (lo que hacía el handler antes). (2) `TestStore` guarda los hechos en diccionarios en memoria y rehidrata **aplicando** los eventos al agregado. Como no puede tener un `switch` por evento (serviría a un solo agregado), usa **reflexión**: busca en el agregado el método `Apply(TEvento)` que calza con el tipo del evento y lo invoca —la misma convención `Apply` de [el swap](el-swap.md), llamada a mano—. Esa API (`GetMethods`/`Invoke`) es idioma nuevo: te la muestro en la solución.
+> 🛠️ **Inténtalo tú.** (1) `MartenEventStore` recibe una `IDocumentSession` y traduce cada método a Marten (lo que hacía el handler antes). (2) `TestStore` guarda los hechos en diccionarios en memoria y rehidrata **aplicando** los eventos al agregado. Como no puede tener un `switch` por evento (serviría a un solo agregado), usa **reflexión**: busca en el agregado el método `Apply(TEvento)` que calza con el tipo del evento y lo invoca —la misma convención `Apply` de [el swap](el-swap.md), llamada a mano—. Esa API (`GetMethods`/`Invoke`) es idioma nuevo: te la muestro en la solución. Dale además dos ayudas **solo para tests** —`SembrarPrevios` (los `Given`) y `HechosNuevos` (los emitidos)—, que `Given`/`Then` usarán en el Paso 3.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -112,6 +112,8 @@ public class TestStore : IEventStore
 
 Ahora el `HandlerTest` vuelve a ser **en memoria** (como en [Blindar el motor](given-when-then.md)): su motor es un `TestStore`, no Marten. Los escenarios, los mismos.
 
+> 🛠️ **Inténtalo tú.** **🔁** En `HandlerTest`, cambia el motor de Marten a un `TestStore`. `Given` siembra con `SembrarPrevios`, `Then` lee con `HechosNuevos`; los escenarios no se tocan.
+
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
@@ -169,7 +171,7 @@ Metiste una **costura** —`IEventStore`, tres métodos— y tu handler dejó de
 ## ✅ Compruébalo
 
 - [ ] `IEventStore` declara `GetAggregateRootAsync`/`AppendEvent`/`SaveChangesAsync`, y `SuspenderHandler` recibe `IEventStore` (ya no `IDocumentSession`).
-- [ ] Explicas por qué `AppendEvent` (encola) y `SaveChangesAsync` (confirma) van separados: componer varios handlers en una transacción (unidad de trabajo).
+- [ ] Explicas por qué `AppendEvent` (encola) y `SaveChangesAsync` (confirma) van separados (idea de *unidad de trabajo*; su pago pleno —componer varios handlers— llega con el middleware de la plantilla).
 - [ ] `MartenEventStore` traduce a Marten; `TestStore` guarda en memoria y rehidrata con la **misma** convención `Apply` (por reflexión).
 - [ ] `HandlerTest` usa un `TestStore`; `dotnet test` corre **verde sin Postgres**, en milisegundos.
 - [ ] Explicas la **pirámide**: muchos rápidos (`TestStore`) + pocos de integración (Marten).

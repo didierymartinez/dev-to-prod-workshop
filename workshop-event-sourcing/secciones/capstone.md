@@ -1,6 +1,6 @@
 # Capstone — la decisión con criterio
 
-Este es el momento al que apuntó todo el taller. Empezaste con una duda honesta: la doc de Marten recomienda `FetchForWriting`, pero no te sentías capaz de **adoptarlo con criterio** en `Cosmos.BuildingBlocks`. Ahora conoces la librería de punta a punta —el dominio, los adaptadores, la unidad de trabajo, la tenancy, el empaquetado— y construiste a mano cada pieza que hay debajo. Es hora de tomar la decisión: evaluar y aplicar `FetchForWriting` sobre el `MartenEventStore` real, no por fe en la doc.
+Este es el momento al que apuntó todo el taller. Empezaste con una duda honesta: la doc de Marten recomienda `FetchForWriting`, pero no te sentías capaz de **adoptarlo con criterio** en `Cosmos.BuildingBlocks`. Ahora conoces la librería de punta a punta —el dominio, los adaptadores, la unidad de trabajo, la tenancy, el empaquetado— y construiste a mano cada pieza que hay debajo.
 
 ## 🎯 El Objetivo
 
@@ -40,7 +40,7 @@ Antes de tocar nada, responde estas preguntas. Ese razonamiento **es** el criter
 
 ### Paso 3 · Aplica, prueba y clasifica
 
-> 🛠️ **Inténtalo tú.** Adopta `FetchForWriting` **dentro** de `MartenEventStore`: lee de la sesión de escritura, recuerda un stream por agregado, y al confirmar añade por ahí. Deja el handler y `IEventStore` intactos. Respalda el cambio con el test de dos escritores (Postgres, arnés de [Tests de integración](tests-de-integracion.md)), y **clasifica** la versión.
+> 🛠️ **Inténtalo tú.** Adopta `FetchForWriting` **dentro** de `MartenEventStore`: lee de la sesión de escritura, recuerda un stream por agregado, y al confirmar añade por ahí. Deja el handler y `IEventStore` intactos. Respalda el cambio con el test de dos escritores que ya escribiste en [FetchForWriting](fetch-for-writing.md) —ahora apuntando al `MartenEventStore` real (Postgres, arnés de [Tests de integración](tests-de-integracion.md))—, y **clasifica** la versión.
 
 <details>
 <summary>👉 La forma del cambio (guía, no receta)</summary>
@@ -48,6 +48,7 @@ Antes de tocar nada, responde estas preguntas. Ese razonamiento **es** el criter
 ```csharp
 // una entrada por agregado: cómo añadir a SU stream (la clausura del juguete, ahora ×N)
 private readonly Dictionary<string, Action<object>> _append = new();
+// (StartStream, para un agregado NUEVO, sigue igual; AppendEvents ahora enruta por _append[id], no por session.Events.Append)
 
 public async Task<T?> GetAggregateRootAsync<T>(string id, CancellationToken ct) where T : AggregateRoot
 {
