@@ -11,7 +11,7 @@ Este es el **guion para dictar el taller en vivo**. Tú das los **conceptos**; a
 >
 > **Bitácora (📓):** cada sección cierra con un `commit` + `push`; el mensaje del commit es la **reflexión del asistente con sus palabras** (la pregunta está en el bloque "📓 Registra tu avance" de cada sección). Pídeles que lo hagan al cerrar cada sección — su GitHub queda como diario de lo aprendido.
 
-> 📸 **Foto al 2026-07-07 · v7 en construcción (15/~40).** Este guion recorre las **15 secciones ya construidas** de la cadena real (los enlaces resuelven). El resto del arco (proyecciones → API+DI → Marten a fondo → Wolverine → EDA → multi-tenancy → la plantilla) está **planeado** en [`REPLANTEO.md`](REPLANTEO.md) pero **aún sin archivo**: aparece al final en *"Lo que viene (planeado)"*, por nombre y sin enlaces.
+> 📸 **Foto al 2026-07-07 · v7 en construcción (14/~40).** Este guion recorre las **14 secciones ya construidas** de la cadena real (los enlaces resuelven). El resto del arco (proyecciones → API+DI → Marten a fondo → Wolverine → EDA → multi-tenancy → la plantilla) está **planeado** en [`REPLANTEO.md`](REPLANTEO.md) pero **aún sin archivo**: aparece al final en *"Lo que viene (planeado)"*, por nombre y sin enlaces.
 
 **Prerequisitos del asistente:** .NET 10 SDK (C# 14) · Docker Desktop (para PostgreSQL) · Git + cuenta de GitHub · saber C# básico.
 
@@ -134,30 +134,19 @@ Este es el **guion para dictar el taller en vivo**. Tú das los **conceptos**; a
 
 ---
 
-## 11 · Persistir a mano tiene un límite  ·  📄 [persistir-a-mano.md](secciones/persistir-a-mano.md)
-🎯 *Levantar un PostgreSQL real, guardar un hecho a mano y verlo sobrevivir a un reinicio. Y ver el límite: recuperar ese hecho a su tipo desde C# marca dónde hacerlo a mano deja de tener sentido.*
-**🧑‍🏫 Presentas:** un evento no cabe en una tabla rígida → es un **documento JSONB**; una fila **muta**, un hecho **no** (se escribe una vez); **PostgreSQL + JSONB** (ACID + consultable); el **"muro"** (recuperar un `object` a su **tipo exacto**: serialización polimórfica).
+## 11 · Conoce a Marten: una base de datos de documentos  ·  📄 [conoce-a-marten.md](secciones/conoce-a-marten.md)
+🎯 *Entender por qué un evento es un documento (no una fila) y por qué persistirlo a mano no escala; luego guardar y leer un objeto de C# con Marten, verlo convertido en JSONB, y descubrir el giro: tu event store viajará sobre este mismo motor.*
+**🧑‍🏫 Presentas:** el **dolor** primero — un evento no cabe en una tabla rígida (una fila **muta**, un hecho **no**, se escribe una vez) → es un **documento JSONB**; el **muro** de hacerlo a mano (recuperar el `object` a su **tipo** exige un `switch` que crece, más conexión, índices y versión en SQL). Luego **Marten** como base de datos de **documentos** sobre Postgres (la idea de Mongo/Raven, pero en Postgres); el `DocumentStore` (fábrica central) y las **sesiones**; serializar a JSONB es justo lo que se haría a mano, pero automático.
 **🛠️ Pides que hagan:**
 1. Crea `docker-compose.yml` con `postgres` (usuario, contraseña, db, puerto `5432`); `docker compose up -d`; `docker ps` (debe verse `Up`).
-2. Guarda un hecho **a mano** (un `INSERT` con el JSON del evento) y recárgalo tras reiniciar.
-3. Intenta recuperarlo **a su tipo** de C# — y topa con el muro.
+2. `dotnet add package Marten --version 9.2.1`; crea el `DocumentStore.For(...)` con la cadena de conexión.
+3. Abre una sesión, **guarda** un objeto y **léelo** de vuelta; míralo en Postgres como **JSONB** y comprueba que sobrevive a `docker compose restart`.
 **💬 Discusión:** ¿cuál es el **muro** que hace que escribir el store de Postgres a mano no valga la pena?
-**✅ Deben ver:** el hecho sobrevive al reinicio; y el muro (deserializar a su tipo) que motiva **adoptar** una herramienta.
+**✅ Deben ver:** un objeto de C# ida y vuelta como documento JSONB que sobrevive al reinicio — y el gancho: el event store irá sobre **este mismo motor**.
 
 ---
 
-## 12 · Conoce a Marten: una base de datos de documentos  ·  📄 [conoce-a-marten.md](secciones/conoce-a-marten.md)
-🎯 *Guardar y leer un objeto de C# como documento con Marten, verlo convertido en JSONB dentro de Postgres, y descubrir el giro: tu event store viajará sobre este mismo motor.*
-**🧑‍🏫 Presentas:** **Marten** como base de datos de **documentos** sobre Postgres (la idea de Mongo/Raven, pero en Postgres); el `DocumentStore` (fábrica central) y las **sesiones**; que serializar a JSONB es justo lo que hicieron a mano en §11, pero automático.
-**🛠️ Pides que hagan:**
-1. `dotnet add package Marten --version 9.2.1`.
-2. Crea el `DocumentStore.For(...)` con la cadena de conexión; abre una sesión, **guarda** un objeto y **léelo** de vuelta.
-3. Mira en Postgres cómo quedó guardado como **JSONB**.
-**✅ Deben ver:** un objeto de C# ida y vuelta como documento JSONB — y el gancho: el event store irá sobre **este mismo motor**.
-
----
-
-## 13 · El swap: tu motor sobre Marten  ·  📄 [el-swap.md](secciones/el-swap.md)
+## 12 · El swap: tu motor sobre Marten  ·  📄 [el-swap.md](secciones/el-swap.md)
 🎯 *Que tus handlers reales dejen de hablar con el `EventStore` en RAM y hablen con Marten (Postgres de verdad), y borrar el almacén casero — sin cambiar el comportamiento.*
 **🧑‍🏫 Presentas:** el swap es **1:1** (intercambiar el motor, no rediseñar); las dos opciones de eventos de Marten (`StreamIdentity.AsString` para llaves `"emp-7"`, `EventNamingStyle.SmarterTypeName`); `Events.StartStream`/`Append` para escribir y `AggregateStreamAsync` para rehidratar.
 **🛠️ Pides que hagan:**
@@ -168,7 +157,7 @@ Este es el **guion para dictar el taller en vivo**. Tú das los **conceptos**; a
 
 ---
 
-## 14 · Tests de integración: validar el swap  ·  📄 [tests-de-integracion.md](secciones/tests-de-integracion.md)
+## 13 · Tests de integración: validar el swap  ·  📄 [tests-de-integracion.md](secciones/tests-de-integracion.md)
 🎯 *Que los mismos escenarios Given-When-Then de antes corran verdes contra Marten + Postgres reales. Ese verde es la validación del swap.*
 **🧑‍🏫 Presentas:** los **escenarios no se tocan**; solo cambia la base a Marten; el `DocumentStore` es **caro** → un `MartenFixture` que xUnit crea **una vez** y comparte, con `ResetAllData()` por test; todo **`async`**.
 **🛠️ Pides que hagan:**
@@ -179,7 +168,7 @@ Este es el **guion para dictar el taller en vivo**. Tú das los **conceptos**; a
 
 ---
 
-## 15 · El almacén abstracto: tests rápidos sin Postgres  ·  📄 [el-almacen-abstracto.md](secciones/el-almacen-abstracto.md)
+## 14 · El almacén abstracto: tests rápidos sin Postgres  ·  📄 [el-almacen-abstracto.md](secciones/el-almacen-abstracto.md)
 🎯 *Que los handlers dependan de una abstracción (`IEventStore`), no de Marten: producción usa Marten, y los tests un doble en memoria — rápidos, sin Postgres.*
 **🧑‍🏫 Presentas:** la **costura** — de todo Marten, el handler solo usa **tres** cosas (rehidratar, emitir, confirmar); eso es el contrato `IEventStore`; producción → `MartenEventStore` (envuelve la sesión), tests → `TestStore` en memoria (rehidrata por **reflexión** sobre `Apply`); los de integración quedan como el **puñado** que valida el cableado.
 **🛠️ Pides que hagan:**

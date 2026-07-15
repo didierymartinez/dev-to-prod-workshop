@@ -222,7 +222,7 @@ Destilaste la forma que **todo** test de event sourcing comparte: **Given** (hec
 Tu motor está protegido. Ahora sí puedes refactorizarlo sin volar a ciegas — y lo primero que le falta para ser real es no perder la historia al apagarse. Esa es la próxima grieta.
 
 > [!NOTE]
-> 🌱 **Semilla — estos escenarios validarán el swap.** Cuando cambies el motor a Marten ([persistir a mano](persistir-a-mano.md) y el swap), la base apuntará a Postgres y estos mismos `[Fact]` correrán como tests de **integración** (tocan una base de datos real, no solo RAM): si siguen verdes, el swap no cambió el comportamiento. Y más adelante, el **`TestStore`** del equipo ([El almacén abstracto](el-almacen-abstracto.md)) te dejará correrlos rápido, sin base de datos. Es la misma base `HandlerTest`, evolucionando.
+> 🌱 **Semilla — estos escenarios validarán el swap.** Cuando cambies el motor a Marten ([conócelo](conoce-a-marten.md) y el swap), la base apuntará a Postgres y estos mismos `[Fact]` correrán como tests de **integración** (tocan una base de datos real, no solo RAM): si siguen verdes, el swap no cambió el comportamiento. Y más adelante, el **`TestStore`** del equipo ([El almacén abstracto](el-almacen-abstracto.md)) te dejará correrlos rápido, sin base de datos. Es la misma base `HandlerTest`, evolucionando.
 
 ---
 
@@ -260,4 +260,4 @@ Blindas el motor con la gramática **Given** (hechos previos) → **When** (un c
 
 [⬅️ Volver: Cuando dos escriben a la vez (concurrencia optimista)](./concurrencia-optimista.md)
 
-[➡️ Siguiente: Persistir a mano tiene un límite](./persistir-a-mano.md)
+[➡️ Siguiente: Conoce a Marten: una base de datos de documentos](./conoce-a-marten.md)
