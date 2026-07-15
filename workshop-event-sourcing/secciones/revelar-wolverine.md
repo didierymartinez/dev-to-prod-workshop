@@ -57,6 +57,9 @@ var app = builder.Build();
 
 > 🛠️ **Inténtalo tú.** **🔁** El endpoint ya no inyecta el handler concreto: inyecta el **bus** (`IMessageBus`) y hace `await bus.InvokeAsync(comando)`. Wolverine encuentra y ejecuta el handler.
 
+> [!NOTE]
+> 🆕 **`IMessageBus.InvokeAsync(comando)` = tu `Enviar`.** Le das el comando y Wolverine **rutea al handler que lo maneja** — el gemelo industrial del `Despachador.Enviar` que escribiste a mano (que buscaba por `comando.GetType()`). El endpoint ya no conoce el handler; solo el comando.
+
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
@@ -69,9 +72,6 @@ app.MapPost("/empresas/{id}/suspender",
     });
 ```
 </details>
-
-> [!NOTE]
-> 🆕 **`IMessageBus.InvokeAsync(comando)` = tu `Enviar`.** Le das el comando y Wolverine **rutea al handler que lo maneja** — el gemelo industrial del `Despachador.Enviar` que escribiste a mano (que buscaba por `comando.GetType()`). El endpoint ya no conoce el handler; solo el comando.
 
 ### Paso 3 · El `SaveChanges` desaparece
 

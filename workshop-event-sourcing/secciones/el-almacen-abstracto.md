@@ -51,7 +51,10 @@ public class SuspenderHandler(IEventStore store) : ICommandHandler<SuspenderEmpr
 
 La misma interfaz, dos motores detrás: uno real (Marten) para producción, uno en memoria para los tests.
 
-> 🛠️ **Inténtalo tú.** (1) `MartenEventStore` recibe una `IDocumentSession` y traduce cada método a Marten (lo que hacía el handler antes). (2) `TestStore` guarda los hechos en diccionarios en memoria y rehidrata **aplicando** los eventos al agregado. Como no puede tener un `switch` por evento (serviría a un solo agregado), usa **reflexión**: busca en el agregado el método `Apply(TEvento)` que calza con el tipo del evento y lo invoca —la misma convención `Apply` de [el swap](el-swap.md), llamada a mano—. Esa API (`GetMethods`/`Invoke`) es idioma nuevo: te la muestro en la solución. Dale además dos ayudas **solo para tests** —`SembrarPrevios` (los `Given`) y `HechosNuevos` (los emitidos)—, que `Given`/`Then` usarán en el Paso 3.
+> 🛠️ **Inténtalo tú.** (1) `MartenEventStore` recibe una `IDocumentSession` y traduce cada método a Marten (lo que hacía el handler antes). (2) `TestStore` guarda los hechos en diccionarios en memoria y rehidrata **aplicando** los eventos al agregado. Como no puede tener un `switch` por evento (serviría a un solo agregado), usa **reflexión**: busca en el agregado el método `Apply(TEvento)` que calza con el tipo del evento y lo invoca —la misma convención `Apply` de [el swap](el-swap.md), llamada a mano—. Esa API (`GetMethods`/`Invoke`) es idioma nuevo: la explico justo abajo, antes de la solución. Dale además dos ayudas **solo para tests** —`SembrarPrevios` (los `Given`) y `HechosNuevos` (los emitidos)—, que `Given`/`Then` usarán en el Paso 3.
+
+> [!NOTE]
+> 🆕 **La reflexión del `TestStore`.** Marten reconstruye llamando tus `Apply(TEvento)` por convención (§ [El swap](el-swap.md)). El `TestStore` hace **lo mismo a mano**: busca por reflexión el método `Apply` cuyo parámetro coincide con el tipo del evento, y lo invoca. Por eso **la misma `Empresa` sirve en producción y en tests** sin cambios — ninguno de los dos necesita un `switch`.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -104,9 +107,6 @@ public class TestStore : IEventStore
 }
 ```
 </details>
-
-> [!NOTE]
-> 🆕 **La reflexión del `TestStore`.** Marten reconstruye llamando tus `Apply(TEvento)` por convención (§ [El swap](el-swap.md)). El `TestStore` hace **lo mismo a mano**: busca por reflexión el método `Apply` cuyo parámetro coincide con el tipo del evento, y lo invoca. Por eso **la misma `Empresa` sirve en producción y en tests** sin cambios — ninguno de los dos necesita un `switch`.
 
 ### Paso 3 · Los tests, otra vez rápidos
 

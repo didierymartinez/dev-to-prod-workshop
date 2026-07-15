@@ -24,7 +24,7 @@ Lo bonito: el cambio vive **dentro** de `MartenEventStore`. Tu handler sigue pid
 > 🆕 **`FetchForWriting<T>(id)` → `IEventStream<T>`.** Devuelve un *stream para escritura*: `.Aggregate` es el agregado rehidratado (o `null` si no existe todavía — sirve para **crear** también), y por dentro guarda la **versión** con la que lo leíste. `.AppendOne(hecho)` encola un hecho en ese stream. El control de versión se cobra en `SaveChangesAsync`.
 
 > [!NOTE]
-> 🆕 **La clausura — el truco del `Despachador`, otra vez.** `FetchForWriting<T>` es genérico, pero `AppendEvent` recibe un `object`. Como en [El despachador](el-despachador.md), capturas el stream en una **clausura** (`_append`) al leer, y la reutilizas al añadir — sin que `MartenEventStore` tenga que ser genérico. *(Aquí guardas un stream, el de la empresa del handler; el caso **crear** —`.Aggregate` null— se aprovecha en la plantilla. La plantilla real guarda varios, uno por stream.)*
+> 🆕 **`FetchForWriting<T>` es genérico; `AppendEvent` recibe `object`.** El puente entre ambos es el **truco de la clausura** que ya usaste en [El despachador](el-despachador.md): capturas el stream en una clausura (`_append`) al leer, y la reutilizas al añadir — sin que `MartenEventStore` tenga que ser genérico. *(Aquí guardas un stream, el de la empresa del handler; el caso **crear** —`.Aggregate` null— se aprovecha en la plantilla. La plantilla real guarda varios, uno por stream.)*
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>

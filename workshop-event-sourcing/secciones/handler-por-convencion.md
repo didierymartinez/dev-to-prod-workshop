@@ -40,7 +40,7 @@ public class SuspenderHandler
 
 Podrías inyectar `NotificarSuspension` en el handler y llamarlo a mano — pero entonces el que suspende tendría que **conocer** a cada reactor, y sumar uno nuevo obliga a tocarlo. **Devolver** el evento invierte eso: el emisor no sabe quién reacciona; Wolverine reparte.
 
-> 🛠️ **Inténtalo tú.** Quieres que `InvokeAsync(new SuspenderEmpresa("emp-7","impago"))` imprima `[aviso] suspendida: impago` desde un handler que **nadie cableó**. Haz que `Handle` **devuelva** el hecho, y crea otro handler que reciba `EmpresaSuspendida` y reaccione. Wolverine conecta los dos.
+> 🛠️ **Inténtalo tú.** Quieres que, al enviar `SuspenderEmpresa("emp-7","impago")` y **esperar a que Wolverine drene los mensajes en vuelo** (la entrega es asíncrona, por cola: se espera con las *tracked sessions*, `InvokeMessageAndWaitAsync`), se imprima `[aviso] suspendida: impago` desde un handler que **nadie cableó**. Haz que `Handle` **devuelva** el hecho, y crea otro handler que reciba `EmpresaSuspendida` y reaccione. Wolverine conecta los dos.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -66,7 +66,7 @@ public class NotificarSuspension
 </details>
 
 > [!NOTE]
-> 🆕 **Cascading messages.** Si un `Handle` **devuelve** un mensaje, Wolverine lo **publica** — lo entrega a cualquier handler que lo maneje. Si devuelve `null`, no publica nada. Aquí el mismo hecho se **persiste** (`AppendEvent`) **y se publica** (el `return`): el evento es, a la vez, el registro y el mensaje. La entrega es **asíncrona** (por una cola, no dentro del `InvokeAsync`) — en un test hay que **esperar** el efecto: usa las *tracked sessions* de Wolverine (`InvokeMessageAndWaitAsync`, que esperan a que se drenen los mensajes en vuelo), o en un spike rápido un `await Task.Delay(...)`.
+> 🆕 **Cascading messages.** Si un `Handle` **devuelve** un mensaje, Wolverine lo **publica** — lo entrega a cualquier handler que lo maneje. Si devuelve `null`, no publica nada. Aquí el mismo hecho se **persiste** (`AppendEvent`) **y se publica** (el `return`): el evento es, a la vez, el registro y el mensaje. Esa entrega asíncrona por cola es la que el reto espera con `InvokeMessageAndWaitAsync`; en un spike rápido basta un `await Task.Delay(...)`.
 
 > 🔍 **¿Lo lograste?** `InvokeAsync(new SuspenderEmpresa("emp-7","impago"))` → corre `SuspenderHandler` (persiste el hecho), y un instante después `NotificarSuspension` imprime el aviso, sin que nadie los conectara a mano. Wolverine ruteó el evento devuelto a su handler.
 

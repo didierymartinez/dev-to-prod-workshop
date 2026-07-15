@@ -136,6 +136,9 @@ Queda un olor en `Aplicar`: esa pila de `if (hecho is …)`. Repite `is` en cada
 
 > 🛠️ **Inténtalo tú.** Convierte los cuatro `if (hecho is …)` de `Aplicar` en un **`switch`** por tipo. *(Pista: `case EmpresaRegistrada r:` te entrega el hecho ya convertido en `r`, y cada rama termina en `break;`.)*
 
+> [!NOTE]
+> 🆕 **Idioma de C#: pattern matching de tipo (`case Tipo x:`).** Un `switch` clásico compara valores (`case 1:`, `case "hola":`). Aquí el `switch` ramifica según el **tipo** del objeto: `case EmpresaRegistrada r:` significa "si `hecho` **es** un `EmpresaRegistrada`, entra aquí y dámelo ya convertido en la variable `r`". Es el mismo `hecho is EmpresaRegistrada r` que ya usabas en los `if`, ahora como rama del `switch`. Si no necesitas la variable (porque el hecho no trae datos), omites el nombre: `case EmpresaSuspendida:`.
+
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
@@ -154,9 +157,6 @@ protected override void Aplicar(object hecho)
 
 Cada `case` es "si el hecho es de **este tipo**, recíbelo ya convertido (`r`, `p`) y haz esto". Misma lógica que los `if`, pero agrupada, sin repetir `is`, y mucho más fácil de leer y crecer: un hecho nuevo = un `case` más.
 </details>
-
-> [!NOTE]
-> 🆕 **Idioma de C#: pattern matching de tipo (`case Tipo x:`).** Un `switch` clásico compara valores (`case 1:`, `case "hola":`). Aquí el `switch` ramifica según el **tipo** del objeto: `case EmpresaRegistrada r:` significa "si `hecho` **es** un `EmpresaRegistrada`, entra aquí y dámelo ya convertido en la variable `r`". Es el mismo `hecho is EmpresaRegistrada r` que ya usabas en los `if`, ahora como rama del `switch`. Si no necesitas la variable (porque el hecho no trae datos), omites el nombre: `case EmpresaSuspendida:`.
 
 > [!NOTE]
 > **Otra forma de enrutar por tipo (que NO usaremos, pero vale la pena ver entera).** En vez del `switch`, el enrutado podría vivir en la clase base, y cada hija tener un método `Aplicar` **por tipo**. El cambio completo sería así:
