@@ -8,13 +8,13 @@ Este taller es **hands-on**: en cada sección **te reto a escribir el código t�
 
 El norte del taller es entender la **conexión de cada pieza** de `Cosmos.BuildingBlocks` a fondo —para **usarla, mantenerla y extenderla con criterio**, no por fe en la doc—. Por eso construimos **a mano** un motor de event sourcing: es un **andamio deliberado**. La librería nació sobre la Critter Stack (Marten **9.2.1** / Wolverine **6.1.0**); invertimos el orden a propósito, para que cuando la herramienta te dé algo hecho, sepas exactamente qué hace por debajo, porque lo escribiste tú. El caso emblemático del criterio: decidir si adoptar (o no) `FetchForWriting`.
 
-> **Foto al 2026-07-07 · N=15 secciones construidas de ~40 planeadas (v7 en construcción); re-sincronizar al avanzar.**
+> **Foto al 2026-07-07 · N=14 secciones construidas de ~40 planeadas (v7 en construcción); re-sincronizar al avanzar.**
 
 ---
 
 ## Lo construido
 
-Las 15 secciones que existen hoy, en el orden real (sigue los ➡️ de cada archivo):
+Las 14 secciones que existen hoy, en el orden real (sigue los ➡️ de cada archivo):
 
 1. **[El diario de una empresa](secciones/el-diario-de-una-empresa.md)** — sección conceptual (sin código): guardar el **diario** de hechos en vez de la **foto** del estado. Aprendes qué es **Event Sourcing** y por qué un `UPDATE` destruye el pasado que el diario conserva.
 
@@ -36,15 +36,13 @@ Las 15 secciones que existen hoy, en el orden real (sigue los ➡️ de cada arc
 
 10. **[Blindar el motor: Given-When-Then](secciones/given-when-then.md)** — destilas una base de test con tres verbos —`Given` (hechos previos), `When` (comando), `Then` (hechos emitidos)— partida entre el **motor** (intercambiable) y los **escenarios** (el invariante). Aprendes que en ES un test afirma **eventos**, no filas — y a escribirlos para que sobrevivan al swap.
 
-11. **[Persistir a mano tiene un límite](secciones/persistir-a-mano.md)** — levantas Postgres en Docker, guardas un hecho como documento `JSONB` a mano y lo ves sobrevivir a un reinicio. Aprendes por qué un evento **es un documento** y dónde hacerlo a mano deja de valer la pena: recuperar un `object` a su tipo exige un `switch` que crece, más conexión, índices y control de versión en SQL.
+11. **[Conoce a Marten: una base de datos de documentos](secciones/conoce-a-marten.md)** — descubres por qué un evento **es un documento** (no una fila) y por qué escribir su persistencia a mano no escala (el `switch` que crece, más conexión, índices y control de versión en SQL); luego levantas Postgres en Docker, guardas y lees un objeto de C# con Marten y lo ves convertido en `JSONB`, sobreviviendo a un reinicio. Aprendes el giro: Marten es de nacimiento una **base de datos de documentos** (`DocumentStore`), y como **un evento es solo otro documento**, el event sourcing viaja sobre esa misma maquinaria.
 
-12. **[Conoce a Marten: una base de datos de documentos](secciones/conoce-a-marten.md)** — guardas y lees un objeto de C# con Marten y lo ves convertido en `JSONB`. Aprendes el giro: Marten es de nacimiento una **base de datos de documentos** (`DocumentStore`), y como **un evento es solo otro documento**, el event sourcing viaja sobre esa misma maquinaria.
+12. **[El swap: tu motor sobre Marten](secciones/el-swap.md)** — reemplazas, en tu proyecto real, el almacén casero por Marten pieza por pieza: los handlers usan `IDocumentSession` (`AggregateStreamAsync`/`Append`/`SaveChangesAsync`) y la `Empresa` reconstruye por convención (`Apply` por tipo). Aprendes el **lock-in** que asumes a propósito y por qué la concurrencia optimista queda pendiente para `FetchForWriting`.
 
-13. **[El swap: tu motor sobre Marten](secciones/el-swap.md)** — reemplazas, en tu proyecto real, el almacén casero por Marten pieza por pieza: los handlers usan `IDocumentSession` (`AggregateStreamAsync`/`Append`/`SaveChangesAsync`) y la `Empresa` reconstruye por convención (`Apply` por tipo). Aprendes el **lock-in** que asumes a propósito y por qué la concurrencia optimista queda pendiente para `FetchForWriting`.
+13. **[Tests de integración: validar el swap](secciones/tests-de-integracion.md)** — revives los escenarios Given-When-Then contra Marten + Postgres reales cambiando **solo la base** (un `MartenFixture` que crea el store una vez), con `ResetAllData` por test. Aprendes que ese verde **valida el swap** y por qué estos tests son lentos (Docker, red) frente a los de RAM.
 
-14. **[Tests de integración: validar el swap](secciones/tests-de-integracion.md)** — revives los escenarios Given-When-Then contra Marten + Postgres reales cambiando **solo la base** (un `MartenFixture` que crea el store una vez), con `ResetAllData` por test. Aprendes que ese verde **valida el swap** y por qué estos tests son lentos (Docker, red) frente a los de RAM.
-
-15. **[El almacén abstracto: tests rápidos sin Postgres](secciones/el-almacen-abstracto.md)** — metes una costura `IEventStore` (rehidratar + encolar + confirmar) con dos motores: `MartenEventStore` (producción) y `TestStore` (tests, en memoria). Recuperas tests **rápidos sin Postgres** y descubres que acabas de reconstruir, a mano, piezas que `Cosmos.BuildingBlocks` trae hechas.
+14. **[El almacén abstracto: tests rápidos sin Postgres](secciones/el-almacen-abstracto.md)** — metes una costura `IEventStore` (rehidratar + encolar + confirmar) con dos motores: `MartenEventStore` (producción) y `TestStore` (tests, en memoria). Recuperas tests **rápidos sin Postgres** y descubres que acabas de reconstruir, a mano, piezas que `Cosmos.BuildingBlocks` trae hechas.
 
 ---
 
@@ -53,7 +51,7 @@ Las 15 secciones que existen hoy, en el orden real (sigue los ➡️ de cada arc
 El roadmap de las secciones aún **no construidas** (definidas en [`REPLANTEO.md`](REPLANTEO.md)). Van marcadas 📋 **sin enlace** porque los archivos todavía no existen; se listan por su nombre y bloque para no adelantar links rotos.
 
 ### Bloque D — El lado de lectura (CQRS)
-- 📋 **Proyecciones** — el read model separado (una proyección = fold de eventos hacia un documento consultable); `Query<T>` tipo LINQ. La #15 apunta a esta sección como siguiente.
+- 📋 **Proyecciones** — el read model separado (una proyección = fold de eventos hacia un documento consultable); `Query<T>` tipo LINQ. La #14 apunta a esta sección como siguiente.
 - 📋 **Lifecycles + el daemon de proyecciones** — `MultiStreamProjection` async + `AddAsyncDaemon(HotCold)`, checkpoints.
 
 ### Servicio y DI

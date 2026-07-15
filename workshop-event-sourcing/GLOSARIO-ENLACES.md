@@ -80,7 +80,7 @@ Conceptos **intrínsecos a ES** que ya nacen de un dolor y enlazan bien (verific
 - **Event Store (por id)** ⇄ un cajón por agregado; el id es la llave (`el-almacen-por-id`).
 - **Concurrencia optimista + sobre/versión** ⇄ nace del dolor "lost update" (`concurrencia-optimista`).
 - **Given-When-Then / test double** ⇄ el motor en RAM es su propio doble (`given-when-then`).
-- **Documento / JSONB / serialización polimórfica** ⇄ un hecho no cabe en tabla rígida; el `switch(type)` que no vale la pena (`persistir-a-mano`).
+- **Documento / JSONB / serialización polimórfica** ⇄ un hecho no cabe en tabla rígida; el `switch(type)` que no vale la pena (`conoce-a-marten`).
 - **`DocumentStore` / event = documento** ⇄ el giro que motiva el swap (`conoce-a-marten`).
 - **Swap / lock-in / fold / `Apply` por convención** ⇄ cada pieza casera muere nombrando su reemplazo (`el-swap`).
 - **Tests de integración / fixture** ⇄ los mismos escenarios validan el swap (`tests-de-integracion`).

@@ -14,7 +14,7 @@ Hasta ahora el bus fue abstracto: el outbox guardaba el saliente, pero ¿salient
 
 ### Paso 1 · Levanta RabbitMQ y conéctalo
 
-Primero necesitas el broker corriendo. Añade el servicio a tu `docker-compose.yml` (junto al de Postgres de [Persistir a mano](persistir-a-mano.md)) y levántalo con `docker compose up -d`:
+Primero necesitas el broker corriendo. Añade el servicio a tu `docker-compose.yml` (junto al de Postgres de [Conoce a Marten](conoce-a-marten.md)) y levántalo con `docker compose up -d`:
 
 ```yaml
   rabbitmq:
