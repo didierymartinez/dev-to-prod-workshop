@@ -22,7 +22,7 @@ Si tratas los dos igual, o creas un stream que ya existe (choque) o intentas añ
 > 🛠️ **Inténtalo tú.** Amplía tu `IEventStore`: además de leer (`GetAggregateRootAsync`, heredado de un `IAggregateRootReader`), que sepa **iniciar** un stream, **añadir** hechos y **confirmar**.
 
 > [!NOTE]
-> 🆕 **Dos cambios de firma respecto a tu costura.** Frente al `IEventStore` de [El almacén abstracto](el-almacen-abstracto.md), la restricción pasó de `class, new()` a **`where T : AggregateRoot`**: el store ahora necesita leer `UncommittedEvents` del agregado para volcarlos, y eso solo lo garantiza `AggregateRoot`. Y entra un `CancellationToken`, para propagar la cancelación como el resto de Marten. La costura es la misma; el contrato se afinó.
+> 🆕 **Dos cambios de firma respecto a tu costura.** Frente al `IEventStore` de [El almacén abstracto](el-almacen-abstracto.md), la restricción pasó de `class, new()` a **`where T : AggregateRoot`**: el store ahora necesita leer `UncommittedEvents` del agregado para volcarlos, y eso solo lo garantiza `AggregateRoot`. Y entra un **`CancellationToken`** —la señal de *«ya no me interesa el resultado, para»* (la petición HTTP se abortó, o la app se está apagando)—: no haces nada especial con él, lo **recibes y lo pasas hacia abajo** a los métodos `async` de Marten, que revisan la señal y **cortan la operación en curso** en vez de seguir gastando trabajo contra Postgres. Casi todo método `async` de .NET acepta uno; propagarlo es la convención (es el mismo parámetro que Marten te dio ya hecho en la firma de [Suscripciones](suscripciones.md), donde solo lo copiabas). La costura es la misma; el contrato se afinó.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>

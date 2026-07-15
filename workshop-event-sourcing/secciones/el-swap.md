@@ -12,7 +12,7 @@ Que tus handlers reales dejen de hablar con el `EventStore` en RAM y hablen con 
 dotnet add package Marten --version 9.2.1
 ```
 
-En [Conoce a Marten](conoce-a-marten.md) creaste el `DocumentStore` solo con la cadena de conexión. Para trabajar con **eventos**, le añades dos opciones:
+En [Conoce a Marten](conoce-a-marten.md) creaste el `DocumentStore` solo con la cadena de conexión. Marten ya guarda **eventos** así, sin nada más; para estos ejemplos le ajustas dos opciones —**no son obligatorias**, son las que nos convienen—:
 
 ```csharp
 using Marten;
@@ -27,9 +27,9 @@ var store = DocumentStore.For(opts =>
 ```
 
 > [!NOTE]
-> 🆕 **La config de eventos.** El `DocumentStore` y la `LightweightSession` ya los conoces de [Conoce a Marten](conoce-a-marten.md). Lo nuevo son dos ajustes para eventos:
-> - `StreamIdentity.AsString`: los streams se identifican por **texto** (`"emp-7"`), como los venías usando, no por `Guid`.
-> - `EventNamingStyle.SmarterTypeName`: Marten etiqueta cada evento con un **nombre corto** (`empresa_registrada`). Sin esto guardaría un nombre largo atado a la ubicación de la clase en tu código, y el día que muevas o renombres esa clase, los eventos viejos ya no calzarían.
+> 🆕 **La config de eventos (opcional).** El `DocumentStore` y la `LightweightSession` ya los conoces de [Conoce a Marten](conoce-a-marten.md). Marten guarda eventos **sin configurar nada**; estos dos ajustes no lo habilitan, solo cambian **cómo**, y son los que nos convienen:
+> - `StreamIdentity.AsString`: los streams se identifican por **texto** (`"emp-7"`), como los venías usando. **Por defecto** Marten usa `Guid`; lo cambiamos porque nuestras llaves son strings.
+> - `EventNamingStyle.SmarterTypeName`: Marten etiqueta cada evento con un **nombre corto** (`empresa_registrada`). Sin este ajuste igual funciona, pero guardaría un nombre largo atado a la ubicación de la clase en tu código, y el día que muevas o renombres esa clase, los eventos viejos ya no calzarían.
 
 ### Paso 2 · El handler habla con Marten
 
