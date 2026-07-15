@@ -14,7 +14,7 @@ Si pegas el `AggregateRoot`, el `MartenEventStore` y el `TestStore` en tu proyec
 
 ### Paso 1 · Referencia la vertiente que cada proyecto necesita
 
-> 🛠️ **Inténtalo tú.** Reparte las referencias por proyecto: tu **dominio** solo debe ver los contratos; el **host** ve la implementación Critter Stack y el transporte; los **tests** ven las utilidades de prueba.
+> 🛠️ **Inténtalo tú.** Reparte las referencias por proyecto: tu **dominio** solo debe ver los contratos; el **host** ve la implementación Critter Stack, el transporte y el resolver de multi-tenancy; los **tests** ven las utilidades de prueba.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>

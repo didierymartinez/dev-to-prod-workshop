@@ -17,7 +17,7 @@ Tu `TestStore` de [El almacén abstracto](el-almacen-abstracto.md) tenía que **
 > 🛠️ **Inténtalo tú.** Escribe el corazón del `TestStore`: dado un agregado y un hecho, encuentra en el agregado el método `Apply` cuyo **único parámetro** sea del tipo del hecho, e **invócalo**. Cachea el hallazgo en un `ConcurrentDictionary` por `(agregado, evento)` con `GetOrAdd`, para no buscar cada vez.
 
 > [!NOTE]
-> 🆕 **Aplicar por reflexión.** Es la misma reflexión que ya usaste en [El almacén abstracto](el-almacen-abstracto.md): en vez de un `switch` por agregado, el `TestStore` **busca** el método `Apply(TEvento)` que coincide con el tipo del hecho (`GetMethods` + el `Apply` de un solo parámetro de ese tipo) y lo invoca (`MethodInfo.Invoke`, pasándole el hecho). Lo nuevo es el **caché**: guarda el método hallado en un `ConcurrentDictionary` (concurrente porque los tests pueden correr en paralelo) por `(agregado, evento)`, con `GetOrAdd` que **busca una vez y reutiliza**. Resultado: un doble que rehidrata **cualquier** agregado sin conocerlo — no lo tocas al agregar un agregado nuevo.
+> 🆕 **Aplicar por reflexión.** Es la misma reflexión que ya usaste en [El almacén abstracto](el-almacen-abstracto.md): en vez de un `switch` por agregado, el `TestStore` **busca** el método `Apply(TEvento)` que coincide con el tipo del hecho (`GetMethods` + el `Apply` de un solo parámetro de ese tipo) y lo invoca (`MethodInfo.Invoke`, pasándole el hecho). Lo nuevo es el **caché**: guarda el método hallado en un `ConcurrentDictionary` (concurrente porque los tests pueden correr en paralelo) por `(agregado, evento)`, con `GetOrAdd` que **busca una vez y reutiliza** (la lambda va `static` solo para no capturar variables locales, un detalle de rendimiento). Resultado: un doble que rehidrata **cualquier** agregado sin conocerlo — no lo tocas al agregar un agregado nuevo.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -28,7 +28,7 @@ using System.Reflection;
 
 private static readonly ConcurrentDictionary<(Type, Type), MethodInfo?> ApplyMethodCache = new();
 
-private static void ApplyEvent<T>(T aggregateRoot, object @event) where T : AggregateRoot
+private static void ApplyEvent(AggregateRoot aggregateRoot, object @event)
 {
     var key = (aggregateRoot.GetType(), @event.GetType());
     var applyMethod = ApplyMethodCache.GetOrAdd(key, static tipos =>

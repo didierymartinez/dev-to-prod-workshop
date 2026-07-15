@@ -78,10 +78,10 @@ Funciona. Pero mira el cuerpo: seis líneas de andamiaje —crear el store, semb
 
 La primera pieza que se repetirá en todo test: **sembrar los hechos previos**. Súbela a una clase base. La base y tus tests son **clases separadas, en archivos separados**, las dos dentro del proyecto de tests; tu `Program.cs` de producción **no se toca**.
 
-> 🛠️ **Inténtalo tú.** Quieres que el test abra diciendo *dados estos hechos previos*: `Given(new EmpresaRegistrada(...))`. Sube el sembrado a una base `HandlerTest` (ponla en el proyecto de tests — mismo archivo del test u otro, da igual). La base guarda el `EventStore` y el id del agregado (`AggregateId`, `"emp-7"` por ahora); su método `Given` recibe **uno o varios** hechos previos sueltos (sin que armes una lista), **abre el stream de `AggregateId`, se los agrega** y **recuerda cuántos había** (para después aislar los nuevos). Haz que tu test **herede** de la base y cambia el sembrado por `Given(...)`.
+> 🛠️ **Inténtalo tú.** Crea una clase `HandlerTest` de la que **hereden** tus tests (en el proyecto de tests — mismo archivo del test u otro, da igual). Dale dos propiedades que los tests puedan usar: el `EventStore` y el id del agregado (`AggregateId`, `"emp-7"` por ahora). Y dale un método `Given` que reciba **uno o varios** hechos previos —para eso usa la sintaxis `params`: `Given(params object[] eventos)`—: adentro, abre el stream del `EventStore` con el `AggregateId`, recorre los `eventos` y haz `Append` de cada uno, y guarda en una variable **cuántos había** (para después aislar los nuevos). Luego, en tu test, hereda de `HandlerTest` y reemplaza el sembrado a mano por `Given(...)`.
 
 > [!NOTE]
-> 🆕 **`params object[]` — recibir varios sueltos.** Eso de "uno o varios sin armar una lista" es la firma `Given(params object[] eventos)`: C# empaqueta en el array `eventos` lo que le pases (`Given(a)`, `Given(a, b)`). La **herencia** ya la conoces (`Empresa : AggregateRoot` en [Refactorizando el motor](refactorizando-el-motor.md)): la base es una **clase compartida** que cada test hereda —lo común arriba, cada test lo suyo—.
+> 🆕 **`params object[]`.** `params` deja que C# **empaquete en el array `eventos`** los hechos que le pases sueltos: llamas `Given(a)` o `Given(a, b)` sin armar una lista. (La **herencia** ya la conoces de `Empresa : AggregateRoot` en [Refactorizando el motor](refactorizando-el-motor.md).)
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -132,6 +132,9 @@ La segunda pieza repetida: **ejecutar el handler**. Solo cambia **cuál** handle
 
 > 🛠️ **Inténtalo tú.** **🔁** Ahora la línea de en medio: `When(new SuspenderEmpresa(...))`. Quieres que `When` ejecute el handler **sin que la base sepa cuál es** — cada test provee **el suyo**. Así que la base declara un `Handler` que **cada test rellena** (y, hasta que lo rellenen, la base queda **incompleta**: no se crea sola), y necesita saber **de qué comando** habla. Añade `When` y ese `Handler` a la base; en el test, provee tu handler (`new SuspenderHandler(Store)`) y cambia la ejecución por `When(...)`. Haz las **dos** ediciones (base y test) antes de correr: una sin la otra no compila.
 
+> [!NOTE]
+> 🆕 **El `Handler` a-rellenar: `abstract` + genérico.** "El handler que cada test rellena" es una **propiedad `abstract`**: `protected abstract ICommandHandler<TCommand> Handler { get; }` —tu contrato de [El despachador](el-despachador.md), otra vez—, y el test la cumple con `override`. Como la base tiene un miembro `abstract`, la **clase** se marca `abstract` (incompleta, no se crea sola). Y para que `Handler`/`When` sepan el tipo del comando, la base se parametriza: `HandlerTest<TCommand>`. Ni el `abstract` ni el `<TCommand>` hacían falta hasta ahora — nacen con `When`/`Handler`.
+
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
@@ -164,9 +167,6 @@ public class SuspenderEmpresaTests : HandlerTest<SuspenderEmpresa>   // 🔁 ant
 }
 ```
 </details>
-
-> [!NOTE]
-> 🆕 **El `Handler` a-rellenar: `abstract` + genérico.** "El handler que cada test rellena" es una **propiedad `abstract`**: `protected abstract ICommandHandler<TCommand> Handler { get; }` —tu contrato de [El despachador](el-despachador.md), otra vez—, y el test la cumple con `override`. Como la base tiene un miembro `abstract`, la **clase** se marca `abstract` (incompleta, no se crea sola). Y para que `Handler`/`When` sepan el tipo del comando, la base se parametriza: `HandlerTest<TCommand>`. Ni el `abstract` ni el `<TCommand>` hacían falta hasta ahora — nacen con `When`/`Handler`.
 
 > 🔍 `dotnet test` → **verde**. Ya solo queda cruda la última pieza: la comparación.
 

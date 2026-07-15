@@ -14,7 +14,7 @@ Que Marten **aísle** los datos por cliente: la llave pasa de `id` a `(tenant, i
 
 ### Paso 1 · Marca todo como multi-tenant
 
-> 🛠️ **Inténtalo tú.** En tu `AddMarten`, di que los **eventos** y los **documentos** (proyecciones) son multi-tenant estilo *conjoined* — con `opts.Events.TenancyStyle` y una policy en `opts.Policies`.
+> 🛠️ **Inténtalo tú.** En tu `AddMarten`, di que los **eventos** y los **documentos** (proyecciones) son multi-tenant estilo *conjoined*: el estilo de los eventos con `opts.Events.TenancyStyle`, y los documentos con la policy `opts.Policies.AllDocumentsAreMultiTenanted()`.
 
 > [!NOTE]
 > 🆕 **`TenancyStyle.Conjoined`.** Todos los tenants comparten el **mismo esquema y las mismas tablas**; Marten agrega una columna `tenant_id` y la mete en la llave. "Conjoined" = conviven en una base, discriminados por esa columna. La alternativa —una base o esquema por tenant— da aislamiento **físico** pero multiplica la operación. (Gotcha: `TenancyStyle` vive en `JasperFx.MultiTenancy`, no en un namespace de Marten.)
@@ -30,12 +30,14 @@ opts.Policies.AllDocumentsAreMultiTenanted();        // …y en la de todos los 
 ```
 </details>
 
-> [!NOTE]
 ### Paso 2 · Abre la sesión CON el tenant
 
 La llave dejó de ser `id`; ahora es `(tenant, id)`. Por eso ya no abres una sesión "a secas": la abres **para un tenant**, y todo lo que leas o escribas en ella queda marcado con él.
 
 > 🛠️ **Inténtalo tú.** **🔁** Abre la sesión pasándole el tenant.
+
+> [!NOTE]
+> 🆕 **Sesión por tenant.** `LightweightSession(tenantId)` / `QuerySession(tenantId)`: Marten estampa el tenant en cada escritura y filtra cada lectura por él. No pones `WHERE tenant_id = …` a mano — la sesión lo hace. Aquí el tenant `"cliente-acme"` es un **literal**.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -45,9 +47,6 @@ await using var session = store.LightweightSession("cliente-acme");   // escribe
 await using var qs = store.QuerySession("cliente-acme");              // lee solo lo de acme
 ```
 </details>
-
-> [!NOTE]
-> 🆕 **Sesión por tenant.** `LightweightSession(tenantId)` / `QuerySession(tenantId)`: Marten estampa el tenant en cada escritura y filtra cada lectura por él. No pones `WHERE tenant_id = …` a mano — la sesión lo hace. Aquí el tenant `"cliente-acme"` es un **literal**.
 
 ### Paso 3 · Compruébalo: dos clientes, misma id, streams distintos
 

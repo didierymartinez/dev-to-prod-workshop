@@ -43,7 +43,7 @@ public interface IPrivateEvent : IEvent;       // se queda dentro de este servic
 
 Aquí está el giro: el código que **publica** un hecho es **el mismo** para uno público y uno privado; quien decide el destino es la **config de arranque**.
 
-> 🛠️ **Inténtalo tú.** En el arranque, enumera todos los tipos que implementan `IPublicEvent` y decláreles una ruta al bus externo. Los que no la implementan **no** reciben ruta.
+> 🛠️ **Inténtalo tú.** En el arranque, **recorre el ensamblado y quédate con los tipos que implementan `IPublicEvent`** (los demás no reciben ruta). Cómo se le declara a cada uno la ruta al bus externo es config de Wolverine —inguessable, y el transporte real llega en [Transportes](transportes.md)—: te la muestro abajo, antes de la solución.
 
 > [!NOTE]
 > 🆕 **Escanear el ensamblado + declarar ruta.** Recorrer los tipos de un ensamblado con `GetTypes()` y filtrar por marcador con `IsAssignableTo` es hacer **a mano** el mismo escaneo que Wolverine hace para descubrir handlers. A cada tipo público le declaras una ruta con `opts.PublishMessage(tipo).ToRabbitExchange(nombre)` (el transporte real —RabbitMQ— llega en [Transportes](transportes.md); por ahora, la forma). El ensamblado de tus eventos lo obtienes como antes: `typeof(EmpresaSuspendida).Assembly`.
