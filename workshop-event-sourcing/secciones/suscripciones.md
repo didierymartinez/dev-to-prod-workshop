@@ -91,6 +91,9 @@ Separaste **reaccionar** de **escribir**. Una **suscripción** —clase que here
 > 🌱 **Semilla — la puerta a EDA.** El efecto "hacia afuera" más común es **publicar el hecho a un bus de mensajes** para que otros servicios reaccionen. Hacerlo de forma **fiable** (que el mensaje no se pierda aunque el proceso muera justo después de guardar) es el problema del **outbox**, y quien industrializa suscripción + publicación + outbox es **Wolverine**. Ahí entra el mundo **event-driven**.
 
 > [!NOTE]
+> 🧭 **Brújula — "suscripción" significa DOS cosas.** La que construiste aquí es la **suscripción catch-up de Marten**: vive **dentro del proceso**, la corre el daemon leyendo el stream de eventos de tu propia base. En producción te cruzarás con OTRA "suscripción": la de un **bus de mensajes** (Azure Service Bus, RabbitMQ), donde **otro servicio** se suscribe a un *topic* para reaccionar **cross-servicio**. Son primos —misma idea, reaccionar a hechos— pero distinto alcance: **in-process** (Marten) vs **entre servicios** (bus). Dato de criterio del flagship: en **ControlPlane** la catch-up de Marten se usa **una** vez (el daemon de proyecciones del read-side) y la del bus **decenas** (Azure Functions con `[ServiceBusTrigger]`). Cuál usar depende de si el que reacciona vive en **tu** proceso o en **otro** servicio.
+
+> [!NOTE]
 > 🌱 **Semilla — el veneno.** Si un hecho hace fallar tu efecto **siempre**, reintentar para siempre atasca la suscripción. Marten puede mandarlo a una **dead-letter queue** (`SkipApplyErrors` → tabla `mt_doc_deadletterevent`) para no bloquear el resto — un ajuste de criterio para producción.
 
 ---
@@ -102,6 +105,7 @@ Separaste **reaccionar** de **escribir**. Una **suscripción** —clase que here
 - [ ] Explicas el **catch-up**: procesa lo que se perdió mientras estuvo caída (checkpoint en `mt_event_progression`).
 - [ ] Explicas **al-menos-una-vez** y por qué tu efecto debe ser **idempotente** / tolerar reentrega.
 - [ ] Distingues **suscripción** (efecto hacia afuera) de **proyección** (read model adentro).
+- [ ] Distingues la **suscripción catch-up de Marten** (in-process, en el daemon) de la **suscripción de bus** (cross-servicio) — y sabes cuál usa el flagship para qué.
 
 ---
 

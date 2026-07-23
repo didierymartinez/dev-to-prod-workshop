@@ -43,6 +43,9 @@ Tu **dominio** (agregados, handlers) depende solo de la vertiente **Abstractions
 
 Aquí está la decisión que da nombre al taller. Su `MartenEventStore` lee con `AggregateStreamAsync` y añade con `Append`, no con `FetchForWriting`. Es una decisión **confinada a la vertiente CritterStack**: cambiarla no toca el dominio ni los contratos. Justo la clase de cambio que, en [FetchForWriting](fetch-for-writing.md), aprendiste a hacer **con criterio**.
 
+> [!NOTE]
+> 🆕 **La respuesta real del flagship: serializar, no competir.** Si la plantilla no verifica versión al escribir, ¿cómo evita la **actualización perdida** de [Concurrencia optimista](concurrencia-optimista.md)? No la resuelve **dentro** del modelo (optimista + reintento con `FetchForWriting`), sino **afuera**: **serializa las escrituras al mismo stream**. En **ControlPlane**, los mensajes se publican con `GroupId = TenantId` → una **sesión** de Azure Service Bus, que hace que los del mismo tenant se procesen **uno a uno, en orden** (el `GroupId` que viste en [el sobre](el-sobre.md), ahora como palanca de concurrencia). Si nunca hay dos escritores del mismo stream a la vez, **no hay carrera que `FetchForWriting` deba atrapar** (ADR-0026). Dos estrategias legítimas para el mismo dolor: `FetchForWriting` **detecta** el choque y reintenta (optimista); serializar en el bus **evita** que ocurra (por sesión). Cuál elegir es, exactamente, el criterio que el **capstone** te pide decidir.
+
 > 🔍 **¿Lo lograste?** Abre la solución real: verás `…Abstractions` sin referencia a Marten (revisa su `.csproj`) y `…CritterStack` con la referencia a Marten y las clases que implementan las interfaces. Y en `MartenEventStore` verás `AggregateStreamAsync` + `Append`, no `FetchForWriting`. Reconoces cada pieza porque la construiste.
 
 ---
@@ -63,6 +66,7 @@ La librería está partida en **dos vertientes**: `Abstractions` (contratos puro
 - [ ] Mapeas tus piezas (`IEventStore`, `MartenEventStore`, `TestStore`) a las de la librería.
 - [ ] Reconoces el patrón **puertos y adaptadores** y por qué tus tests sobrevivieron al swap.
 - [ ] Explicas por qué *no usar `FetchForWriting`* es una decisión de la vertiente CritterStack, no del dominio.
+- [ ] Explicas la **alternativa real** del flagship: serializar las escrituras en el bus (`GroupId=TenantId` → sesión ASB) **evita** el choque, en vez de **detectarlo** con concurrencia optimista.
 
 ---
 

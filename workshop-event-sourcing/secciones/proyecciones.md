@@ -59,6 +59,9 @@ opts.Projections.Add<ResumenEmpresaProjection>(ProjectionLifecycle.Inline);
 ```
 </details>
 
+> [!NOTE]
+> 🆕 **`ShouldDelete` — cuando el read model debe DESAPARECER.** No todo read model es una foto que perdura. A veces es una **lista de "en curso"** donde un ítem debe **irse** al completarse. Marten trae la convención `public static bool ShouldDelete(HechoTerminal _) => true;`: al plegar ese hecho, **borra** el documento en vez de mutarlo. Tu `ResumenEmpresa` no tiene un hecho terminal (una empresa activa perdura), así que aquí no lo usas — pero **ControlPlane sí**: su vista de onboarding se **borra** al llegar `TenantOnboardingFinished`, y por eso `GET /onboarding` lista solo los onboardings **en curso** (los que quedan, siempre lo están). Que el documento **desaparezca** *es* la respuesta a la consulta. Marten ofrece el borrado por convención; el criterio es tuyo: ¿este read model es una **lista viva** o una **foto** que perdura?
+
 ### Paso 2 · Consulta el read model
 
 Rehidratar era para **uno**. Para consultar **muchos**, Marten te da LINQ sobre los documentos.
@@ -130,6 +133,7 @@ Construiste el **lado de lectura**. La agregación en vivo (`GetAggregateRootAsy
 - [ ] `IProjectionStore.Query<ResumenEmpresa>().Where(e => e.Suspendida)` responde con una consulta, **sin** rehidratar cada empresa.
 - [ ] Explicas el dolor que resuelve (consultar a través de muchos agregados) y qué es **CQRS** (escribir por un lado, leer por otro).
 - [ ] Explicas *inline* vs *async*: consistencia inmediata vs. no bloquear la escritura (consistencia eventual).
+- [ ] Reconoces `ShouldDelete` (borrar el read model al llegar un hecho terminal) y distingues un read model **lista viva** de una **foto** que perdura.
 
 ---
 

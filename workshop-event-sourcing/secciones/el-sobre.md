@@ -94,6 +94,9 @@ await bus.PublishAsync(hecho, TenancyDelivery.Build(tenantResolver));
 > [!NOTE]
 > 🆕 **Un solo armador de sobres.** `TenancyDelivery.Build` es el único lugar que sabe qué lleva el sobre. Comandos, consultas y eventos lo usan igual, así no divergen en lo que propagan.
 
+> [!NOTE]
+> 🆕 **Un tercer pasajero del sobre: `GroupId` (orden).** Además del cliente y el usuario, el sobre puede llevar un **`GroupId`** — una clave de **agrupamiento/orden**. En Azure Service Bus se traduce a un **`SessionId`**: los mensajes con el mismo `GroupId` se procesan **uno a uno, en orden**, nunca en paralelo. **ControlPlane** publica con `GroupId = TenantId` (su `TenancyDelivery.Build` lo toma como parámetro opcional). No es solo tenancy: **serializar por sesión** es la palanca con la que el flagship **evita** las escrituras concurrentes al mismo stream — la alternativa a la concurrencia optimista de `FetchForWriting`, que cierras con criterio en [Las dos vertientes](las-dos-vertientes.md) y el capstone.
+
 > 🔍 **¿Lo lograste?** Todavía no hay un servicio receptor cableado (llega con el [transporte](transportes.md)), así que la comprobación es **conceptual**: el sobre que arma `TenancyDelivery.Build` lleva el `TenantId` en su casilla nativa y el `user_id` en un header. Cuando exista el receptor, lo desempacará sin tocar el evento: `context.TenantId` → el cliente, y `context.Envelope.Headers["user_id"]` → el usuario. El hecho (`EmpresaSuspendida`) viaja **limpio**, con el contexto al lado.
 
 ---
@@ -114,6 +117,7 @@ Envolviste el hecho publicado en un **sobre** (`DeliveryOptions`) que lleva **co
 - [ ] El `user_id` viaja como **header** (con una constante para el nombre), no como campo nativo.
 - [ ] Explicas por qué `TenantId` va nativo (Wolverine lo propaga/rutea) y `user_id` va como header.
 - [ ] Centralizaste el armado en `TenancyDelivery.Build` y explicas qué evita (que cada publish diverja).
+- [ ] Reconoces el `GroupId` (orden → sesión ASB) como tercer pasajero del sobre, y por qué serializar por sesión es la alternativa a la concurrencia optimista.
 
 ---
 
