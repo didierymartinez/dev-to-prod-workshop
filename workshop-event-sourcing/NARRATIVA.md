@@ -6,6 +6,8 @@
 >
 > Es un **recuento narrativo** (no la guía paso a paso): para los retos, el código y las comprobaciones, ve a cada sección en [`MAPA.md`](MAPA.md). Aquí solo está la historia.
 
+> ⚠️ **Desincronizado — arco previo.** Esta narrativa cuenta un **orden y agrupación distintos** al arco realmente construido (39 secciones). La **fuente de verdad** del path real es [`MAPA.md`](MAPA.md) (ya re-sincronizado). La reescritura de esta narrativa al arco v7 queda **pendiente**.
+
 ---
 
 ## 🛠️ El motor, a mano
