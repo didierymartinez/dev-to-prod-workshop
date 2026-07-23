@@ -25,7 +25,7 @@ Cambias el ciclo de vida de la proyección a `Async`. Pero una proyección async
 > 🆕 **`AddMarten` mete Marten en el contenedor.** Registra Marten en `builder.Services` (el *contenedor*), en vez de tu `DocumentStore.For` a mano — la **inyección de dependencias**, que verás a fondo en la próxima sección. El daemon lo **necesita**: es un servicio en segundo plano que vive dentro del host. Y cuando quieras el store de vuelta, se lo **pides** al contenedor con `GetRequiredService<IDocumentStore>()` (lo usarás en el checkpoint). Este host es mínimo, solo para el daemon; crecerá cuando conviertas la app en un servicio.
 
 > [!NOTE]
-> 🆕 **`AddAsyncDaemon(DaemonMode.Solo)`.** Enciende el **daemon**: un worker que, en segundo plano, lee el stream de eventos y alimenta las proyecciones `Async`. `Solo` = un único daemon corriendo todas las proyecciones (hay otros modos para varias instancias; los dejas para después).
+> 🆕 **`AddAsyncDaemon(DaemonMode.Solo)` — y `HotCold` en producción.** Enciende el **daemon**: un worker que, en segundo plano, lee el stream de eventos y alimenta las proyecciones `Async`. `Solo` asume **un solo proceso** corriendo el daemon — perfecto en tu máquina. Pero en producción el servicio suele correr en **varias instancias** a la vez, y no quieres N daemons rejugando los mismos eventos y pisándose. Para eso está **`DaemonMode.HotCold`**: todas las instancias compiten por un **advisory lock** de Postgres y solo **una** (la "hot") corre el daemon; si esa cae, otra toma el relevo. Es el cambio de **un enum** —`Solo`→`HotCold`— y es justo lo que hace **ControlPlane** (`AddAsyncDaemon(DaemonMode.HotCold)` en cada store de lectura, para escalar el servicio sin duplicar el daemon). Marten ofrece los dos modos; el criterio es tuyo: `Solo` mientras haya un proceso, `HotCold` en cuanto escales horizontalmente.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -85,6 +85,7 @@ Pasaste la proyección de **inline** (misma transacción, consistencia inmediata
 - [ ] Tras `SaveChangesAsync`, la proyección se llena **fuera** de la transacción; una consulta inmediata podría no verla aún (**consistencia eventual**).
 - [ ] Explicas qué son el **checkpoint** y el **high water mark**, y cómo permiten **reconstruir** una proyección.
 - [ ] Explicas la decisión **inline vs async** con criterio (consistencia inmediata vs. no penalizar la escritura).
+- [ ] Explicas `DaemonMode.Solo` (un proceso, dev) vs `HotCold` (advisory lock, una sola instancia activa al escalar) — y que es el cambio de un enum.
 
 ---
 
