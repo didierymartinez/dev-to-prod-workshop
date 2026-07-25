@@ -1,6 +1,6 @@
 # El diario en disco (y lo que se queda afuera)
 
-Cerraste §9 con un motor completo. Faltaba ver qué pasa cuando lo apagas y lo vuelves a abrir.
+Cerraste el motor a mano con todo funcionando. Faltaba ver qué pasa cuando lo apagas y lo vuelves a abrir.
 
 ## 🎯 El Objetivo
 
@@ -22,6 +22,8 @@ El diario de "emp-7" **no existe**: nació y murió con el proceso anterior. Un 
 
 Si el `Dictionary` se borra al cerrar, escribe los hechos donde **queden**: un archivo por empresa (`emp-7.log`). Cada vez que anotas un sobre, lo agregas como una línea; al abrir el stream, lees las líneas de vuelta. Las dos puertas de afuera del almacén (`GetEvents` / `AppendEvent`) siguen igual — lo que cambia es de dónde salen y a dónde van los hechos.
 
+> 💡 Un archivo de texto **no** es donde guardarías esto en un sistema real, y tu instinto de "para esto hay una base de datos" es correcto. Lo usamos a propósito: es lo más simple que sobrevive al reinicio, así ves los problemas de fondo del event sourcing **desnudos, sin una base de datos escondiendo la mecánica**. La base llega en cuanto choques con algo que el archivo no pueda — y no falta mucho.
+
 Para eso necesitas dos cosas nuevas: leer/escribir un archivo, y convertir cada sobre a **texto** (para escribirlo) y de vuelta (para leerlo).
 
 > [!NOTE]
@@ -36,7 +38,7 @@ Para eso necesitas dos cosas nuevas: leer/escribir un archivo, y convertir cada 
 > [!NOTE]
 > 🆕 **Idioma de C#: `System.Text.Json`.** `JsonSerializer.Serialize(algo)` convierte un objeto en una cadena JSON; `JsonSerializer.Deserialize<T>(cadena)` hace el camino inverso. Viene en .NET (`using System.Text.Json;`). Un detalle: `Deserialize<T>` puede devolver `null`, y el `!` al final (`Deserialize<T>(linea)!`) le dice al compilador "confía, aquí no será null" para que no te avise.
 
-> 🛠️ **Inténtalo tú.** Cambia **solo** las tripas de `EventStore` (deja igual `EventStream`, los handlers y la `Empresa`). Como ahora escribe a un archivo, el almacén necesita saber **en qué carpeta**: recíbela por constructor y crea la carpeta ahí mismo — eso obliga a cambiar tus `new EventStore()` por `new EventStore("datos")`. En `AppendEvent`, serializa el sobre y **agrégalo como una línea** al archivo de ese id (mantén la verificación de versión de §9: lee lo que ya hay antes de aceptar). En `GetEvents`, si el archivo existe, lee cada línea y **deserialízala** de vuelta a `EventoAlmacenado`; si no, devuelve una lista vacía.
+> 🛠️ **Inténtalo tú.** Cambia **solo** las tripas de `EventStore` (deja igual `EventStream`, los handlers y la `Empresa`). Como ahora escribe a un archivo, el almacén necesita saber **en qué carpeta**: recíbela por constructor y crea la carpeta ahí mismo — eso obliga a cambiar tus `new EventStore()` por `new EventStore("datos")`. En `AppendEvent`, serializa el sobre y **agrégalo como una línea** al archivo de ese id (mantén la verificación de versión que ya hacías: lee lo que ya hay antes de aceptar). En `GetEvents`, si el archivo existe, lee cada línea y **deserialízala** de vuelta a `EventoAlmacenado`; si no, devuelve una lista vacía.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -66,13 +68,13 @@ public class EventStore
 
     public void AppendEvent(string id, EventoAlmacenado sobre)
     {
-        if (sobre.Version <= GetEvents(id).Count)   // misma regla de §9
+        if (sobre.Version <= GetEvents(id).Count)   // misma verificación de versión de antes
             throw new ConcurrencyException($"La versión {sobre.Version} ya está ocupada.");
 
         File.AppendAllText(RutaDe(id), JsonSerializer.Serialize(sobre) + Environment.NewLine);
     }
 
-    // AbrirStream no cambia respecto a §8.
+    // AbrirStream no cambia.
     public EventStream<T> AbrirStream<T>(string id) where T : AggregateRoot, new() => new(this, id);
 }
 ```
@@ -106,7 +108,7 @@ Console.WriteLine($"{empresa.Nombre}: {empresa.Plan}, {(empresa.Suspendida ? "su
 // Obtenido : ": , activa"   ← ¡vacío! (esperado: Constructora Andes: Enterprise, suspendida)
 ```
 
-No explota. No avisa. Devuelve una empresa que **parece** válida y es mentira — justo el error que "probar a ojo" (como venías haciendo en §9) no atrapa.
+No explota. No avisa. Devuelve una empresa que **parece** válida y es mentira — justo el error que "probar a ojo" (como venías haciendo) no atrapa.
 
 ¿Por qué? En RAM, cada sobre llevaba un objeto de C# que **sabía su propia clase** (`PlanCambiado`, `EmpresaSuspendida`…). Al escribirlo a disco solo quedó **texto**, y la clase se quedó afuera: `{"NuevoPlan":"Enterprise"}` no dice en ninguna parte que sea un `PlanCambiado`.
 
@@ -151,7 +153,7 @@ public class EventStore
         ["EmpresaRegistrada"] = typeof(EmpresaRegistrada),
         ["PlanCambiado"]      = typeof(PlanCambiado),
         ["EmpresaSuspendida"] = typeof(EmpresaSuspendida),
-        ["EmpresaReactivada"] = typeof(EmpresaReactivada),
+        // (los eventos que usa esta empresa; si aparece uno más, hay que añadirlo)
     };
 
     public EventStore(string carpeta)
@@ -212,7 +214,7 @@ Console.WriteLine($"{empresa.Nombre}: plan {empresa.Plan}, {(empresa.Suspendida 
 
 Corre una vez (siembra e imprime) y **vuelve a correr sin borrar `datos`**: la segunda vez **no** siembra —el diario ya no está vacío— y aun así imprime `Constructora Andes: plan Enterprise, suspendida`. Los hechos sobrevivieron al proceso anterior.
 
-> 🌱 Ese **mapa de nombre → clase** lo llenas a mano. Agrega un evento a la `Empresa` —reactivarla con un `EmpresaReactivada`—, olvida ponerlo en el mapa, reinicia, y al leer el diario:
+> 🌱 Ese **mapa de nombre → clase** lo llenas a mano. Reactiva una empresa (emite un `EmpresaReactivada`, un evento que aún **no** pusiste en el mapa), reinicia, y al leer el diario:
 >
 > ```
 > 💥 KeyNotFoundException: The given key 'EmpresaReactivada' was not present in the dictionary.
@@ -259,6 +261,6 @@ Persistir el diario en un archivo lo hace **sobrevivir al reinicio**, pero al pa
 
 ---
 
-[⬅️ Volver: Cuando dos escriben a la vez (concurrencia optimista)](./concurrencia-optimista.md)
+[⬅️ Volver: El agregado recuerda lo que decide](./el-agregado-recuerda.md)
 
-➡️ *Siguiente: el mapa de nombre → clase que llenas a mano se rompe en cuanto olvidas un evento (o renombras uno). Ese es el próximo dolor — se vive a continuación, sin plano por delante ([método](../CRITTERWATCH-BRUJULA.md)).*
+[➡️ Siguiente: El nombre del hecho es un contrato](./el-nombre-es-un-contrato.md)
