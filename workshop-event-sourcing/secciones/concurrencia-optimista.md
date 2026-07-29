@@ -129,7 +129,7 @@ b.Append(new PlanCambiado("Enterprise"));            // también trae la versió
 
 Envolviste cada hecho en un **sobre `EventoAlmacenado`** con su **versión** (su posición en la historia), y el almacén **rechaza** un `Append` cuya posición ya está ocupada. Así, dos escrituras simultáneas sobre la misma empresa ya no se pisan en silencio: la segunda choca con una `ConcurrencyException`. La versión no es un adorno: es el **detector de conflictos**.
 
-Tienes el motor de event sourcing completo — pero lo has probado leyendo la consola con los ojos, y todo vive en RAM: al reiniciar, se pierde. Eso lo resolverás pronto. Primero, algo más cercano al dominio: ¿tu motor sabe expresar **cualquier** acción del negocio? Hay una que todavía no.
+Tienes el motor de event sourcing completo — pero lo has probado leyendo la consola con los ojos, y el choque lo provocaste tú, a mano, con dos streams en secuencia: nadie ha demostrado que con N escrituras de verdad en paralelo solo una gana. Esa duda queda abierta. Y todo vive en RAM: al reiniciar, se pierde. Eso lo resolverás pronto. Primero, algo más cercano al dominio: ¿tu motor sabe expresar **cualquier** acción del negocio? Hay una que todavía no.
 
 ---
 

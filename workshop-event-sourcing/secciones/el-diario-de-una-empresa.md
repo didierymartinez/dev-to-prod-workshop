@@ -42,7 +42,7 @@ En lugar de sobrescribir el estado, vamos a **anotar cada cosa que pasa**, como 
 
 Mira lo que cambió: **no perdiste nada**. ¿El estado de hoy? Lo lees de corrido y llegas solo a "Premium, suspendida". Pero además conservas el **pasado**: desde cuándo, por qué, cuántas veces.
 
-La foto siempre la puedes **reconstruir** leyendo el diario. El diario, en cambio, una vez lo tiras no vuelve. Por eso conviene guardar el diario, no la foto.
+La foto siempre la puedes **reconstruir** leyendo el diario. El diario, en cambio, una vez lo tiras no vuelve. Por eso conviene guardar el diario, no la foto. (¿Y toda tabla del sistema merece un diario? Guarda esa pregunta: más adelante te tocará responderla por escrito — y decir «no» también será una respuesta profesional.)
 
 ### El Descubrimiento
 
@@ -85,6 +85,8 @@ git push -u origin main
 ## 🧠 En una frase
 
 Guardar el **diario** de hechos (eventos), en vez de la **foto** del estado, conserva toda la historia: el estado de hoy se **reconstruye**, pero el pasado ya no se pierde. Eso es **Event Sourcing**.
+
+Queda una pregunta incómoda: un diario en prosa no compila. ¿Cómo se escribe un **hecho** en código de modo que nadie —ni tú mismo, dentro de un mes— pueda editarlo? Eso lo resuelves tú, tecla a tecla, en la siguiente sección.
 
 ---
 

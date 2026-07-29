@@ -1,6 +1,6 @@
 # El diario en disco (y lo que se queda afuera)
 
-Cerraste el motor a mano con todo funcionando. Faltaba ver qué pasa cuando lo apagas y lo vuelves a abrir.
+Ya tienes el motor a mano y un test que lo cuida. Pero ese test lo delató: siembra su historia en RAM y la olvida al terminar. Falta ver qué pasa cuando apagas el programa y lo vuelves a abrir.
 
 ## 🎯 El Objetivo
 
@@ -109,6 +109,8 @@ Console.WriteLine($"{empresa.Nombre}: {empresa.Plan}, {(empresa.Suspendida ? "su
 ```
 
 No explota. No avisa. Devuelve una empresa que **parece** válida y es mentira — justo el error que "probar a ojo" (como venías haciendo) no atrapa.
+
+> 🔮 Abre `datos/emp-7.log`: los datos están completos. Antes de seguir: ¿qué sabía cada hecho en RAM que estas líneas ya no dicen? Escribe tu hipótesis.
 
 ¿Por qué? En RAM, cada sobre llevaba un objeto de C# que **sabía su propia clase** (`PlanCambiado`, `EmpresaSuspendida`…). Al escribirlo a disco solo quedó **texto**, y la clase se quedó afuera: `{"NuevoPlan":"Enterprise"}` no dice en ninguna parte que sea un `PlanCambiado`.
 
@@ -241,7 +243,11 @@ Cambiar el `Dictionary` por un archivo hizo que el diario **sobreviva al reinici
 
 ## 📓 Registra tu avance
 
-Piensa la respuesta a esto (es tu reflexión de la sección):
+Primero, deja en tu `DECISIONES.md` la decisión de hoy, tal cual y sin comentario:
+
+> Rotulé cada hecho en disco con `GetType().Name`: el nombre de MI clase de C# quedó escrito dentro de la historia persistida.
+
+Y piensa la respuesta a esto (es tu reflexión de la sección):
 
 > 💭 **Reto:** en RAM nunca tuviste que guardar el tipo de cada hecho, pero en disco sí. ¿Qué cambió entre RAM y disco que lo hizo necesario?
 
@@ -261,6 +267,6 @@ Persistir el diario en un archivo lo hace **sobrevivir al reinicio**, pero al pa
 
 ---
 
-[⬅️ Volver: El agregado recuerda lo que decide](./el-agregado-recuerda.md)
+[⬅️ Volver: Verde, y roto](./verde-y-roto.md)
 
 [➡️ Siguiente: El nombre del hecho es un contrato](./el-nombre-es-un-contrato.md)

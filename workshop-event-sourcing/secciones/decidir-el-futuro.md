@@ -87,6 +87,8 @@ stream.Append(orden2.Suspender("falta de pago"));   // hoy emite OTRA VEZ → el
 > [!NOTE]
 > 🔍 **Lo que descubres al correrlo: el agregado debe estar recargado.** Fíjate en los dos `Get()` de arriba. Si en cambio reusaras la **misma** instancia (`empresa.Suspender(...)` dos veces seguidas), `Suspendida` seguiría en `false`. `decide` **no muta** el objeto: el cuerpo de `Suspender` solo hace `return new …`, ninguna línea asigna a una propiedad de `this`. El cambio vive en el diario, no en la instancia que tienes en mano. Y la guarda que estás por escribir **nunca dispararía**. La idempotencia funciona porque **cada orden recarga** el agregado: el `Get()` lo rehidrata con el hecho ya guardado, así que la segunda orden **sí** ve `Suspendida = true`. Ese ciclo *cargar → actuar → guardar* por comando es justo lo que formaliza el [Command Handler](el-command-handler.md).
 
+> 🔮 **Predice:** tienes dos lugares para la guarda: `CambiarPlan` (decide) o el `switch Aplicar` (evolve). ¿Cuál eliges — y qué pasaría al REJUGAR una historia ya archivada si `Aplicar` pudiera rechazar un hecho?
+
 El agregado es el **guardián de las reglas**, así que la defensa nace **dentro** de la `Empresa`, mirando su estado **antes** de emitir.
 
 > 🛠️ **Inténtalo tú.** **🔁 Modifica** los dos métodos que ya escribiste —sin crear otra `Empresa` ni otro agregado— para que: `CambiarPlan` **lance** una `ReglaDeNegocioException` (una clase de excepción pequeña, que creas aparte como hiciste con los `record`) si la empresa está `Suspendida` (la operación es **inválida**), y `Suspender` **devuelva `null`** si ya está `Suspendida` (es **redundante**, no un error → su tipo de retorno pasa a `EmpresaSuspendida?`). *(`Reactivar()` queda igual.)*
@@ -201,7 +203,7 @@ El flujo del dominio queda claro: **cargar** (rehidratar el pasado) → **actuar
 Pero ese ciclo **cargar → actuar → guardar** está suelto en el `Program.cs`. En la próxima sección lo encapsulamos en una pieza con un solo trabajo: el **Command Handler**.
 
 > [!NOTE]
-> 🌱 **Semilla — el agregado terminará GUARDÁNDOSE sus propios hechos.** Hoy `CambiarPlan` **devuelve** el hecho y el handler lo archiva (`stream.Append(hecho)`). Funciona y deja todo a la vista. Pero las herramientas de producción usan otro modelo: el agregado **se aplica el hecho a sí mismo y lo recuerda** en una lista de *cambios sin confirmar*, y al final **un solo paso** los persiste todos juntos (en una transacción). Cuando afinemos el motor a su forma de producción **invertiremos** esto —de "devolver y que otro guarde" a "el agregado acumula y un middleware persiste"— en [El agregado de la plantilla](el-agregado-de-la-plantilla.md). Por ahora, devolver el hecho es el peldaño correcto.
+> 🌱 **Semilla — el agregado terminará GUARDÁNDOSE sus propios hechos.** Hoy `CambiarPlan` **devuelve** el hecho y el handler lo archiva (`stream.Append(hecho)`). Funciona y deja todo a la vista. Pero las herramientas de producción usan otro modelo: el agregado **se aplica el hecho a sí mismo y lo recuerda** en una lista de *cambios sin confirmar*, y al final **un solo paso** los persiste todos juntos (en una transacción). Cuando afinemos el motor a su forma de producción **invertiremos** esto —de "devolver y que otro guarde" a "el agregado acumula y un middleware persiste"— en [El agregado recuerda](el-agregado-recuerda.md). Por ahora, devolver el hecho es el peldaño correcto.
 
 ---
 

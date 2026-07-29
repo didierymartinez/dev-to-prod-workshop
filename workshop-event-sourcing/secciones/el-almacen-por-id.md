@@ -64,7 +64,7 @@ Fíjate: el **id es siempre un parámetro**. El almacén no sabe de empresas ni 
 > **No llames al almacén directo desde tu handler.** `GetEvents` y `AppendEvent` son plomería interna: los llama el `EventStream` que construyes enseguida. Tu handler usará `stream.Get()` y `stream.Append(hecho)`; al `store` solo le pides el stream con `AbrirStream`. Llamar `store.AppendEvent(id, hecho)` tú mismo **funciona aquí** (el stream solo reenvía), pero es un hábito que se rompe: en [Concurrencia optimista](concurrencia-optimista.md) `AppendEvent` pasa a recibir un **sobre con versión**, y saltarte el stream te salta ese control.
 
 > [!NOTE]
-> 🌱 **Semilla — este no será tu único almacén.** El de hoy guarda en RAM, perfecto para aprender. Pero más adelante nacerán **hermanos con otros propósitos**: uno contra una **base de datos real** para producción ([El swap](el-swap.md)) y uno **en memoria pensado para tests** ([El almacén abstracto](el-almacen-abstracto.md)). El día que existan varios, extraeremos una interfaz `IEventStore` para poder **intercambiarlos sin tocar el resto del código**.
+> 🌱 **Semilla — este no será tu único almacén.** El de hoy guarda en RAM, perfecto para aprender. Pero más adelante nacerán **hermanos con otros propósitos**: uno contra una **base de datos real** para producción y uno **en memoria pensado para tests**. El día que existan varios, extraeremos una interfaz `IEventStore` para poder **intercambiarlos sin tocar el resto del código**.
 
 ## El `EventStream`: ahora el almacén te lo entrega
 
@@ -186,7 +186,7 @@ Console.WriteLine($"emp-7: suspendida={andes.Suspendida}");
 Con esto, el id es **uno solo** que entregas **una vez**: se lo das al **almacén** al pedir el stream (`AbrirStream(id)`), y el **stream** se lo pasa en cada `GetEvents`/`AppendEvent` como la **llave del cajón**.
 
 > [!NOTE]
-> 🌱 **Semilla — este `EventStream` es un andamio.** Nos sirve para ver el ciclo (cargar → escribir). Pero el almacén de verdad (el que adoptaremos) **no te entrega un objeto así**: te da **directamente la empresa** rehidratada. Cuando lleguemos ahí, el `EventStream` **desaparece** (lo verás en [El swap](el-swap.md)). Es un peldaño, no la meta.
+> 🌱 **Semilla — este `EventStream` es un andamio.** Sirve para ver el ciclo (cargar → escribir), pero míralo bien: ya no guarda nada, solo reenvía. Una pieza que solo reenvía es candidata a sobrar.
 
 ---
 
@@ -202,7 +202,7 @@ EventStore
 ```
 
 > [!NOTE]
-> 🌱 **Semilla — reconstruir el estado es solo UNA vista de los eventos.** `Get()` recorre los hechos para armar la `Empresa`. Pero de **esos mismos** hechos podrías derivar otras vistas: un *listado por estado*, un *conteo de suspensiones por mes*… A cada vista derivada se le llama **proyección**, y a separar escritura (eventos) de lectura (proyecciones), **CQRS**. Lo verás en [Proyecciones](proyecciones.md).
+> 🌱 **Semilla — reconstruir el estado es solo UNA vista de los eventos.** `Get()` recorre los hechos para armar la `Empresa`. Pero de **esos mismos** hechos podrías derivar otras vistas: un *listado por estado*, un *conteo de suspensiones por mes*… A cada vista derivada se le llama **proyección**, y a separar escritura (eventos) de lectura (proyecciones), **CQRS**. Lo verás en [La vista de lectura](la-vista-de-lectura.md).
 
 Pero falta un peligro que aparece justo cuando hay **muchos escritores** sobre el mismo cajón: dos peticiones que tocan la misma empresa a la vez. Eso —y su cura— es la próxima sección.
 

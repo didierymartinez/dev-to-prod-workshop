@@ -128,7 +128,7 @@ Ahora, crear una `Factura` event-sourced es heredar de `AggregateRoot` y escribi
 > Las dos sirven para estandarizar ("toda entidad sabe cargar su historia"). La diferencia que importa **aquí**: una **clase abstracta** lleva **código real compartido** (el bucle `Load`, escrito una vez) y puede guardar **estado**; además es "incompleta" — no se crea sola con `new`. Una **interfaz** —la **lista de lo que una clase promete tener**, sin código propio— es ante todo un **contrato**: aunque el C# moderno le permite traer métodos *por defecto*, **no guarda estado de instancia**, y una clase puede implementar muchas. Como nuestro motor es **el mismo para todos** y pronto tendrá estado, encaja una clase abstracta: lo escribes **una vez** y cada hija lo hereda. (Con una interfaz, en la práctica, acabarías **repitiendo** el motor en cada clase.)
 
 > [!NOTE]
-> 🌱 **Semilla — este motor que escribes a mano, luego lo automatiza el framework.** El ciclo "cargar la historia → aplicar hecho por hecho" es tan universal que **las librerías que adoptaremos lo hacen por ti** (lo llaman el *Aggregate Handler Workflow*); lo verás al [conocer a Marten](conoce-a-marten.md). Lo construyes a mano ahora para que ese atajo, más adelante, **no sea magia**: sabrás exactamente qué hace por debajo, porque lo escribiste.
+> 🌱 **Semilla — este ciclo lo escribes a mano a propósito.** "Cargar la historia → aplicar hecho por hecho" es tan universal que tarde o temprano algo lo hará por ti. Lo construyes ahora para que ese atajo, cuando un muro real lo reclame, no sea magia: sabrás qué hace por debajo, porque lo escribiste.
 
 ## 🔧 Refactor 3: del `if` encadenado al `switch`
 
@@ -188,7 +188,7 @@ Cada `case` es "si el hecho es de **este tipo**, recíbelo ya convertido (`r`, `
 > ```
 > Funciona, y se parece a lo que un framework hace por dentro (un `Aplicar` por tipo, enrutado solo). **Pero** `(dynamic)` enruta en ejecución y **el compilador deja de verificarte los tipos**: si te falta un `Aplicar`, el error sale al correr el programa, no al compilar (y es más lento). Por eso **nos quedamos con el `switch`** de arriba: la misma idea, pero tipada.
 >
-> 🌱 Guarda eso sí la **forma** —un `Aplicar` por tipo—: es la que usan las herramientas que adoptaremos, y a la que el motor convergirá cuando adoptes [Marten](conoce-a-marten.md) (con un enrutador seguro, no `dynamic`).
+> 🌱 Guarda eso sí la **forma** —un `Aplicar` por tipo—: la volverás a encontrar más adelante, con un enrutador seguro en vez de `dynamic`. Cuando la veas, recuerda que aquí ya decidiste por qué el enrutado en ejecución no te sirve.
 
 ---
 
@@ -210,7 +210,7 @@ dotnet run
 
 ### El Descubrimiento
 
-En tres saltos —separar, subir a una base, y rutear por tipo— pasaste de un `if` que crecía feo a un **motor de replay reutilizable**: una clase base **`AggregateRoot`** con el bucle `Load`, y un `Aplicar` por entidad resuelto con **pattern matching**. No es un `if` mejorado: es la forma en que se escribe esto en serio. Y lo **escribiste tú** — por eso, cuando una librería te lo dé hecho, sabrás exactamente qué hace.
+En tres saltos —separar, subir a una base, y rutear por tipo— pasaste de un `if` que crecía feo a un **motor de replay reutilizable**: una clase base **`AggregateRoot`** con el bucle `Load`, y un `Aplicar` por entidad resuelto con **pattern matching**. No es un `if` mejorado: es la forma en que se escribe esto en serio. Y lo **escribiste tú** — por eso, cuando una librería te lo dé hecho, sabrás exactamente qué hace. Pero mira cómo lo usas: la historia sigue siendo una `List<object>` pelada que armas a mano y le pasas al constructor. Cualquiera puede reordenarla o meterle basura antes de que llegue. Ese cabo suelto es el siguiente.
 
 ---
 
@@ -227,7 +227,7 @@ En tres saltos —separar, subir a una base, y rutear por tipo— pasaste de un 
 
 Piensa la respuesta a esto (es tu reflexión de la sección):
 
-> 💭 ¿Por qué el motor (`Load`) vive en la base `AggregateRoot` y el `Aplicar` en cada entidad? ¿Qué ganó el `switch` frente al `if`?
+> 💭 ¿Por qué el motor (`Load`) vive en la base `AggregateRoot` y el `Aplicar` en cada entidad? ¿Qué ganó el `switch` frente al `if`? …y ¿qué habrías perdido si hubieras elegido el enrutado con `dynamic`? Esa última déjala también en tu `DECISIONES.md`: elegiste enrutado tipado — el compilador avisa si falta un `Aplicar`.
 
 Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
 

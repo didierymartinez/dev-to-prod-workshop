@@ -238,6 +238,8 @@ docker exec empresas-db psql -U postgres -c "SELECT version, tipo FROM eventos W
 
 Siguen **solo 2 filas** (registrada, suspendida): como nunca llegaste al `Commit`, Postgres descartó el pago. La empresa quedó **igual que antes del acto** — morosa y suspendida, sin media acción. **Quita el `throw`** y corre de nuevo: ahora el acto entra **entero** (4 filas; `DeudaPendiente=False`, `Suspendida=False`). Eso es lo que el archivo no podía darte.
 
+Guarda la letra pequeña de esta garantía: el todo-o-nada cubre lo que viaja DENTRO de la transacción. El día que un acto, además de grabarse, tenga que avisarle a algo que vive FUERA de la base, esa letra pequeña va a doler.
+
 **Prueba 2 — la concurrencia, gratis.** Como ya viste con dos escritores a la vez, ambos cargan la misma empresa e intentan guardar:
 
 ```csharp
@@ -248,6 +250,17 @@ eb.CambiarPlan("Enterprise"); b.Append(eb);   // B trae una versión ya ocupada 
 ```
 
 `b.Append` lanza `ConcurrencyException`: B cargó en la misma versión que A, A escribió primero, y el `PRIMARY KEY` rechazó la fila de B. No tuviste que escribir la verificación: la base la hace.
+
+**Prueba 3 — nacer dos veces.** La Prueba 2 protegió una empresa que **ya existía**. ¿Y una que aún no? Dos escritores abren un stream **virgen** y ambos lo registran:
+
+```csharp
+var v1 = store.AbrirStream<Empresa>("emp-9");  var e1 = v1.Get();   // no existe → versión 0
+var v2 = store.AbrirStream<Empresa>("emp-9");  var e2 = v2.Get();   // versión 0 también
+e1.Registrar("Andes-1", "Basico"); v1.Append(e1);   // el primer nacimiento entra en versión 1
+e2.Registrar("Andes-2", "Basico"); v2.Append(e2);   // el segundo trae la versión 1 ya ocupada → 💥 ConcurrencyException
+```
+
+El segundo nacimiento choca igual: ambos cargaron un stream vacío (versión 0) y ambos intentaron escribir la **versión 1**. `emp-9` queda con **una sola fila**. El `PRIMARY KEY` no solo protege las escrituras sobre una empresa existente: protege también el **nacimiento** del stream. Pero fíjate en el alcance de esa garantía: cubre un mismo **id** (`emp-9`). ¿Y si dos empresas **distintas** llegan con el mismo NIT bajo ids distintos (`emp-9` y `emp-42`)? El `PRIMARY KEY` no las ve chocar. Ese dolor queda abierto.
 
 > 🌱 Abre la tabla y mírala: tus hechos están ahí, en una base que **sabe consultar**. El negocio pide "dame **todas** las empresas con deuda pendiente ahora mismo". Tu instinto: `SELECT ... WHERE deuda`. Pero `datos` es JSONB opaco y "tiene deuda" no es una columna: es algo que sale de **rejugar** los hechos de cada empresa. Tienes un motor de consultas al lado y no puedes preguntarle lo que el negocio quiere. Ese es el próximo dolor.
 
@@ -264,6 +277,7 @@ La acción de varios hechos escondía un segundo problema que el archivo no deja
 - [ ] `docker exec empresas-db pg_isready -U postgres` responde *accepting connections*.
 - [ ] Con el `throw` antes del `Commit`, corres el acto y la consulta `SELECT ... FROM eventos` muestra **solo** los eventos previos — cero media acción. Sin el `throw`, entran los dos hechos del acto.
 - [ ] Reproduces la **Prueba 2**: el segundo escritor lanza `ConcurrencyException` por el `PRIMARY KEY`.
+- [ ] Reproduces la **Prueba 3**: dos nacimientos del mismo id virgen chocan; el stream queda con **una** fila.
 - [ ] Explica, con tus palabras, por qué un `File.AppendAllText` (o dos) no puede darte "todo o nada" y una transacción sí.
 - [ ] Explica de dónde salió tu `_version`, y qué hace ahora el `PRIMARY KEY(stream, version)` con él.
 

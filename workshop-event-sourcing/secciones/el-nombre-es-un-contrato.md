@@ -46,6 +46,8 @@ En disco, la línea se rotula con el nombre estable, nunca con la clase:
 {"Version":2,"Tipo":"plan-cambiado","Datos":{"NuevoPlan":"Enterprise"}}
 ```
 
+> 🔮 **Predice:** al escribir tienes el TIPO del hecho y tu mapa va nombre→clase. ¿Cómo consigues el nombre estable? ¿Qué te toca hacer con el mapa?
+
 Al **leer** ya tienes lo que necesitas: el mapa va del nombre a la clase. Al **escribir** te falta el otro sentido — tienes el hecho (su tipo) y necesitas su nombre estable. Un `Dictionary` solo sabe buscar por su llave, y tu mapa está llaveado por el **nombre**; con el tipo en mano no puedes preguntarle directo, así que lo **recorres** buscando ese tipo.
 
 > [!NOTE]
@@ -117,7 +119,7 @@ Ahora renombra `PlanCambiado` a lo que quieras (el IDE te cambia también el `ca
 
 > **¿Y si dejo las dos llaves en el mapa** —la vieja y la nueva, ambas al tipo de hoy— y no cambio nada más? Para leer, funciona. Pero como seguirías escribiendo `GetType().Name`, **cada** renombre te obliga a acumular otra llave para siempre, y el nombre en disco va cambiando con el tiempo. El nombre estable corta eso de raíz: lo que escribes ya no depende de cómo se llame la clase.
 
-> 🌱 Fíjate dónde vive ese mapa: dentro del `EventStore`. El almacén —que solo debería mover hechos— ahora tiene que **conocer por nombre cada evento del dominio**, y esa lista crece con cada evento nuevo. Y hay algo que el nombre estable no cubre: protege el **nombre** del evento, no su **forma**; el día que un evento gane o pierda un campo, los de disco tendrán la forma vieja. Dolores para más adelante.
+> 🌱 Fíjate dónde vive ese mapa: dentro del `EventStore`. El almacén —que solo debería mover hechos— ahora tiene que **conocer por nombre cada evento del dominio**, y esa lista crece con cada evento nuevo. Y hay algo que el nombre estable no cubre: protege el **nombre** del evento, no su **forma**; el día que un evento gane o pierda un campo, los de disco tendrán la forma vieja. Y un tercero, heredado del diario en disco: pagar-y-reactivar escribe DOS líneas, una por hecho — dos `AppendAllText` seguidos. ¿Qué pasa si el proceso muere entre la primera y la segunda? Dolores para más adelante — el último, para la próxima sección.
 
 ---
 
