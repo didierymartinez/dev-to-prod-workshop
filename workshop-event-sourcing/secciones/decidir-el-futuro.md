@@ -166,7 +166,7 @@ if (hecho is not null) stream.Append(hecho);
 
 ## 🧪 Pruébalo desde ya (solo léelo por ahora)
 
-`Suspender` y `CambiarPlan` son **funciones puras**: reciben un estado (la historia previa) y devuelven un hecho (o lo rechazan). Eso significa que se pueden probar **sin base de datos ni mocks**. Aquí **no** vamos a montar el proyecto de pruebas todavía (lo haremos en su propia sección, con la librería de aserciones — el `.Should()` que verás es de esa librería, no de C# de fábrica); **lee** este bloque solo para ver la **forma** —*Given* (historia previa) → *When* (actuar) → *Then* (verificar el hecho)—, no para ejecutarlo aún:
+`Suspender` y `CambiarPlan` son **funciones puras**: reciben un estado (la historia previa) y devuelven un hecho (o lo rechazan). Eso significa que se pueden probar **sin base de datos ni mocks**. Aquí **no** vamos a montar el proyecto de pruebas todavía (lo haremos en su propia sección); **lee** este bloque solo para ver la **forma** —*Given* (historia previa) → *When* (actuar) → *Then* (verificar el hecho)—, no para ejecutarlo aún:
 
 ```csharp
 // montamos una empresa desde su historia previa (Given) — sin base de datos, en memoria

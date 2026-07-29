@@ -81,15 +81,15 @@ falta, M8) · **nav** (repuntar enlace) · **tramo** (reescribir UNA línea).
 3. **predice** — antes de *"Esa secuencia ordenada de hechos tiene nombre: es un **Stream**."*: *"🔮 **Predice:** si mañana pasa algo real con la empresa pero nadie lo anota en esta lista… ¿qué sabrá tu sistema de eso?"* [M3·P1]
 
 **`refactorizando-el-motor`** *(media — la más desalineada del oro · 4)*
-4. **semilla** ⚠️deuda-v8 — la 🌱 que dice *"(lo llaman el Aggregate Handler Workflow); lo verás al [conocer a Marten](conoce-a-marten.md)"* (nombra a Marten + enlaza sección borrada) se reescribe: *"🌱 Este ciclo lo escribes a mano a propósito. «Cargar la historia → aplicar hecho por hecho» es tan universal que tarde o temprano algo lo hará por ti. Lo construyes ahora para que ese atajo, cuando un muro real lo reclame, no sea magia: sabrás qué hace por debajo, porque lo escribiste."* [brújula·M1/M5]
-5. **semilla** ⚠️deuda-v8 — *"a la que el motor convergirá cuando adoptes [Marten](conoce-a-marten.md)…"* → *"🌱 Guarda eso sí la forma —un `Aplicar` por tipo—: la volverás a encontrar más adelante, con un enrutador seguro en vez de `dynamic`. Cuando la veas, recuerda que aquí ya decidiste por qué el enrutado en ejecución no te sirve."* [brújula·M5]
+4. **semilla** ⚠️deuda-v8 — la 🌱 que dice *"(lo llaman el Aggregate Handler Workflow); lo verás al conocer a Marten (`conoce-a-marten.md`, borrador anterior)"* (nombra a Marten + enlaza sección borrada) se reescribe: *"🌱 Este ciclo lo escribes a mano a propósito. «Cargar la historia → aplicar hecho por hecho» es tan universal que tarde o temprano algo lo hará por ti. Lo construyes ahora para que ese atajo, cuando un muro real lo reclame, no sea magia: sabrás qué hace por debajo, porque lo escribiste."* [brújula·M1/M5]
+5. **semilla** ⚠️deuda-v8 — *"a la que el motor convergirá cuando adoptes Marten (`conoce-a-marten.md`, borrador anterior)…"* → *"🌱 Guarda eso sí la forma —un `Aplicar` por tipo—: la volverás a encontrar más adelante, con un enrutador seguro en vez de `dynamic`. Cuando la veas, recuerda que aquí ya decidiste por qué el enrutado en ejecución no te sirve."* [brújula·M5]
 6. **semilla** — tras *"Y lo **escribiste tú** — por eso, cuando una librería te lo dé hecho, sabrás exactamente qué hace."* añadir: *"Pero mira cómo lo usas: la historia sigue siendo una `List<object>` pelada que armas a mano y le pasas al constructor. Cualquiera puede reordenarla o meterle basura antes de que llegue. Ese cabo suelto es el siguiente."* → repara la **costura débil →el-flujo-de-vida** [M1]
 7. **micro-decisión** — extender la reflexión *"¿Qué ganó el `switch` frente al `if`?"* con: *"…y ¿qué habrías perdido si hubieras elegido el enrutado con `dynamic`?"* — que registre la decisión de mantenedor que ya tomó [M2·P6]
 
 **`el-flujo-de-vida`** *(alta · 0 cambios — costura ejemplar hacia decidir-el-futuro)*
 
 **`decidir-el-futuro`** *(alta · 2)*
-8. **nav** ⚠️deuda-v8 — la semilla *"en [El agregado de la plantilla](el-agregado-de-la-plantilla.md)"* (borrada en v8) se repunta a *"[El agregado recuerda](el-agregado-recuerda.md)"* — la sección viva que HOY paga esa deuda [M5·P1]
+8. **nav** ⚠️deuda-v8 — la semilla *"en El agregado de la plantilla (`el-agregado-de-la-plantilla.md`, borrador anterior)"* (borrada en v8) se repunta a *"[El agregado recuerda](secciones/el-agregado-recuerda.md)"* — la sección viva que HOY paga esa deuda [M5·P1]
 9. **predice** — antes de *"El agregado es el **guardián de las reglas**, así que la defensa nace **dentro** de la `Empresa`…"*: *"🔮 **Predice:** tienes dos lugares para la guarda: `CambiarPlan` (decide) o el `switch Aplicar` (evolve). ¿Cuál eliges — y qué pasaría al REJUGAR una historia ya archivada si `Aplicar` pudiera rechazar un hecho?"* → primera pata del enriquecimiento **Apply puro** (insumo #4) [M3·P1/P4]
 
 **`el-command-handler`** *(alta · 1)*
@@ -102,9 +102,9 @@ falta, M8) · **nav** (repuntar enlace) · **tramo** (reescribir UNA línea).
 14. **tramo** — el cierre *"…y es justo lo que Wolverine industrializará con discovery + InvokeAsync"* → *"— y el molde con el que, mucho más adelante, reconocerás a cualquier herramienta que ofrezca despachar por ti."* [M1·P6]
 
 **`el-almacen-por-id`** *(media · 3 — todos deuda-v8)*
-15. **nav** — quitar los links rotos *"([El swap](el-swap.md))"* y *"([El almacén abstracto](el-almacen-abstracto.md))"*, dejando la frase sin enlaces; la semilla (extraer `IEventStore`) se conserva — es el hilo hacia S2 [P6/P2]
+15. **nav** — quitar los links rotos *"(El swap (`el-swap.md`, borrador anterior))"* y *"(El almacén abstracto (`el-almacen-abstracto.md`, borrador anterior))"*, dejando la frase sin enlaces; la semilla (extraer `IEventStore`) se conserva — es el hilo hacia S2 [P6/P2]
 16. **semilla** — *"Pero el almacén de verdad (el que adoptaremos) no te entrega un objeto así…"* → *"🌱 Este EventStream es un andamio. Sirve para ver el ciclo (cargar → escribir), pero míralo bien: ya no guarda nada, solo reenvía. Una pieza que solo reenvía es candidata a sobrar."* ("el que adoptaremos" adelanta la respuesta) [M1]
-17. **nav** — *"Lo verás en [Proyecciones](proyecciones.md)"* (borrada) → *"Lo verás en [La vista de lectura](la-vista-de-lectura.md)"* [P3]
+17. **nav** — *"Lo verás en Proyecciones (`proyecciones.md`, borrador anterior)"* (borrada) → *"Lo verás en [La vista de lectura](secciones/la-vista-de-lectura.md)"* [P3]
 
 **`concurrencia-optimista`** *(alta · 1)*
 18. **semilla** — extender *"pero lo has probado leyendo la consola con los ojos, y todo vive en RAM…"* con: *"— y el choque lo provocaste tú, a mano, con dos streams en secuencia. Nadie ha demostrado que con N escrituras de verdad en paralelo solo una gana; esa duda queda abierta —"* → ubica el enriquecimiento del insumo #3 como semilla (único tipo legal en oro); la paga S1 [P2/P5]

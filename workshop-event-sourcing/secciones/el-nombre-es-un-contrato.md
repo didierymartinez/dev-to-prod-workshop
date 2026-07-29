@@ -32,7 +32,7 @@ Ahora el negocio deja de decir "cambiar plan" y empieza a decir "actualizar plan
 > 💥 KeyNotFoundException: The given key 'PlanCambiado' was not present in the dictionary.
 > ```
 >
-> No olvidaste nada: un refactor de rutina dejó ilegible tu pasado, y ni el compilador ni "probar a ojo" te avisaron.
+> No olvidaste nada: un refactor de rutina dejó ilegible tu pasado, y ni el compilador ni "probar a ojo" te avisaron. *(Como en la sección pasada, es un choque de serialización/disco que el arnés en RAM de [Verde, y roto](./verde-y-roto.md) todavía no atrapa — por eso el experimento se corre y se mira.)*
 
 El problema de fondo: el disco es permanente, pero los nombres de tus clases son tuyos y los cambias cuando quieras. **El nombre que escribes en el disco es una promesa que tu código futuro tiene que cumplir** — y `GetType().Name` la ata a algo que no prometiste dejar quieto.
 
@@ -68,6 +68,7 @@ public class EventStore
         ["plan-cambiado"]      = typeof(PlanCambiado),
         ["empresa-suspendida"] = typeof(EmpresaSuspendida),
         ["empresa-reactivada"] = typeof(EmpresaReactivada),
+        ["pago-registrado"]    = typeof(PagoRegistrado),
     };
 
     // Sentido inverso, para escribir: dado el tipo, encuentra su nombre estable.
