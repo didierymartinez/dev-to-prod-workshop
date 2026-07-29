@@ -47,7 +47,7 @@ No cambias tu motor: la `Empresa`, los handlers, incluso el `EventStream.Get()` 
 
 ### Paso 1 · Levanta Postgres
 
-Ya usaste Docker en el taller de DevOps; aquí es un comando:
+Si ya usaste Docker te será familiar; aquí es un solo comando:
 
 ```bash
 docker run -d --name empresas-db -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:16
@@ -256,13 +256,13 @@ eb.CambiarPlan("Enterprise"); b.Append(eb);   // B trae una versión ya ocupada 
 ```csharp
 var v1 = store.AbrirStream<Empresa>("emp-9");  var e1 = v1.Get();   // no existe → versión 0
 var v2 = store.AbrirStream<Empresa>("emp-9");  var e2 = v2.Get();   // versión 0 también
-e1.Registrar("Andes-1", "Basico"); v1.Append(e1);   // el primer nacimiento entra en versión 1
-e2.Registrar("Andes-2", "Basico"); v2.Append(e2);   // el segundo trae la versión 1 ya ocupada → 💥 ConcurrencyException
+e1.Registrar("Andes-1", "Básico"); v1.Append(e1);   // el primer nacimiento entra en versión 1
+e2.Registrar("Andes-2", "Básico"); v2.Append(e2);   // el segundo trae la versión 1 ya ocupada → 💥 ConcurrencyException
 ```
 
 El segundo nacimiento choca igual: ambos cargaron un stream vacío (versión 0) y ambos intentaron escribir la **versión 1**. `emp-9` queda con **una sola fila**. El `PRIMARY KEY` no solo protege las escrituras sobre una empresa existente: protege también el **nacimiento** del stream. Pero fíjate en el alcance de esa garantía: cubre un mismo **id** (`emp-9`). ¿Y si dos empresas **distintas** llegan con el mismo NIT bajo ids distintos (`emp-9` y `emp-42`)? El `PRIMARY KEY` no las ve chocar. Ese dolor queda abierto.
 
-> 🌱 Abre la tabla y mírala: tus hechos están ahí, en una base que **sabe consultar**. El negocio pide "dame **todas** las empresas con deuda pendiente ahora mismo". Tu instinto: `SELECT ... WHERE deuda`. Pero `datos` es JSONB opaco y "tiene deuda" no es una columna: es algo que sale de **rejugar** los hechos de cada empresa. Tienes un motor de consultas al lado y no puedes preguntarle lo que el negocio quiere. Ese es el próximo dolor.
+> 🌱 Abre la tabla y mírala: tus hechos están ahí, en una base que **sabe consultar**. El negocio pide "dame **todas** las empresas suspendidas ahora mismo". Tu instinto: `SELECT ... WHERE suspendida`. Pero `datos` es JSONB opaco y "está suspendida" no es una columna: es algo que sale de **rejugar** los hechos de cada empresa. Tienes un motor de consultas al lado y no puedes preguntarle lo que el negocio quiere. Ese es el próximo dolor.
 
 ---
 

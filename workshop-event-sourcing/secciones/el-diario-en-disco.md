@@ -87,9 +87,11 @@ Registras la empresa, le cambias el plan a "Enterprise" y la suspendes, usando e
 ```csharp
 var store = new EventStore("datos");
 var s = store.AbrirStream<Empresa>("emp-7");
-s.Append(new EmpresaRegistrada("Constructora Andes", "Básico"));
-s.Append(new PlanCambiado("Enterprise"));
-s.Append(new EmpresaSuspendida("falta de pago"));
+var e = s.Get();
+e.Registrar("Constructora Andes", "Básico");
+e.CambiarPlan("Enterprise");           // cambiar de plan ANTES de suspender (CambiarPlan lanza si está suspendida)
+e.Suspender("falta de pago");
+s.Append(e);                           // el modelo acumulador de §11: Append recibe el agregado, no el hecho
 ```
 
 Abre el archivo `datos/emp-7.log`: los hechos **están ahí**.
@@ -108,7 +110,7 @@ Console.WriteLine($"{empresa.Nombre}: {empresa.Plan}, {(empresa.Suspendida ? "su
 // Obtenido : ": , activa"   ← ¡vacío! (esperado: Constructora Andes: Enterprise, suspendida)
 ```
 
-No explota. No avisa. Devuelve una empresa que **parece** válida y es mentira — justo el error que "probar a ojo" (como venías haciendo) no atrapa.
+No explota. No avisa. Devuelve una empresa que **parece** válida y es mentira — justo el error que "probar a ojo" no atrapa. *(El arnés de tests de [Verde, y roto](./verde-y-roto.md) fija reglas en RAM; este choque es de **disco y reinicio** —otra corrida del proceso—, que el arnés en memoria aún no cubre. Por eso aquí verificas corriendo y mirando; fijarlo en un test propio llega con la persistencia real más adelante.)*
 
 > 🔮 Abre `datos/emp-7.log`: los datos están completos. Antes de seguir: ¿qué sabía cada hecho en RAM que estas líneas ya no dicen? Escribe tu hipótesis.
 
@@ -205,9 +207,11 @@ var store = new EventStore("datos");
 if (store.AbrirStream<Empresa>("emp-7").Get().Nombre == "")
 {
     var s = store.AbrirStream<Empresa>("emp-7");
-    s.Append(new EmpresaRegistrada("Constructora Andes", "Básico"));
-    s.Append(new PlanCambiado("Enterprise"));
-    s.Append(new EmpresaSuspendida("falta de pago"));
+    var e = s.Get();
+    e.Registrar("Constructora Andes", "Básico");
+    e.CambiarPlan("Enterprise");
+    e.Suspender("falta de pago");
+    s.Append(e);
 }
 
 var empresa = store.AbrirStream<Empresa>("emp-7").Get();
