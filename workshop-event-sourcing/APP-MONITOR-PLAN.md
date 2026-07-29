@@ -114,9 +114,14 @@ cercano a su fuente). Lo que ajusta nuestra definición:
 el nombre exacto de la tabla de *progression* del daemon de Marten (para el rezago), los *source names* de
 OTel de Marten/Wolverine, y el esquema de dead-letter de Wolverine.
 
-**Estado: listo para construir.** Decisiones cerradas (React SPA + .NET API; siempre última versión;
-`gestion-empresas` como app observada; repo `cosmos-trace`). El próximo prompt puede ser "constrúyelo":
-arranco por el *walking skeleton* y de ahí panel por panel, verificado.
+**Estado: walking skeleton FUNCIONAL** (jul 2026). En `didierymartinez/cosmos-trace` (commit local, sin
+push): `src/CosmosTrace.Api` (ASP.NET Core .NET 10 + Npgsql 10.0.3) lee **agentless** el Postgres del
+proyecto observado y sirve `/api/streams` (Event Store), `/api/streams/{id}` (Activity Timeline) y
+`/api/lag` (**rezago** = frente − checkpoint). **Verificado con `curl` contra Postgres real** (rezago=2
+sobre datos sembrados). Decisiones cerradas: React SPA + .NET API, siempre última versión (Npgsql 10.0.3,
+Aspire 13.4.6, .NET 10.0.10, React 19.2.8), `gestion-empresas` como app observada. **Siguiente:** Aspire
+AppHost (orquestar Postgres + gestion-empresas + API + SPA), SPA React (paneles, SignalR), vía
+OTel→Prometheus→PromQL para métricas, y los paneles sobre `mt_events`/Wolverine tras el swap.
 
 ## Se conecta a los datos del alumno — nunca inventa
 

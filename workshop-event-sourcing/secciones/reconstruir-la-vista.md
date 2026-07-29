@@ -171,4 +171,4 @@ Los hechos no se re-ejecutan, pero las conclusiones **sí se re-derivan**: la vi
 
 [⬅️ Volver: La pregunta que el diario no sabe responder](./la-vista-de-lectura.md)
 
-➡️ *Siguiente: reconstruir a mano no sirve para el día a día, y mantener la vista a pulso es frágil — falta que se mantenga sola sabiendo hasta dónde leyó. Ese dolor se vive a continuación, sin plano por delante ([método](../CRITTERWATCH-BRUJULA.md)).*
+[➡️ Siguiente: La vista se mantiene sola](./la-vista-se-mantiene-sola.md)

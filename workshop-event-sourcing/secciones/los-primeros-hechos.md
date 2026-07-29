@@ -192,7 +192,7 @@ git commit -m "ES · Los primeros hechos" -m "<aquí TU respuesta, con tus palab
 git push
 ```
 
-Y desde hoy, una cosa más: crea junto a tu código un archivo `DECISIONES.md`. Cada sección dejarás ahí **una línea** con la decisión que tomaste y por qué — el commit cuenta lo que hiciste; este archivo, lo que **decidiste**. La primera:
+Y desde hoy, una cosa más: crea junto a tu código un archivo `DECISIONES.md`. Cada vez que tomes una **decisión de criterio** —por qué elegiste esto y no aquello— dejarás ahí **una línea** — el commit cuenta lo que hiciste; este archivo, lo que **decidiste**. La primera:
 
 > Los hechos son `record` inmutables: nadie —ni yo— puede editar el pasado; el estado se reconstruye rejugándolos.
 
