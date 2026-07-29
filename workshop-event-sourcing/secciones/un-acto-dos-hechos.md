@@ -75,6 +75,8 @@ new PagarDeudaHandler(store).Handle(new PagarDeuda("emp-7", 500));
 💥 ReglaDeNegocioException: No puedes reactivar con deuda pendiente.
 ```
 
+> 🔮 **Predice:** la empresa acaba de pagar y `Reactivar` igual la rechaza. Antes de leer la explicación: ¿qué mira `Reactivar` para decidir, y qué NO ha visto todavía?
+
 La empresa **acaba de pagar** y aun así `Reactivar` la rechaza por deuda. ¿Por qué? `Reactivar()` mira `e` para decidir, y `e` **no vio el pago**. Tus `decide` **devuelven** el hecho pero no se lo aplican al agregado — el estado de `e` solo cambia cuando **recargas** (el replay). Con un hecho por acción nunca se notó; aquí el segundo `decide` decide **a ciegas**: `e.DeudaPendiente` sigue en `true` aunque la línea anterior registró el pago.
 
 ---

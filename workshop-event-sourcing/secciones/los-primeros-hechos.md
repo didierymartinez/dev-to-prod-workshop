@@ -60,6 +60,8 @@ var historia = new List<object>
 };
 ```
 
+> 🔮 **Predice:** si mañana pasa algo real con la empresa pero nadie lo anota en esta lista… ¿qué sabrá tu sistema de eso?
+
 Esa secuencia ordenada de hechos tiene nombre: es un **Stream**. Y no es "una lista más": es la **única fuente de la verdad**. Si un hecho no está en el stream, para tu sistema **nunca pasó**.
 
 ## Revivir el pasado
@@ -189,6 +191,10 @@ git add .
 git commit -m "ES · Los primeros hechos" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
+
+Y desde hoy, una cosa más: crea junto a tu código un archivo `DECISIONES.md`. Cada sección dejarás ahí **una línea** con la decisión que tomaste y por qué — el commit cuenta lo que hiciste; este archivo, lo que **decidiste**. La primera:
+
+> Los hechos son `record` inmutables: nadie —ni yo— puede editar el pasado; el estado se reconstruye rejugándolos.
 
 ---
 

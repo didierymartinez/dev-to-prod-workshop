@@ -199,12 +199,12 @@ Mira el despachador y verás a las dos piezas **ganando su sueldo** — y por qu
 Ninguna de las dos apareció "porque sí" en [El Command Handler](el-command-handler.md): **nacieron aquí, cuando el despachador las exigió**. Ese es el punto — un concepto se introduce cuando hay un trabajo que sin él no se puede hacer.
 
 > [!NOTE]
-> 🌳 **Cosecha — esto es lo que Wolverine hará por ti.** Acabas de construir las dos mitades de un **mediador** de comandos: `Registrar` (llenar la tabla *tipo → handler*) y `Enviar` (rutear por tipo). Cuando reveles Wolverine ([El gran reveal (2)](revelar-wolverine.md)): `Discovery.IncludeAssembly` hace tu `Registrar` —escanea el ensamblado y arma la tabla sola— y `bus.InvokeAsync(comando)` hace tu `Enviar`. Por eso, cuando Wolverine **descubre por convención**, tu `ICommandHandler<T>` se vuelve **opcional**: el framework encuentra el `Handle` solo. Pero tú, sin esa magia, **necesitabas** el contrato para escribir el despachador — y eso es lo que te deja entender qué hace el framework por dentro.
+> 🌳 **Cosecha — construiste un mediador.** Sus dos mitades: `Registrar` (llenar la tabla *tipo → handler*) y `Enviar` (rutear por tipo). El día que una herramienta ofrezca hacerlos por ti —armar la tabla sola y encontrar el `Handle` por convención— sabrás exactamente qué hace por dentro, y podrás juzgar si lo hace bien. Sin esa magia, **necesitabas** el contrato para escribir el despachador — y eso es lo que te deja entender qué hará cualquier framework por dentro.
 
 > [!NOTE]
-> 💡 **El `Despachador` es un andamio para *entender*, no la meta.** Lo construiste para **sentir** por qué hacían falta el tipo-comando y el contrato. Lo **seguirás usando** un tramo —de hecho, en la próxima sección lo usas tal cual, con handlers que ahora reciben el almacén—; pero cuando el motor se vuelva **async** (unas secciones adelante) este `Despachador` sencillo **dejará de encajar** (su `Handle` síncrono no casa con un `HandleAsync`). Ahí lo jubilamos: el despachador *de verdad* lo pone **Wolverine**.
+> 💡 **El `Despachador` es un andamio para *entender*, no la meta.** Lo construiste para **sentir** por qué hacían falta el tipo-comando y el contrato. Lo **seguirás usando** un tramo —de hecho, en la próxima sección lo usas tal cual, con handlers que ahora reciben el almacén—; pero llegará un dolor con el que este `Despachador` sencillo **deje de encajar**. Ese día lo jubilamos — y su reemplazo tendrá que ganarse el puesto.
 >
-> Dos cosas para anotar de su **cableado** (`Registrar(new SuspenderHandler(stream))`): (1) ata cada handler a **un** stream fijo — solo sirve con **una** empresa; cuando llegue el almacén-por-id ([El almacén por id](el-almacen-por-id.md)), el handler abrirá el stream **por id dentro de `Handle`**, no lo recibirá ya fijado. (2) Ese `new …` a mano —el del `Registrar` y el de cada handler— es el **germen del "infierno de los `new`"** que despacharás con **inyección de dependencias** unas secciones más adelante.
+> Dos cosas para anotar de su **cableado** (`Registrar(new SuspenderHandler(stream))`): (1) ata cada handler a **un** stream fijo — solo sirve con **una** empresa; cuando llegue el almacén-por-id ([El almacén por id](el-almacen-por-id.md)), el handler abrirá el stream **por id dentro de `Handle`**, no lo recibirá ya fijado. (2) Ese `new …` a mano —el del `Registrar` y el de cada handler— es el **germen del "infierno de los `new`"**: hoy son dos; el día que sean veinte, armar el grafo a mano va a doler, y ese dolor tiene cura con nombre (**inyección de dependencias**). La cobrarás cuando duela de verdad.
 
 ---
 
@@ -221,7 +221,7 @@ Pero todo esto sigue sobre **una sola** empresa, en un stream suelto. ¿Y cuando
 - [ ] Cada comando es un **`record`** propio, y los handlers reciben su comando (`Handle(CambiarPlanDeEmpresa)`), no un `string`.
 - [ ] Tus handlers implementan **`ICommandHandler<T>`**, y tu `Despachador` enruta un `object comando` a su handler por `comando.GetType()`, **sin** `switch` y sin nombrar clases.
 - [ ] Explicas por qué el despachador **necesita** las dos piezas: el `record` (para rutear por tipo — con `string` colisionarían) y la interfaz (para llamar `Handle` de forma tipada sin reflexión/`dynamic`).
-- [ ] Reconoces el mapeo: `Registrar` ≈ el *discovery* de Wolverine, `Enviar` ≈ `bus.InvokeAsync`.
+- [ ] Explicas qué tendría que darte una herramienta para jubilar tu Despachador: armar la tabla sola (tu `Registrar`) y rutear por tipo (tu `Enviar`).
 
 ---
 
@@ -243,7 +243,7 @@ git push
 
 ## 🧠 En una frase
 
-Para tener **un punto que rutee cualquier comando a su handler** nacen, en su momento de necesidad, el **`record` por comando** (identidad de tipo para rutear) y el contrato **`ICommandHandler<T>`** (molde común para tratarlos igual); el **`Despachador`** (`Dictionary<Type, Action<object>>`) los usa — y es justo lo que Wolverine industrializará con *discovery* + `InvokeAsync`.
+Para tener **un punto que rutee cualquier comando a su handler** nacen, en su momento de necesidad, el **`record` por comando** (identidad de tipo para rutear) y el contrato **`ICommandHandler<T>`** (molde común para tratarlos igual); el **`Despachador`** (`Dictionary<Type, Action<object>>`) los usa — y es el molde con el que, mucho más adelante, reconocerás a cualquier herramienta que ofrezca despachar por ti.
 
 ---
 

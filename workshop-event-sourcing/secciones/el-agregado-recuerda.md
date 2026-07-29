@@ -164,6 +164,8 @@ public class PagarDeudaHandler(EventStore store) : ICommandHandler<PagarDeuda>
 >
 > 🔨 **Rómpelo tú.** Haz que `Load` use `Emitir` en vez de `Aplicar`, rehidrata una empresa con historia y llama `Append`: revienta con `ConcurrencyException` (versión ya ocupada), porque re-escribió toda la historia que acababa de cargar. Devuélvelo a `Aplicar`. Por la misma razón `Append` termina con `MarcarConfirmados()`: los hechos que ya guardó están en el almacén; si no los quitara de la lista, el siguiente `Append` los reescribiría.
 
+> 🔨 **Rómpelo tú (el hecho huérfano).** Comenta la línea `case EmpresaReactivada:` en tu `Aplicar` y corre el arnés de pagar-y-reactivar. **Nada explota.** Pero recarga la empresa: `Suspendida` sigue en `true`. El hecho `EmpresaReactivada` **está** en el diario —cuéntalo si dudas—, y aun así el estado lo ignora. Un hecho sin su rama en `Aplicar` es un **huérfano**: no revienta, **miente** — y en silencio, que es peor. Restaura la línea.
+
 > Y la idempotencia sigue viva, pero cambió de mecanismo: ahora que `Emitir` **muta** el agregado, la guarda `if (Suspendida) return;` corta el no-op sin recargar. Recargar (`Get()` en cada handler) es lo que la garantiza **entre comandos** distintos.
 
 ## Un acto, dos hechos, juntos
@@ -189,7 +191,7 @@ Tras recargar → Suspendida=False, DeudaPendiente=False
 
 `Reactivar` decidió bien porque, esta vez, **vio el pago** que se acababa de aplicar. Y el acto entró como una **unidad** —un solo `Append` con los dos hechos acumulados, en versiones consecutivas—, no como dos escrituras sueltas.
 
-> 🌱 Tu modelo de escritura quedó **completo**: decide, valida, se aplica, acumula, versiona. Pero fíjate dónde vive todo esto — en un `Dictionary`, en **RAM**. Cierras el programa y desaparece: el diario todavía no sobrevive al reinicio. Ese es el próximo dolor.
+> 🌱 Tu modelo de escritura quedó **completo**: decide, valida, se aplica, acumula, versiona. Pero todo lo has comprobado **con los ojos**, leyendo la consola — y el hecho huérfano de hace un momento te mostró que el estado puede **mentir sin que nada explote**. ¿Cómo sabrías, *sin mirar*, que tu motor hace lo que crees? Ese es el próximo dolor.
 
 ---
 
@@ -210,7 +212,11 @@ El agregado dejó de ser una función que **devuelve** hechos y pasó a ser algo
 
 ## 📓 Registra tu avance
 
-Piensa la respuesta a esto (es tu reflexión de la sección):
+Primero, deja en tu `DECISIONES.md` la decisión de hoy:
+
+> `Aplicar` solo asigna estado: no valida, no mira el reloj ni genera ids — el replay lo re-ejecuta N veces y debe dar siempre lo mismo. Las reglas y los datos nuevos viven en los verbos (`CambiarPlan`, `Reactivar`), que corren UNA vez.
+
+Y piensa la respuesta a esto (es tu reflexión de la sección):
 
 > 💭 **Reto:** ¿qué gana el agregado al aplicarse el hecho en el momento de decidir, en vez de solo devolverlo? ¿Y por qué el replay no debe acumular lo que aplica?
 
@@ -232,4 +238,4 @@ El agregado se **aplica** cada hecho al decidir —para que el siguiente `decide
 
 [⬅️ Volver: Un acto de negocio, dos hechos](./un-acto-dos-hechos.md)
 
-[➡️ Siguiente: El diario en disco (y lo que se queda afuera)](./el-diario-en-disco.md)
+[➡️ Siguiente: Verde, y roto](./verde-y-roto.md)
