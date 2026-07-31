@@ -32,12 +32,26 @@ Necesitamos algo que el compilador **no nos deje mutar**. En C# eso es un `recor
 
 ```csharp
 public record EmpresaRegistrada(string Nombre, string Plan);
+```
+
+Un `record` nos da, sin escribir más, justo lo que un hecho necesita: es **inmutable** y se compara **por su contenido**, no por referencia. Pruébalo:
+
+```csharp
+var evento = new EmpresaRegistrada("Constructora Andes", "Básico");
+evento.Plan = "Premium";   // ❌ error de compilación: el pasado queda en piedra
+```
+
+> 🛠️ **Inténtalo tú.** El diario de "Constructora Andes" también anota que le cambiaron el plan, que la suspendieron y que la reactivaron. Crea, junto a `EmpresaRegistrada`, un `record` para cada uno de esos tres hechos — piensa qué dato mínimo necesita cargar cada uno (un cambio de plan necesita el plan nuevo; una suspensión, el motivo; una reactivación no necesita ningún dato extra).
+
+<details>
+<summary>👉 Muéstrame una forma de hacerlo</summary>
+
+```csharp
 public record PlanCambiado(string NuevoPlan);
 public record EmpresaSuspendida(string Motivo);
 public record EmpresaReactivada();
 ```
-
-Un `record` nos da, sin escribir más, justo lo que un hecho necesita: es **inmutable** (prueba `evento.Plan = "otro"` y no compila — el pasado queda en piedra) y se compara **por su contenido**, no por referencia.
+</details>
 
 > [!NOTE]
 > 🌱 **Semilla — los eventos son para siempre.** `EmpresaRegistrada` quedará escrito en el diario por años. ¿Qué pasa el día que el negocio quiera añadirle un campo `Sector`? No puedes editar el pasado. Ese problema tiene nombre y solución —*versionado de eventos / upcasting*— y lo veremos a fondo más adelante. Por ahora quédate con la idea: **un evento es un contrato inmutable con el futuro**; nómbralo y modélalo con cuidado.
@@ -47,17 +61,20 @@ Un `record` nos da, sin escribir más, justo lo que un hecho necesita: es **inmu
 
 ## El orden importa: un Stream
 
-Una suspensión antes de un registro no tendría sentido. Los hechos van **en el orden en que ocurrieron**. Escribe la historia de "Constructora Andes" (arriba, en el código suelto):
+Una suspensión antes de un registro no tendría sentido. Los hechos van **en el orden en que ocurrieron**. Primero, crea cada hecho de la historia de "Constructora Andes" (arriba, en el código suelto):
 
 ```csharp
-var historia = new List<object>
-{
-    new EmpresaRegistrada("Constructora Andes", "Básico"),
-    new PlanCambiado("Premium"),
-    new EmpresaSuspendida("falta de pago"),
-    new EmpresaReactivada(),
-    new EmpresaSuspendida("incumplimiento de contrato"),
-};
+var registrada = new EmpresaRegistrada("Constructora Andes", "Básico");
+var planCambiado = new PlanCambiado("Premium");
+var suspendida1 = new EmpresaSuspendida("falta de pago");
+var reactivada = new EmpresaReactivada();
+var suspendida2 = new EmpresaSuspendida("incumplimiento de contrato");
+```
+
+Y ahora ordénalos, en el orden en que pasaron:
+
+```csharp
+var historia = new List<object> { registrada, planCambiado, suspendida1, reactivada, suspendida2 };
 ```
 
 > 🔮 **Predice:** si mañana pasa algo real con la empresa pero nadie lo anota en esta lista… ¿qué sabrá tu sistema de eso?
@@ -71,7 +88,11 @@ Esa secuencia ordenada de hechos tiene nombre: es un **Stream**. Y no es "una li
 > [!NOTE]
 > 🆕 **Idioma de C#: `is Tipo x` (comprueba el tipo y captura).** `hecho is EmpresaRegistrada r` pregunta *¿este hecho es un `EmpresaRegistrada`?* y, si lo es, te lo entrega ya convertido en una variable nueva `r`, lista para leer sus datos (`r.Nombre`, `r.Plan`). Es el `if` con el que vas a distinguir cada tipo de hecho.
 
-> 🛠️ **Inténtalo tú.** Recorre `historia` reconstruyendo el estado hasta imprimir esta línea: `Constructora Andes: plan Premium, suspendida, reactivada 1 vez/veces`. Para eso declara cuatro variables (`nombre`, `plan`, `suspendida`, `reactivaciones`), recórrela con un `foreach`, y según el **tipo** de cada hecho actualiza la que toque (registrada → nombre y plan; plan cambiado → plan; suspendida → suspendida=true; reactivada → suspendida=false y +1 reactivación). Corre `dotnet run`.
+> 🛠️ **Inténtalo tú.** Vas a imprimir esto al final de tu código suelto:
+> ```csharp
+> Console.WriteLine($"{nombre}: plan {plan}, {(suspendida ? "suspendida" : "activa")}, reactivada {reactivaciones} vez/veces");
+> ```
+> Para que compile y muestre `Constructora Andes: plan Premium, suspendida, reactivada 1 vez/veces`, declara esas cuatro variables (`nombre`, `plan`, `suspendida`, `reactivaciones`) y recorre `historia` con un `foreach`, actualizando la que toque según el **tipo** de cada hecho (registrada → nombre y plan; plan cambiado → plan; suspendida → suspendida=true; reactivada → suspendida=false y +1 reactivación). Corre `dotnet run`.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -156,7 +177,7 @@ Console.WriteLine($"{empresa.Nombre}: plan {empresa.Plan}, {(empresa.Suspendida 
 
 > 🔍 **¿Lo lograste?** Corre `dotnet run`: la empresa se reconstruye igual (misma salida de arriba), pero ahora el estado vive **dentro** de un objeto que lo protege — y `empresa.Plan = "X"` ni siquiera compila.
 
-Esa clase que es **dueña** de la coherencia de la empresa, y el **único punto autorizado** para tocarla, tiene un nombre en diseño de dominio: **Aggregate Root** (raíz del agregado). Nadie le cambia el plan a `Empresa` por fuera; se lo pide a `Empresa`. (Esa frontera —que `Empresa` sea el único que decide— la construyes en [Decidir el futuro](decidir-el-futuro.md); por ahora, quédate con el nombre.)
+Esa clase que es **dueña** de la coherencia de la empresa, y el **único punto autorizado** para tocarla, tiene un nombre en diseño de dominio: **Aggregate Root** (raíz del agregado). Nadie le cambia el plan a `Empresa` por fuera; se lo pide a `Empresa`.
 
 > [!NOTE]
 > 🌱 Mira ese `foreach` con cuatro `if (hecho is …)` dentro del constructor. Funciona hoy, pero **crecerá feo**: cada hecho nuevo es otro `if`, y el día que tengas una `Factura` además de la `Empresa`, copiarías todo este bucle. En la próxima sección lo vamos a **sentir doler** y lo evolucionaremos paso a paso — el código nos pedirá una forma mejor.
