@@ -2,9 +2,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400&display=swap">
 <style>
-/* Layout: un juego a pantalla completa. El espacio es el canvas; arriba el HUD de la misión,
-   abajo a la izquierda la radio con COSMO (el copiloto), abajo a la derecha el minimapa.
-   Al llegar a un sector se abre la consola de construcción. Un solo look oscuro: es el espacio. */
+/* Layout: un juego a pantalla completa. El canvas es el espacio. Arriba, el marcador y el objetivo;
+   a la derecha, la ficha del sector (aduana, control del dron, mesa de Radicación); abajo a la
+   izquierda, la radio con COSMO; abajo a la derecha, los botones de acción. Los paneles grandes
+   (elegir, predecir, nombrar, glosario) se abren encima y pausan el juego. Un solo look oscuro. */
 :root {
   color-scheme: dark;
   --vacio: #050714;
@@ -12,9 +13,9 @@
   --borde: #283270;
   --texto: #eef0ff;
   --tenue: #98a0cf;
-  --oro: #ffb547;       /* Control Plane, recompensas */
-  --cian: #4fd1ff;      /* Application Plane, la nave */
-  --lila: #b48cff;      /* mensajería */
+  --oro: #ffb547;
+  --cian: #4fd1ff;
+  --lila: #b48cff;
   --ok: #43e6a0;
   --mal: #ff4d6d;
   --display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
@@ -24,730 +25,1318 @@
 html, body { height: 100%; }
 body { background: var(--vacio); color: var(--texto); font-family: var(--cuerpo); font-size: 15px; overflow: hidden; }
 #juego { position: fixed; inset: 0; }
-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#lienzo { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 button { font: inherit; color: inherit; cursor: pointer; }
-button:focus-visible { outline: 2px solid var(--oro); outline-offset: 2px; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--oro); outline-offset: 2px; }
+[hidden] { display: none !important; }
 
-.hud { position: absolute; top: calc(10px + env(safe-area-inset-top, 0px)); left: 16px; right: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; pointer-events: none; }
+.hud { position: absolute; top: calc(10px + env(safe-area-inset-top, 0px)); left: 16px; right: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; pointer-events: none; }
 .hud > * { pointer-events: auto; }
 .titulo { font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: 3px; text-transform: uppercase; text-shadow: 0 2px 10px #000; }
 .titulo span { color: var(--oro); }
-.medidor { display: flex; align-items: center; gap: 8px; background: #0a0f2ccc; border: 1px solid var(--borde); border-radius: 999px; padding: 5px 12px; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.medidor { background: #0a0f2ccc; border: 1px solid var(--borde); border-radius: 999px; padding: 5px 12px; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .medidor b { font-family: var(--display); color: var(--oro); }
-.barra { width: 110px; height: 6px; background: #1a2150; border-radius: 3px; overflow: hidden; }
-.barra i { display: block; height: 100%; background: linear-gradient(90deg, var(--cian), var(--ok)); transition: width 0.6s; }
 .empuje { flex: 1; }
-.boton { font-family: var(--display); font-weight: 500; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; padding: 7px 12px; border: 1px solid var(--borde); border-radius: 4px; background: #0d1336e6; white-space: nowrap; }
+.boton { font-family: var(--display); font-weight: 500; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; padding: 8px 12px; border: 1px solid var(--borde); border-radius: 4px; background: #0d1336e6; white-space: nowrap; }
 .boton:hover { border-color: var(--cian); }
 .boton.oro { background: #4a3510; border-color: var(--oro); color: #ffe2a8; }
 
-.radio { position: absolute; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: min(460px, calc(100% - 32px)); display: grid; grid-template-columns: 54px 1fr; gap: 12px; align-items: start; background: var(--panel); border: 1px solid var(--borde); border-radius: 10px; padding: 12px 14px; }
-.radio canvas { position: static; width: 54px; height: 54px; }
+.objetivo { position: absolute; top: calc(52px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); max-width: calc(100% - 32px); background: #0a0f2ce6; border: 1px solid var(--borde); border-radius: 8px; padding: 8px 14px; text-align: center; pointer-events: none; }
+.objetivo b { font-family: var(--display); font-size: 15px; letter-spacing: 1px; display: block; }
+.objetivo span { font-size: 13px; color: var(--tenue); font-variant-numeric: tabular-nums; }
+
+.ficha { position: absolute; right: 16px; top: calc(110px + env(safe-area-inset-top, 0px)); width: min(320px, calc(100% - 32px)); background: var(--panel); border: 1px solid var(--borde); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.ficha-t { font-family: var(--display); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--tenue); }
+.ficha dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 14px; }
+.ficha dt { color: var(--tenue); }
+.ficha .grande { font-family: var(--codigo); font-size: 22px; }
+.ficha .acciones-f { display: flex; flex-direction: column; gap: 6px; }
+.ficha .acciones-f button { text-align: left; padding: 9px 10px; border: 1px solid var(--borde); border-radius: 6px; background: #121a46; }
+.ficha .acciones-f button:hover { border-color: var(--cian); }
+.ficha .acciones-f kbd { font-family: var(--codigo); font-size: 12px; color: var(--oro); margin-right: 8px; }
+.ficha input[type=range] { width: 100%; accent-color: var(--oro); }
+.ficha .registro { font-family: var(--codigo); font-size: 12px; color: var(--tenue); line-height: 1.6; }
+.bandera { display: inline-block; width: 14px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 4px; }
+.si { color: var(--ok); } .no { color: var(--mal); } .oro { color: var(--oro); }
+.barra-t { height: 4px; background: #1a2150; border-radius: 2px; overflow: hidden; }
+.barra-t i { display: block; height: 100%; background: var(--oro); }
+
+.radio { position: absolute; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: min(470px, calc(100% - 120px)); display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 12px; align-items: start; background: var(--panel); border: 1px solid var(--borde); border-radius: 10px; padding: 12px 14px; }
+.radio canvas { width: 48px; height: 48px; }
 .radio .quien { font-family: var(--display); font-size: 11px; letter-spacing: 2px; color: var(--cian); text-transform: uppercase; }
-.radio p { line-height: 1.4; margin-top: 3px; }
-.radio .tecla { font-size: 12px; color: var(--tenue); margin-top: 6px; }
-.mini { position: absolute; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: 180px; height: 130px; background: #070b22d9; border: 1px solid var(--borde); border-radius: 8px; }
-.mini canvas { position: static; width: 180px; height: 130px; }
+.radio p { line-height: 1.45; margin-top: 3px; }
+#radio-acc:not(:empty) { margin-top: 8px; }
 
-.consola { position: absolute; inset: 0; display: grid; place-items: center; background: #02030acc; padding: 16px; }
-.caja { width: min(720px, 100%); max-height: calc(100% - 16px); overflow: auto; background: var(--panel); border: 1px solid var(--borde); border-radius: 12px; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 20px 80px #000; }
-.caja header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
-.caja .sector { font-family: var(--display); font-size: 12px; letter-spacing: 2px; color: var(--tenue); text-transform: uppercase; }
-.caja h2 { font-family: var(--display); font-weight: 700; font-size: 24px; letter-spacing: 1px; text-wrap: balance; width: 100%; }
-.etapas { display: flex; gap: 6px; }
-.etapas i { flex: 1; height: 4px; border-radius: 2px; background: #1a2150; }
-.etapas i.hecha { background: var(--oro); }
-.etapas i.ahora { background: var(--cian); }
-.caja h3 { font-family: var(--display); font-weight: 500; font-size: 12px; letter-spacing: 2px; color: var(--oro); text-transform: uppercase; }
-.caja p { line-height: 1.5; max-width: 64ch; }
-.caja pre { font-family: var(--codigo); font-size: 12.5px; background: #050716; border: 1px solid var(--borde); border-radius: 6px; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ok); }
-.opciones { display: grid; gap: 8px; }
-.opciones button { text-align: left; background: #0f1640; border: 1px solid var(--borde); border-radius: 6px; padding: 10px 14px; line-height: 1.35; }
-.opciones button:hover:not([disabled]) { border-color: var(--cian); }
-.opciones button.bien { border-color: var(--ok); background: #0e3329; }
-.opciones button.mal { border-color: var(--mal); background: #3a1022; }
-.piezas { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
-.pieza { text-align: left; background: #0f1640; border: 1px solid var(--borde); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.pieza b { font-family: var(--display); font-size: 14px; letter-spacing: 0.5px; }
-.pieza span { font-size: 13px; color: var(--tenue); line-height: 1.35; }
-.pieza.elegida { border-color: var(--ok); background: #0e3329; }
-.pieza.rechazada { border-color: var(--mal); background: #3a1022; }
-.pieza.rechazada span { color: #ffb3c1; }
-.nota { font-size: 14px; line-height: 1.45; }
-.nota.bien b { color: var(--ok); }
-.nota.mal b { color: var(--mal); }
-.fuente { font-size: 12px; color: var(--tenue); border-top: 1px dashed var(--borde); padding-top: 10px; }
-.acciones { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
-.acciones .boton { padding: 10px 16px; font-size: 13px; }
-.acciones .boton[disabled] { opacity: 0.35; cursor: default; }
-.bitacora .fila { display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--borde); }
-.bitacora .num { font-family: var(--display); font-weight: 700; color: var(--tenue); }
-.bitacora .fila.hecho .num { color: var(--ok); }
-.bitacora small { display: block; color: var(--tenue); font-size: 12px; }
+.acciones { position: absolute; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 10px; }
+.accion { width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--cian); background: #0d1336e6; font-family: var(--display); font-weight: 700; font-size: 20px; display: grid; place-content: center; line-height: 1; }
+.accion small { font-size: 10px; letter-spacing: 1px; color: var(--tenue); font-weight: 500; text-transform: uppercase; margin-top: 3px; }
+.accion.f { border-color: var(--mal); }
 
-@media (max-width: 640px) {
-  .mini { display: none; }
-  .radio { grid-template-columns: 40px 1fr; padding: 10px; }
-  .radio canvas { width: 40px; height: 40px; }
-  .caja { padding: 16px; }
-  .caja h2 { font-size: 20px; }
-  .barra { width: 70px; }
+.capa { position: absolute; inset: 0; display: grid; place-items: center; background: #02030acc; padding: 16px; }
+.caja { width: min(640px, 100%); max-height: calc(100% - 16px); overflow: auto; background: var(--panel); border: 1px solid var(--borde); border-radius: 12px; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 20px 80px #000; }
+.caja header { display: flex; flex-direction: column; gap: 4px; }
+.sector { font-family: var(--display); font-size: 12px; letter-spacing: 2px; color: var(--tenue); text-transform: uppercase; }
+.caja h2 { font-family: var(--display); font-weight: 700; font-size: 22px; letter-spacing: 0.5px; text-wrap: balance; }
+.caja p { line-height: 1.5; }
+.tenue { color: var(--tenue); }
+.opciones { display: flex; flex-direction: column; gap: 8px; }
+.opcion { text-align: left; padding: 12px 14px; border: 1px solid var(--borde); border-radius: 8px; background: #121a46; line-height: 1.4; }
+.opcion:hover:not(:disabled) { border-color: var(--cian); }
+.opcion:disabled { cursor: default; opacity: 0.55; }
+.opcion.bien { border-color: var(--ok); opacity: 1; background: #0f3a33; }
+.opcion.mal { border-color: var(--mal); background: #3a1022; }
+.nota { border-radius: 8px; padding: 12px 14px; line-height: 1.5; }
+.nota.bien { background: #0f3a33; border: 1px solid #1f7a5f; }
+.nota.mal { background: #3a1022; border: 1px solid #7a1f3a; }
+.pie { display: flex; justify-content: flex-end; gap: 8px; }
+.pares { width: 100%; border-collapse: collapse; font-size: 14px; }
+.pares th { text-align: left; font-family: var(--display); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--tenue); padding: 0 8px 6px 0; }
+.pares td { border-top: 1px solid var(--borde); padding: 8px 8px 8px 0; vertical-align: middle; }
+.real { background: #0d1336; border-left: 3px solid var(--oro); border-radius: 0 8px 8px 0; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.chip { display: inline-block; font-family: var(--display); font-size: 13px; padding: 2px 9px; margin: 1px 0; border: 1px solid var(--oro); border-radius: 999px; background: #2a1f0a; color: #ffe2a8; }
+.chip:hover { background: #4a3510; }
+.lista-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.def dl { display: grid; gap: 4px 0; }
+.def dt { font-family: var(--display); font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--tenue); margin-top: 8px; }
+.def dd { line-height: 1.5; }
+#def { z-index: 5; }
+
+@media (max-width: 680px) {
+  .titulo { font-size: 14px; letter-spacing: 2px; }
+  .objetivo { top: calc(88px + env(safe-area-inset-top, 0px)); }
+  .ficha { top: auto; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); right: 16px; left: 16px; width: auto; padding: 10px 12px; gap: 6px; }
+  .radio { width: calc(100% - 32px); bottom: calc(86px + env(safe-area-inset-bottom, 0px)); grid-template-columns: 36px minmax(0, 1fr); padding: 10px 12px; }
+  .radio canvas { width: 36px; height: 36px; }
+  .radio p { font-size: 14px; }
+  .accion { width: 56px; height: 56px; }
 }
-@media (prefers-reduced-motion: reduce) { .barra i { transition: none; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
 <div id="juego">
-  <canvas id="lienzo" aria-label="El espacio de Cosmos: pilota la nave hasta cada sector para construirlo"></canvas>
+  <canvas id="lienzo" aria-label="El espacio de Cosmos: tu nave y los sectores"></canvas>
 
   <div class="hud">
     <div class="titulo">Misión <span>Cosmos</span></div>
-    <div class="medidor">Construido <b id="h-sectores">0/0</b><div class="barra"><i id="h-barra" style="width:0"></i></div></div>
-    <div class="medidor">★ <b id="h-estrellas">0</b> estrellas</div>
-    <span class="empuje"></span>
-    <button class="boton" id="b-bitacora">Bitácora</button>
-    <button class="boton" id="b-rumbo">Rumbo al siguiente</button>
+    <div class="medidor">Sectores <b id="m-sec">0/3</b></div>
+    <div class="medidor"><b id="m-est">0</b> ★</div>
+    <div class="empuje"></div>
+    <button class="boton" id="b-glosario">Glosario · <span id="m-glo">0</span></button>
+    <button class="boton" id="b-reinicio">Reiniciar</button>
   </div>
 
-  <div class="radio" id="radio" aria-live="polite">
-    <canvas id="cara" width="108" height="108" aria-hidden="true"></canvas>
-    <div><div class="quien">COSMO · copiloto</div><p id="radio-texto"></p><div class="tecla" id="radio-tecla"></div></div>
-  </div>
-  <div class="mini"><canvas id="mapa" width="360" height="260" aria-label="Minimapa"></canvas></div>
+  <div class="objetivo" id="objetivo" hidden><b id="obj-t"></b><span id="obj-c"></span></div>
+  <div class="ficha" id="ficha" hidden></div>
 
-  <div class="consola" id="consola" hidden><div class="caja" id="caja" role="dialog" aria-modal="true"></div></div>
+  <div class="radio" role="status" aria-live="polite">
+    <canvas id="cara" width="96" height="96" aria-hidden="true"></canvas>
+    <div>
+      <div class="quien">COSMO · copiloto</div>
+      <p id="dice"></p>
+      <div id="radio-acc"></div>
+    </div>
+  </div>
+
+  <div class="acciones">
+    <button class="accion f" id="b-f" hidden>F<small>disparar</small></button>
+    <button class="accion" id="b-e">E<small>usar</small></button>
+  </div>
+
+  <div class="capa" id="capa" hidden><div class="caja" id="caja" role="dialog" aria-modal="true"></div></div>
+  <div class="capa" id="def" hidden><div class="caja def" id="def-caja" role="dialog" aria-modal="true"></div></div>
 </div>
 
 <script>
-// ══════════════════════ Contenido: los sectores del taller ══════════════════════
-// Cada sector es una sección del taller. Etapas: briefing → predicción → ensamblaje → construcción → prueba → bitácora.
-// `piezas`: el alumno elige las correctas; las incorrectas explican por qué no.
-// `estructura`: qué aparece en el espacio al construirlo · `prueba`: ruta de naves que la atraviesan.
-const SECTORES = [];   // se llena abajo (CONTENIDO)
+// ---------------------------------------------------------------------------
+// Regla de diseño: antes de la etapa "nombres", ningún término técnico aparece en pantalla.
+// Cada sector: lo haces a mano → sientes el problema → eliges qué construir → lo pruebas y
+// lo rompes → predices → recién ahí aprendes cómo se llama y cómo está en Cosmos hoy.
+// Cada término tiene su entrada en GLOSARIO, en lenguaje llano.
+// ---------------------------------------------------------------------------
 
-// ══════════════════════ Utilidades ══════════════════════
-const $ = id => document.getElementById(id);
-const K = { oro: '#ffb547', cian: '#4fd1ff', lila: '#b48cff', ok: '#43e6a0', mal: '#ff4d6d', texto: '#eef0ff', tenue: '#98a0cf', naranja: '#ff8f5a' };
-const lienzo = $('lienzo'), ctx = lienzo.getContext('2d');
+const GLOSARIO = {
+  'contenedor': {
+    llano: 'Un programa empacado junto con todo lo que necesita para correr, para que funcione igual en cualquier máquina.',
+    juego: 'Cada módulo del anillo.',
+    cosmos: 'Cada servicio de Cosmos (por ejemplo, la API de Radicación) corre como un contenedor de Docker.' },
+  'orquestador': {
+    llano: 'Un programa que vigila tus contenedores: los arranca, los reparte y repone los que se caen, sin que nadie se lo pida.',
+    juego: 'El dron.',
+    cosmos: 'Cosmos usa [[Docker Swarm]] como orquestador.' },
+  'Docker Swarm': {
+    llano: 'El orquestador que viene incluido en Docker. Le describes qué servicios quieres y cuántas copias de cada uno, y él lo mantiene así.',
+    juego: 'El modelo de dron que usa Cosmos.',
+    cosmos: 'Cada producto tiene un archivo stack.prod.yml que le dice a Swarm qué servicios correr y cómo.' },
+  'réplicas': {
+    llano: 'Copias idénticas del mismo contenedor. Si una cae, las demás siguen atendiendo.',
+    juego: 'Los módulos encendidos del anillo.',
+    cosmos: 'Hoy cada servicio de Cosmos corre con una sola réplica.' },
+  'estado deseado': {
+    llano: 'Lo que tú declaras que debe existir ("quiero 3 copias"). El orquestador compara eso con lo que hay y corrige la diferencia.',
+    juego: 'El número que pusiste en el control del dron.',
+    cosmos: 'Se escribe en el stack.prod.yml de cada producto.' },
+  'VM': {
+    llano: 'Máquina virtual: un computador que alquilas en la nube. Por dentro se comporta como un servidor completo.',
+    juego: 'La estación donde viven los módulos y el dron.',
+    cosmos: 'Cada producto tiene su propia VM, una para desarrollo y otra para producción.' },
+  'punto único de falla': {
+    llano: 'Una pieza que, si se cae, tumba todo lo que depende de ella, porque no hay otra que la reemplace.',
+    juego: 'La estación: si cae, caen el dron y todos los módulos.',
+    cosmos: 'Hoy cada producto vive en una sola [[VM]]. La documentación planea 3 para producción.' },
+  'Azure Front Door': {
+    llano: 'La puerta de entrada global de Microsoft Azure: recibe el tráfico de internet hacia tu dominio y lo envía al servicio correcto.',
+    juego: 'El portal oficial.',
+    cosmos: 'app.sincoerp.ai entra por Front Door, que reparte por ruta (/api/oxp, /api/impu…).' },
+  'X-Azure-FDID': {
+    llano: 'Un dato que Front Door agrega a cada petición con su identificador. Quien lo revisa sabe que la petición pasó por la entrada oficial.',
+    juego: 'El sello del portal.',
+    cosmos: 'El [[YARP]] del [[Application Plane]] rechaza las peticiones que no traen el identificador correcto.' },
+  'token JWT': {
+    llano: 'Un texto firmado digitalmente que dice quién eres. Cualquiera puede leerlo, pero nadie puede cambiarlo sin romper la firma.',
+    juego: 'El pasaporte.',
+    cosmos: '[[WorkOS]] lo entrega cuando el usuario inicia sesión, y viaja en cada petición.' },
+  'WorkOS': {
+    llano: 'Un servicio externo que se encarga del inicio de sesión de los usuarios y firma sus tokens.',
+    juego: 'La Oficina de Pasaportes.',
+    cosmos: 'Cada empresa cliente es una organización en WorkOS.' },
+  'tenant': {
+    llano: 'Cada cliente que usa el mismo software que los demás sin ver los datos de los otros. La palabra significa "inquilino".',
+    juego: 'Cada empresa: Andes, Sur y Norte.',
+    cosmos: 'La organización de [[WorkOS]] es el tenant de Cosmos. Los datos de todos los tenants viven en las mismas tablas, separados por una columna tenant_id.' },
+  'claim': {
+    llano: 'Cada dato escrito dentro de un token: tu correo, tu empresa, tu rol.',
+    juego: 'La empresa escrita en el pasaporte.',
+    cosmos: 'Los tokens de Cosmos llevan los claims tenant_id y user_email.' },
+  'header': {
+    llano: 'Una etiqueta que viaja pegada a una petición web. La escribe quien envía la petición, así que puede decir lo que quiera.',
+    juego: 'La bandera de la nave.',
+    cosmos: 'X-Tenant-Id es el header con el tenant. El [[YARP]] borra el que llega y lo vuelve a escribir con el tenant del [[token JWT]].' },
+  'YARP': {
+    llano: 'Un programa de Microsoft que se pone delante de tus servicios, revisa cada petición y la reenvía al destino correcto.',
+    juego: 'El robot de aduana.',
+    cosmos: 'Vive en la VM del [[Application Plane]]. Detrás de él, cada producto tiene su [[nginx]].' },
+  'Application Plane': {
+    llano: 'La parte de Cosmos que comparten todos los productos: la entrada, el inicio de sesión, el frontend.',
+    juego: 'La zona de la aduana, que sirve a todas las empresas.',
+    cosmos: 'Corre en su propia VM (vm-appl).' },
+  'nginx': {
+    llano: 'Un servidor web muy usado como repartidor: recibe peticiones y las pasa a otro servicio según la ruta.',
+    juego: 'Las compuertas de cada zona del planeta.',
+    cosmos: 'Cada producto tiene uno en su VM. No revisa tokens: confía en lo que ya revisó el [[YARP]].' },
+  'fail-open': {
+    llano: 'Cuando un control no puede revisar y deja pasar todo. Lo seguro casi siempre es lo contrario: no dejar pasar a nadie (fail-closed).',
+    juego: 'El robot sin lista de sellos que dejó entrar piratas.',
+    cosmos: 'La auditoría señaló este riesgo en la revisión del sello: hay que confirmar que, si falta la configuración, se rechaza.' },
+  'petición síncrona': {
+    llano: 'Pides algo y te quedas esperando la respuesta antes de hacer otra cosa.',
+    juego: 'Llevar la factura en la mano y esperar a que Radicación despierte.',
+    cosmos: 'Las pantallas de Cosmos llaman así al servidor: esperan su respuesta.' },
+  'cola de mensajes': {
+    llano: 'Un lugar donde un servicio deja mensajes y otro los recoge cuando puede. Los mensajes esperan ahí y no se pierden.',
+    juego: 'El buzón.',
+    cosmos: 'Radicacion-From-EntradasExchange es la cola donde Radicación recibe lo que avisa Entradas.' },
+  'mensajería asíncrona': {
+    llano: 'Enviar y seguir con lo tuyo, sin esperar respuesta. Quien recibe lo procesa a su ritmo.',
+    juego: 'Dejar la factura en el buzón y volver por la siguiente.',
+    cosmos: 'Los servicios de cada producto se avisan así entre ellos.' },
+  'RabbitMQ': {
+    llano: 'Un programa que maneja colas de mensajes. Se instala junto a tus servicios.',
+    juego: 'El buzón dentro del producto.',
+    cosmos: 'Lo usa OXP entre sus servicios: Entradas, Reconocimiento, Radicación…' },
+  'Azure Service Bus': {
+    llano: 'El servicio de colas de mensajes de Azure, administrado por Microsoft.',
+    juego: 'El buzón entre productos.',
+    cosmos: 'Hay uno solo para todos los productos, con un canal por cada tipo de aviso.' },
+  'entrega al menos una vez': {
+    llano: 'La promesa de que un mensaje siempre llega, aunque a veces llegue dos veces. Es el precio de no perder ninguno.',
+    juego: 'El buzón que repite la factura cuando duda.',
+    cosmos: 'Así entregan [[RabbitMQ]] y [[Azure Service Bus]].' },
+  'idempotencia': {
+    llano: 'Que hacer algo dos veces dé el mismo resultado que hacerlo una vez.',
+    juego: 'El registro de facturas radicadas.',
+    cosmos: 'Cada servicio de Cosmos que recibe mensajes debe tolerar los repetidos.' },
+};
+
+// ---------- Utilidades ----------
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = s => esc(s)
+  .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+  .replace(/\[\[(.+?)\]\]/g, (m, t) => `<button class="chip" data-t="${t}">${t}</button>`);
+const rnd = n => Math.floor(Math.random() * n);
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const barajar = a => { for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+let est = { h: [], g: [], e: 0 };
+try { const g = JSON.parse(localStorage.getItem('mision-cosmos-v2')); if (g && Array.isArray(g.h)) est = g; } catch (e) {}
+function guardar() { try { localStorage.setItem('mision-cosmos-v2', JSON.stringify(est)); } catch (e) {} actualizarHud(); }
+function sumar(n) { est.e += n; guardar(); flotante('+' + n + '★', nave.x, nave.y - 30, '#ffb547'); }
+function actualizarHud() {
+  $('#m-sec').textContent = est.h.length + '/' + SECTORES.length;
+  $('#m-est').textContent = est.e;
+  $('#m-glo').textContent = est.g.length;
+}
+
+// ---------- Radio, ficha, paneles ----------
+let pausa = false;
+function decir(texto, acc) {
+  $('#dice').innerHTML = fmt(texto);
+  const r = $('#radio-acc');
+  r.innerHTML = '';
+  if (acc) {
+    const b = document.createElement('button');
+    b.className = 'boton oro'; b.id = 'racc'; b.textContent = acc[0] + ' ›';
+    b.onclick = () => { r.innerHTML = ''; acc[1](); };
+    r.appendChild(b);
+  }
+}
+let fichaHtml = null;
+function ficha(html) {
+  const f = $('#ficha');
+  if (html == null) { f.hidden = true; fichaHtml = null; return; }
+  f.hidden = false;
+  if (html !== fichaHtml) { f.innerHTML = html; fichaHtml = html; }
+}
+function mostrarF(si) { $('#b-f').hidden = !si; }
+
+function abrir(html) {
+  $('#caja').innerHTML = html;
+  $('#capa').hidden = false; pausa = true;
+  const b = $('#caja').querySelector('button:not(:disabled)'); if (b) b.focus();
+}
+function cerrar() { $('#capa').hidden = true; pausa = !$('#def').hidden; }
+
+function eleccion(c) {
+  let fallos = 0;
+  abrir(`<header><span class="sector">Construye</span><h2>${esc(c.titulo)}</h2></header>
+    <p>${fmt(c.pregunta)}</p>
+    <div class="opciones">${c.opciones.map((o, i) => `<button class="opcion" data-i="${i}">${esc(o.t)}</button>`).join('')}</div>
+    <div class="nota" id="nota" hidden></div><div class="pie" id="pie"></div>`);
+  document.querySelectorAll('#caja .opcion').forEach(b => b.onclick = () => {
+    const o = c.opciones[+b.dataset.i], nota = $('#nota');
+    nota.hidden = false;
+    if (!o.ok) {
+      fallos++; b.disabled = true; b.classList.add('mal');
+      nota.className = 'nota mal'; nota.innerHTML = fmt(o.porque) + '<br><span class="tenue">Elige otra.</span>';
+      return;
+    }
+    document.querySelectorAll('#caja .opcion').forEach(x => x.disabled = true);
+    b.classList.add('bien');
+    const gana = fallos === 0 ? 2 : 0;
+    if (gana) sumar(gana);
+    nota.className = 'nota bien';
+    nota.innerHTML = fmt(o.porque) + (gana ? ` <b class="oro">+${gana}★</b>` : '');
+    $('#pie').innerHTML = '<button class="boton oro" id="sigue">Construirlo ›</button>';
+    $('#sigue').onclick = () => { cerrar(); c.luego(); };
+    $('#sigue').focus();
+  });
+}
+
+function prediccion(c) {
+  abrir(`<header><span class="sector">Predice antes de verlo</span><h2>${esc(c.titulo || '¿Qué crees que pasa?')}</h2></header>
+    <p>${fmt(c.pregunta)}</p>
+    <div class="opciones">${c.opciones.map((t, i) => `<button class="opcion" data-i="${i}">${esc(t)}</button>`).join('')}</div>
+    <div class="nota" id="nota" hidden></div><div class="pie" id="pie"></div>`);
+  document.querySelectorAll('#caja .opcion').forEach(b => b.onclick = () => {
+    const i = +b.dataset.i, bien = i === c.correcta, nota = $('#nota');
+    document.querySelectorAll('#caja .opcion').forEach((x, k) => { x.disabled = true; if (k === c.correcta) x.classList.add('bien'); });
+    if (!bien) b.classList.add('mal');
+    if (bien) sumar(3);
+    nota.hidden = false; nota.className = 'nota ' + (bien ? 'bien' : 'mal');
+    nota.innerHTML = (bien ? '<b>Exacto.</b> ' : '<b>No.</b> ') + fmt(c.explica) + (bien ? ' <b class="oro">+3★</b>' : '');
+    $('#pie').innerHTML = '<button class="boton oro" id="sigue">Seguir ›</button>';
+    $('#sigue').onclick = () => { cerrar(); c.luego(); };
+    $('#sigue').focus();
+  });
+}
+
+function bautizo(c) {
+  c.pares.forEach(([, t]) => { if (!est.g.includes(t)) est.g.push(t); });
+  guardar();
+  abrir(`<header><span class="sector">Ahora sí: los nombres</span><h2>Lo que construiste ya tiene nombre</h2></header>
+    <p class="tenue">Toca cada nombre para ver qué significa. Quedan guardados en tu Glosario.</p>
+    <table class="pares"><thead><tr><th>Lo que hiciste en el juego</th><th>Cómo se llama</th></tr></thead>
+    <tbody>${c.pares.map(([a, t]) => `<tr><td>${esc(a)}</td><td><button class="chip" data-t="${esc(t)}">${esc(t)}</button></td></tr>`).join('')}</tbody></table>
+    <div class="real"><span class="sector">Así está en Cosmos hoy</span><p>${fmt(c.real)}</p></div>
+    <div class="pie"><button class="boton oro" id="sigue">Completar sector · +5★</button></div>`);
+  $('#sigue').onclick = () => { cerrar(); c.luego(); };
+}
+
+function abrirDef(html) {
+  $('#def-caja').innerHTML = html;
+  $('#def').hidden = false; pausa = true;
+  const b = $('#def-caja').querySelector('button'); if (b) b.focus();
+}
+function cerrarDef() { $('#def').hidden = true; pausa = !$('#capa').hidden; }
+function definir(t, volverAGlosario) {
+  const d = GLOSARIO[t]; if (!d) return;
+  abrirDef(`<header><span class="sector">Glosario</span><h2>${esc(t)}</h2></header>
+    <dl><dt>En palabras simples</dt><dd>${fmt(d.llano)}</dd>
+    <dt>En el juego</dt><dd>${fmt(d.juego)}</dd>
+    <dt>En Cosmos</dt><dd>${fmt(d.cosmos)}</dd></dl>
+    <div class="pie">${volverAGlosario ? '<button class="boton" id="d-vol">‹ Glosario</button>' : ''}<button class="boton oro" id="d-cer">Cerrar</button></div>`);
+  $('#d-cer').onclick = cerrarDef;
+  if (volverAGlosario) $('#d-vol').onclick = glosario;
+}
+function glosario() {
+  abrirDef(`<header><span class="sector">Tu glosario</span><h2>${est.g.length} términos aprendidos</h2></header>
+    ${est.g.length ? `<div class="lista-chips">${est.g.map(t => `<button class="chip" data-t="${esc(t)}" data-gl="1">${esc(t)}</button>`).join('')}</div>`
+      : '<p class="tenue">Todavía ninguno. Los nombres se ganan al terminar cada sector, después de haber construido la pieza.</p>'}
+    <div class="pie"><button class="boton oro" id="d-cer">Cerrar</button></div>`);
+  $('#d-cer').onclick = cerrarDef;
+}
+
+// ---------- Efectos ----------
+const flotantes = [], particulas = [];
+function flotante(txt, x, y, c) { flotantes.push({ txt, x, y, c: c || '#eef0ff', t: 1.4 }); }
+function chispa(x, y, c, n) {
+  for (let i = 0; i < (n || 14); i++) {
+    const a = Math.random() * 6.283, v = 40 + Math.random() * 140;
+    particulas.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0.6 + Math.random() * 0.4, c });
+  }
+}
+
+// ---------- Nave ----------
+const nave = { x: 0, y: 80, vx: 0, vy: 0, ang: -Math.PI / 2 };
+let destino = null;
+const teclas = new Set();
+const cerca = (p, r) => Math.hypot(nave.x - p.x, nave.y - p.y) < r;
+
+// =====================================================================
+// SECTOR 1 · El astillero — mantener algo encendido sin estar tú ahí
+// =====================================================================
+function iniciarAstillero(def) {
+  const [cx, cy] = def.centro;
+  const S = { fase: 'intro', mods: [], met: [], pets: [], t: 0, perd: 0, aten: 0, manoP: 0, manoT: 0,
+    cadaMet: 2.3, relojMet: 1.2, relojPet: 0, dron: { x: cx, y: cy, obj: null }, deseado: 3,
+    rotos: 0, laser: null, crecio: false, tc: 0 };
+  const fuente = { x: cx - 430, y: cy };
+
+  function poner(n) {
+    const viejos = S.mods; S.mods = [];
+    for (let i = 0; i < n; i++) {
+      const a = -Math.PI / 2 + i * 2 * Math.PI / n;
+      S.mods.push({ x: cx + Math.cos(a) * 180, y: cy + Math.sin(a) * 105, vivo: viejos[i] ? viejos[i].vivo : true });
+    }
+  }
+  poner(3);
+
+  function meteoro() {
+    const vivos = S.mods.filter(m => m.vivo); if (!vivos.length) return;
+    const obj = vivos[rnd(vivos.length)], a = Math.random() * 6.283;
+    S.met.push({ x: cx + Math.cos(a) * 620, y: cy + Math.sin(a) * 520, obj });
+  }
+  function moverDron(dt) {
+    const d = S.dron;
+    if (!d.obj || d.obj.vivo || !S.mods.includes(d.obj))
+      d.obj = S.mods.filter(m => !m.vivo).sort((a, b) => dist(a, d) - dist(b, d))[0] || null;
+    const tx = d.obj ? d.obj.x : cx, ty = d.obj ? d.obj.y : cy;
+    const dx = tx - d.x, dy = ty - d.y, l = Math.hypot(dx, dy), v = 260 * dt;
+    if (l > v) { d.x += dx / l * v; d.y += dy / l * v; }
+    else { d.x = tx; d.y = ty; if (d.obj) { d.obj.vivo = true; chispa(d.obj.x, d.obj.y, '#43e6a0'); d.obj = null; } }
+  }
+  const pct = (p, t) => t ? Math.round(100 * p / t) : 0;
+
+  decir('Esta estación atiende clientes. Cada punto blanco que llega desde la izquierda es un pedido, y cada pedido va a uno de los módulos del anillo. Los meteoritos apagan módulos, y los pedidos que llegan a un módulo apagado se pierden. **Vuela a cada módulo rojo y pulsa E para encenderlo.** Tienes 40 segundos.',
+    ['Empezar', () => { S.fase = 'mano'; S.t = 40; S.perd = 0; S.aten = 0; }]);
+
+  function finMano() {
+    S.fase = 'espera'; S.manoP = S.perd; S.manoT = S.perd + S.aten; S.met = []; S.pets = [];
+    decir(`Se perdieron **${S.manoP} de ${S.manoT} pedidos (${pct(S.manoP, S.manoT)} %)**. Y eso fue con 6 módulos. Con 60 no darías abasto, y tú no puedes vivir aquí encendiendo módulos.`,
+      ['¿Qué construimos?', () => eleccion({
+        titulo: 'Los módulos se apagan solos',
+        pregunta: '¿Qué construimos para que la estación siga atendiendo sin ti?',
+        opciones: [
+          { t: 'Blindar los módulos para que nunca se apaguen', ok: false, porque: 'Algo siempre falla: un meteorito, un error del programa, la memoria que se acaba. No puedes evitar que un módulo caiga. Lo que sí puedes es reponerlo rápido.' },
+          { t: 'Un dron que sepa cuántos módulos deben estar encendidos y encienda solo los que se apaguen', ok: true, porque: 'El dron no necesita que nadie lo llame: compara lo que debería haber con lo que hay y corrige la diferencia, de día y de noche.' },
+          { t: 'Escribir un manual para que otro piloto los encienda', ok: false, porque: 'Sigue dependiendo de alguien despierto y atento. A las 3 de la mañana nadie lee el manual.' },
+        ],
+        luego: iniciarDron,
+      })]);
+  }
+  function iniciarDron() {
+    poner(S.deseado); S.mods.forEach(m => m.vivo = true);
+    S.fase = 'dron'; S.t = 25; S.perd = 0; S.aten = 0; S.cadaMet = 1.4;
+    S.dron.x = cx; S.dron.y = cy;
+    decir('Este es tu dron. En el control del dron le dices cuántos módulos deben estar encendidos, y él se encarga. **Pon 1 y mira qué pasa cuando cae ese único módulo. Después ponlo en 4.**');
+  }
+  function finDron() {
+    S.fase = 'espera'; S.met = []; ficha(null);
+    const tot = S.perd + S.aten;
+    decir(`Con el dron se perdieron **${S.perd} de ${tot} (${pct(S.perd, tot)} %)**. A mano fueron ${S.manoP} de ${S.manoT}. Y no moviste un dedo. ¿Notaste que con 1 módulo cada caída deja todo sin atender, y con 4 casi no se nota? Ahora ponlo a prueba: tú serás el meteorito.`,
+      ['Ponlo a prueba', () => {
+        S.fase = 'rompe'; S.rotos = 0; poner(Math.max(3, S.deseado)); S.mods.forEach(m => m.vivo = true); mostrarF(true);
+        decir('Acércate a un módulo encendido y **pulsa F para destruirlo**. Rompe 3 y mira qué hace el dron.');
+      }]);
+  }
+
+  return {
+    centro: { x: cx, y: cy },
+    update(dt) {
+      if (S.fase === 'mano' || S.fase === 'dron') {
+        S.relojMet -= dt;
+        if (S.relojMet <= 0) { S.relojMet = S.cadaMet * (0.7 + Math.random() * 0.6); meteoro(); }
+      }
+      if (S.fase === 'mano' || S.fase === 'dron' || S.fase === 'rompe') {
+        S.relojPet -= dt;
+        if (S.relojPet <= 0) { S.relojPet = 0.4; S.pets.push({ x: fuente.x, y: fuente.y + (Math.random() - 0.5) * 50, i: rnd(S.mods.length) }); }
+      }
+      for (let k = S.pets.length - 1; k >= 0; k--) {
+        const p = S.pets[k], m = S.mods[p.i % S.mods.length];
+        const dx = m.x - p.x, dy = m.y - p.y, l = Math.hypot(dx, dy), v = 330 * dt;
+        if (l > v) { p.x += dx / l * v; p.y += dy / l * v; continue; }
+        S.pets.splice(k, 1);
+        if (S.fase === 'espera') continue;
+        if (m.vivo) S.aten++; else { S.perd++; flotante('✕', m.x, m.y - 26, '#ff4d6d'); }
+      }
+      for (let k = S.met.length - 1; k >= 0; k--) {
+        const me = S.met[k];
+        if (!S.mods.includes(me.obj)) { S.met.splice(k, 1); continue; }
+        const dx = me.obj.x - me.x, dy = me.obj.y - me.y, l = Math.hypot(dx, dy), v = 180 * dt;
+        if (l > v + 14) { me.x += dx / l * v; me.y += dy / l * v; continue; }
+        S.met.splice(k, 1);
+        if (me.obj.vivo) { me.obj.vivo = false; chispa(me.obj.x, me.obj.y, '#ff8a5b', 18); }
+      }
+      if (S.laser) { S.laser.t -= dt; if (S.laser.t <= 0) S.laser = null; }
+      if (S.fase === 'mano') {
+        S.t -= dt;
+        if (S.t <= 24 && !S.crecio) {
+          S.crecio = true; poner(6); S.cadaMet = 1.2;
+          decir('¡Llegaron más clientes! El anillo creció a **6 módulos** y los meteoritos caen más seguido. Sigue encendiendo los rojos con E.');
+        }
+        if (S.t <= 0) finMano();
+      }
+      if (S.fase === 'dron') {
+        S.t -= dt; moverDron(dt);
+        ficha(`<div class="ficha-t">Control del dron</div>
+          <label for="deseado">Módulos que deben estar encendidos: <b class="oro">${S.deseado}</b></label>
+          <input type="range" id="deseado" min="1" max="6" value="${S.deseado}" data-acc="deseado">
+          <span class="tenue">Encendidos ahora: ${S.mods.filter(m => m.vivo).length} de ${S.mods.length}</span>`);
+        if (S.t <= 0) finDron();
+      }
+      if (S.fase === 'rompe') {
+        moverDron(dt);
+        if (S.rotos >= 3 && S.mods.every(m => m.vivo)) {
+          S.fase = 'espera'; mostrarF(false); S.pets = [];
+          prediccion({
+            pregunta: 'El dron repone todo lo que rompes. Pero el dron, los módulos y el anillo viven dentro de **la misma estación**. Si un meteorito gigante destruye la estación entera, ¿qué pasa?',
+            opciones: ['El dron la reconstruye', 'Todo se apaga hasta que alguien construya otra estación', 'Los módulos se mudan solos a otra estación'],
+            correcta: 1,
+            explica: 'El dron vive dentro de la estación: si ella cae, cae con él. Nada repone lo que está por encima del dron. La única defensa es tener más de una estación, y un dron que pueda mover módulos entre ellas.',
+            luego: () => { S.fase = 'caida'; S.tc = 2.4; chispa(cx, cy, '#ff4d6d', 60); decir('Así se ve: sin estación no hay dron, y sin dron nadie repone nada.'); },
+          });
+        }
+      }
+      if (S.fase === 'caida') {
+        S.tc -= dt;
+        if (S.tc <= 0) {
+          S.fase = 'fin';
+          bautizo({
+            pares: [
+              ['Cada módulo del anillo', 'contenedor'],
+              ['El dron que repone lo que cae', 'orquestador'],
+              ['El modelo de dron que usa Cosmos', 'Docker Swarm'],
+              ['Los módulos encendidos al mismo tiempo', 'réplicas'],
+              ['El número que pusiste en el control', 'estado deseado'],
+              ['La estación', 'VM'],
+              ['La estación, que si cae se lleva todo', 'punto único de falla'],
+            ],
+            real: 'Cada producto de Cosmos (OXP, Impuestos, Contabilidad…) tiene su propia [[VM]] con [[Docker Swarm]], una para desarrollo y otra para producción. Cada servicio es un [[contenedor]] y hoy corre con una sola copia (1 de [[réplicas]]): si se cae, Swarm lo vuelve a levantar. Al publicar una versión nueva, Swarm arranca el contenedor nuevo antes de apagar el viejo, y si el nuevo falla, vuelve al anterior. Lo que falta: cada producto vive en una sola VM, un [[punto único de falla]]. La documentación planea 3 VMs en producción.',
+            luego: () => terminarSector(def),
+          });
+        }
+      }
+    },
+    usar() {
+      if (S.fase !== 'mano') { if (S.fase === 'dron') flotante('El dron se encarga', nave.x, nave.y - 30, '#98a0cf'); return; }
+      const m = S.mods.filter(m => !m.vivo).sort((a, b) => dist(a, nave) - dist(b, nave))[0];
+      if (m && dist(m, nave) < 80) { m.vivo = true; chispa(m.x, m.y, '#43e6a0'); }
+      else flotante('Acércate a un módulo rojo', nave.x, nave.y - 30, '#98a0cf');
+    },
+    disparar() {
+      if (S.fase !== 'rompe') return;
+      const m = S.mods.filter(m => m.vivo).sort((a, b) => dist(a, nave) - dist(b, nave))[0];
+      if (!m || dist(m, nave) > 300) { flotante('Acércate a un módulo encendido', nave.x, nave.y - 30, '#98a0cf'); return; }
+      S.laser = { x1: nave.x, y1: nave.y, x2: m.x, y2: m.y, t: 0.25 };
+      m.vivo = false; S.rotos++; chispa(m.x, m.y, '#ff4d6d', 22);
+    },
+    accion(a, v) {
+      if (a === 'deseado' && v != null) { S.deseado = +v; poner(S.deseado); }
+    },
+    objetivo() {
+      if (S.fase === 'mano') return ['Mantén encendidos los módulos', `⏱ ${Math.ceil(S.t)} s · atendidos ${S.aten} · perdidos ${S.perd}`];
+      if (S.fase === 'dron') return ['Mira trabajar al dron', `⏱ ${Math.ceil(S.t)} s · atendidos ${S.aten} · perdidos ${S.perd}`];
+      if (S.fase === 'rompe') return ['Rompe 3 módulos con F', `${S.rotos}/3 rotos`];
+      return null;
+    },
+    dibujar(c) {
+      const caida = S.fase === 'caida' || S.fase === 'fin';
+      // fuente de pedidos
+      c.fillStyle = '#98a0cf'; c.font = '600 14px "Chakra Petch", sans-serif'; c.textAlign = 'center';
+      c.fillText('CLIENTES', fuente.x, fuente.y - 46);
+      c.strokeStyle = '#4fd1ff66'; c.lineWidth = 2;
+      c.beginPath(); c.arc(fuente.x, fuente.y, 26, 0, 6.283); c.stroke();
+      // estación (anillo estructural)
+      c.save();
+      c.strokeStyle = caida ? '#3a1022' : '#1b2a66'; c.lineWidth = 16;
+      c.beginPath(); c.ellipse(cx, cy, 180, 105, 0, 0, 6.283); c.stroke();
+      c.strokeStyle = caida ? '#ff4d6d55' : '#4fd1ff33'; c.lineWidth = 2;
+      c.beginPath(); c.ellipse(cx, cy, 214, 135, 0, 0, 6.283); c.stroke();
+      c.restore();
+      c.fillStyle = caida ? '#ff4d6d' : '#98a0cf'; c.font = '600 13px "Chakra Petch", sans-serif';
+      c.fillText(caida ? 'ESTACIÓN DESTRUIDA' : 'ESTACIÓN', cx, cy + 165);
+      // pedidos
+      c.fillStyle = '#eef0ff';
+      S.pets.forEach(p => { c.beginPath(); c.arc(p.x, p.y, 3.5, 0, 6.283); c.fill(); });
+      // módulos
+      S.mods.forEach(m => {
+        const vivo = m.vivo && !caida;
+        c.beginPath(); c.arc(m.x, m.y, 22, 0, 6.283);
+        c.fillStyle = vivo ? '#0f4a6a' : '#3a1022'; c.fill();
+        c.lineWidth = 3; c.strokeStyle = vivo ? '#4fd1ff' : '#ff4d6d'; c.stroke();
+        if (vivo) { c.fillStyle = '#4fd1ff'; c.beginPath(); c.arc(m.x, m.y, 7, 0, 6.283); c.fill(); }
+        else { c.strokeStyle = '#ff4d6d'; c.lineWidth = 3; c.beginPath(); c.moveTo(m.x - 7, m.y - 7); c.lineTo(m.x + 7, m.y + 7); c.moveTo(m.x + 7, m.y - 7); c.lineTo(m.x - 7, m.y + 7); c.stroke(); }
+        if (!m.vivo && S.fase === 'mano' && dist(m, nave) < 80) {
+          c.setLineDash([5, 5]); c.strokeStyle = '#ffb547'; c.lineWidth = 2;
+          c.beginPath(); c.arc(m.x, m.y, 34, 0, 6.283); c.stroke(); c.setLineDash([]);
+          c.fillStyle = '#ffb547'; c.font = '700 14px "Chakra Petch", sans-serif'; c.fillText('E', m.x, m.y - 40);
+        }
+      });
+      // meteoritos
+      S.met.forEach(me => {
+        const dx = me.obj.x - me.x, dy = me.obj.y - me.y, l = Math.hypot(dx, dy) || 1;
+        c.strokeStyle = '#ff8a5b55'; c.lineWidth = 6;
+        c.beginPath(); c.moveTo(me.x, me.y); c.lineTo(me.x - dx / l * 30, me.y - dy / l * 30); c.stroke();
+        c.fillStyle = '#a0603a'; c.beginPath(); c.arc(me.x, me.y, 9, 0, 6.283); c.fill();
+      });
+      // dron
+      if (['dron', 'rompe'].includes(S.fase) || (S.fase === 'espera' && S.manoT && S.fase !== 'mano' && S.dron.x !== cx)) {
+        const d = S.dron, g = performance.now() / 120;
+        c.save(); c.translate(d.x, d.y); c.rotate(g);
+        c.fillStyle = '#ffb547'; c.beginPath(); c.moveTo(0, -11); c.lineTo(11, 0); c.lineTo(0, 11); c.lineTo(-11, 0); c.closePath(); c.fill();
+        c.restore();
+        c.fillStyle = '#ffb547'; c.font = '600 12px "Chakra Petch", sans-serif'; c.fillText('DRON', d.x, d.y - 18);
+      }
+      if (S.laser) {
+        c.strokeStyle = '#ff4d6d'; c.lineWidth = 3;
+        c.beginPath(); c.moveTo(S.laser.x1, S.laser.y1); c.lineTo(S.laser.x2, S.laser.y2); c.stroke();
+      }
+    },
+  };
+}
+
+// =====================================================================
+// SECTOR 2 · La aduana — quién entra y a qué empresa
+// =====================================================================
+const EMPRESAS = [{ n: 'Andes', c: '#43e6a0' }, { n: 'Sur', c: '#ff8a5b' }, { n: 'Norte', c: '#7aa8ff' }];
+
+function iniciarAduana(def) {
+  const [cx, cy] = def.centro;
+  const P = { portal: { x: cx - 420, y: cy - 120 }, cint: { x: cx - 420, y: cy + 160 }, puerta: { x: cx - 10, y: cy }, planeta: { x: cx + 360, y: cy } };
+  const S = { fase: 'intro', ronda: 0, cola: [], idas: [], porSalir: [], relojSalida: 0, hechas: 0,
+    ok: 0, err: 0, filt: 0, t: 0, llegadas: 0, revisadas: 0, relojRobot: 0, sabot: false, ts: 0, rok: 0, rfilt: 0 };
+  const rocas = Array.from({ length: 26 }, () => ({ x: P.cint.x + (Math.random() - 0.5) * 220, y: P.cint.y + (Math.random() - 0.5) * 90, r: 3 + Math.random() * 8 }));
+  const zona = k => { const a = Math.PI + (k - 1) * 0.8; return { x: P.planeta.x + Math.cos(a) * 118, y: P.planeta.y + Math.sin(a) * 118, a }; };
+
+  function hacer(tipo) {
+    const e = rnd(3);
+    const n = { e, b: e, portal: tipo !== 'sinPortal', firma: tipo !== 'sinFirma', pirata: false };
+    if (tipo === 'cambia') n.b = (e + 1 + rnd(2)) % 3;
+    const o = n.portal ? P.portal : P.cint;
+    n.x = o.x + (Math.random() - 0.5) * 30; n.y = o.y + (Math.random() - 0.5) * 30;
+    return n;
+  }
+  const azar = r => {
+    const x = Math.random();
+    if (x < 0.3) return 'sinPortal';
+    if (r >= 2 && x < 0.5) return 'sinFirma';
+    if (r >= 3 && x < 0.7) return 'cambia';
+    return 'ok';
+  };
+  function correcta(n, r) {
+    if (!n.portal) return 'rechazar';
+    if (r >= 2 && !n.firma) return 'rechazar';
+    if (r >= 3 && n.b !== n.e) return 'cambiar';
+    return 'pasar';
+  }
+  const RONDAS = {
+    1: { tipos: ['ok', 'sinPortal', 'ok', 'sinPortal', 'ok', 'sinPortal'],
+      msg: 'Esta es la aduana del planeta Cosmos. Ahí viven tres empresas, cada una en su zona: **Andes, Sur y Norte**. Primera regla: **solo entra quien pasó por el portal oficial** (arriba a la izquierda). Las naves que vienen del cinturón de asteroides se lo saltaron. Acércate a la aduana y decide con la ficha (o con las teclas 1 y 2).' },
+    2: { tipos: ['ok', 'sinFirma', 'sinPortal', 'ok', 'sinFirma', 'ok'],
+      msg: 'Los piratas aprendieron a pasar por el portal. Ahora cada nave muestra su **pasaporte**. Uno auténtico lleva la **firma dorada** de la Oficina de Pasaportes; uno falso, un garabato. Revisa el sello y la firma.' },
+    3: { tipos: ['cambia', 'ok', 'sinFirma', 'cambia', 'sinPortal', 'cambia'],
+      msg: 'Última regla. Cada nave pinta una **bandera** con la empresa que dice ser, y la bandera decide a qué zona entra. Pero la bandera la pinta el piloto. Si no coincide con el pasaporte, **déjala pasar con la empresa del pasaporte** (botón 3).' },
+  };
+  function empezarRonda(r) {
+    S.ronda = r; S.hechas = 0; S.fase = 'ronda';
+    S.porSalir = barajar(RONDAS[r].tipos.slice()); S.relojSalida = 0.2;
+    decir(RONDAS[r].msg);
+  }
+  decir(RONDAS[1].msg, ['Abrir la aduana', () => empezarRonda(1)]);
+
+  function explicar(n, acc, ok) {
+    if (!n.portal && acc !== 'rechazar') return 'Esa nave llegó por el cinturón de asteroides: se saltó el portal. Sin sello, no entra.';
+    if (!n.firma && acc !== 'rechazar') return 'Ese pasaporte trae un garabato, no la firma dorada de la Oficina de Pasaportes. Es falso.';
+    if (ok === 'cambiar' && acc === 'pasar') return `Entró a la zona de ${EMPRESAS[n.b].n} con un pasaporte de ${EMPRESAS[n.e].n}. Ahora puede ver los datos de otra empresa. La bandera la pinta el piloto: créele al pasaporte.`;
+    if (ok === 'cambiar' && acc === 'rechazar') return 'El pasaporte es auténtico: no la rechaces. Solo ignora la bandera y usa la empresa del pasaporte.';
+    if (ok === 'pasar' && acc === 'rechazar') return 'Esa nave estaba en regla. Rechazar a un cliente legítimo también cuesta.';
+    return '';
+  }
+  function despachar(n, acc, quien) {
+    S.cola.shift();
+    if (acc === 'rechazar') { n.dest = { x: (n.portal ? P.portal : P.cint).x - 200, y: n.y + (Math.random() - 0.5) * 80 }; n.sale = true; }
+    else { const z = zona(acc === 'cambiar' ? n.e : n.b); if (acc === 'cambiar') n.b = n.e; n.dest = { x: z.x, y: z.y }; }
+    S.idas.push(n);
+  }
+  function decidir(acc) {
+    const n = S.cola[0];
+    if (!n || !['ronda', 'presion'].includes(S.fase)) return;
+    if (!cerca(P.puerta, 230)) { flotante('Acércate a la aduana', nave.x, nave.y - 30, '#98a0cf'); return; }
+    const r = S.fase === 'presion' ? 3 : S.ronda;
+    if (acc === 'cambiar' && r < 3) return;
+    let ok = correcta(n, r);
+    const bien = acc === ok || (acc === 'cambiar' && ok === 'pasar');
+    if (bien) { S.ok++; flotante('✓', P.puerta.x, P.puerta.y - 70, '#43e6a0'); }
+    else {
+      S.err++;
+      if (acc !== 'rechazar') { S.filt++; n.pirata = true; }
+      flotante('✕', P.puerta.x, P.puerta.y - 70, '#ff4d6d');
+      decir(explicar(n, acc, ok));
+    }
+    S.hechas++; S.revisadas++;
+    despachar(n, acc);
+  }
+
+  function iniciarRobot() {
+    S.fase = 'robot'; S.relojRobot = 0.4; S.rok = 0; S.rfilt = 0; S.sabot = false;
+    decir('El robot revisa sello, firma y bandera en cada nave, siempre igual. Mira cómo baja la fila. Ahora ponlo a prueba con el botón de la ficha: ¿qué hace el robot si un día le falta la lista de sellos válidos?');
+  }
+
+  return {
+    centro: { x: cx, y: cy },
+    update(dt) {
+      // salida de naves hacia la fila
+      if (S.fase === 'ronda' && S.porSalir.length) {
+        S.relojSalida -= dt;
+        if (S.relojSalida <= 0) { S.relojSalida = 0.8; S.cola.push(hacer(S.porSalir.shift())); }
+      }
+      if (S.fase === 'presion' || S.fase === 'robot') {
+        S.relojSalida -= dt;
+        if (S.relojSalida <= 0 && S.cola.length < 22) {
+          S.relojSalida = S.fase === 'presion' ? 0.4 : 0.45;
+          S.cola.push(hacer(azar(3))); if (S.fase === 'presion') S.llegadas++;
+        }
+      }
+      S.cola.forEach((n, i) => {
+        const tx = P.puerta.x - 70 - i * 42, ty = cy;
+        n.x += (tx - n.x) * Math.min(1, dt * 3); n.y += (ty - n.y) * Math.min(1, dt * 3);
+      });
+      for (let k = S.idas.length - 1; k >= 0; k--) {
+        const n = S.idas[k];
+        n.x += (n.dest.x - n.x) * Math.min(1, dt * 2.2); n.y += (n.dest.y - n.y) * Math.min(1, dt * 2.2);
+        if (Math.hypot(n.dest.x - n.x, n.dest.y - n.y) < 6) {
+          S.idas.splice(k, 1);
+          if (!n.sale && n.pirata) flotante('pirata dentro', n.x, n.y - 16, '#ff4d6d');
+        }
+      }
+      if (S.fase === 'ronda' && S.hechas >= 6 && !S.porSalir.length && !S.cola.length) {
+        if (S.ronda < 3) empezarRonda(S.ronda + 1);
+        else {
+          S.fase = 'presion'; S.t = 14; S.llegadas = 0; S.revisadas = 0;
+          decir('Buen trabajo. Ahora es un día normal en Cosmos: **llegan muchas más naves**. Sigue revisando con las mismas reglas.');
+        }
+      }
+      if (S.fase === 'presion') {
+        S.t -= dt;
+        if (S.t <= 0) {
+          S.fase = 'espera'; ficha(null);
+          decir(`En 14 segundos llegaron **${S.llegadas} naves** y revisaste **${S.revisadas}**. La fila crece más rápido de lo que puedes revisar, y Cosmos atiende miles por minuto.`,
+            ['¿Qué construimos?', () => eleccion({
+              titulo: 'La fila no para',
+              pregunta: '¿Qué construimos para que la aduana funcione sin ti, con las mismas tres reglas?',
+              opciones: [
+                { t: 'Contratar más guardias', ok: false, porque: 'Cada guardia nuevo hay que entrenarlo, se cansa y se equivoca a su manera. Las reglas son siempre las mismas: es trabajo para una máquina.' },
+                { t: 'Confiar en la bandera de cada nave', ok: false, porque: 'La bandera la pinta el piloto. Confiar en ella es dejar que cualquiera diga ser de cualquier empresa y vea sus datos.' },
+                { t: 'Un robot que revise el sello, la firma y la bandera de cada nave, siempre igual', ok: true, porque: 'Las reglas son fijas y se pueden escribir. Una máquina las aplica igual a la nave número mil que a la primera.' },
+              ],
+              luego: iniciarRobot,
+            })]);
+        }
+      }
+      if (S.fase === 'robot') {
+        S.relojRobot -= dt;
+        if (S.relojRobot <= 0 && S.cola.length) {
+          S.relojRobot = 0.3;
+          const n = S.cola[0], ok = correcta(n, 3);
+          const acc = S.sabot ? correcta({ ...n, portal: true }, 3) : ok;
+          if (acc !== ok) { S.rfilt++; n.pirata = true; } else S.rok++;
+          despachar(n, acc);
+        }
+        if (S.sabot) {
+          S.ts += dt;
+          if (S.ts > 7) {
+            S.fase = 'espera'; ficha(null);
+            prediccion({
+              pregunta: 'Sin la lista, el robot no podía revisar el sello y **dejó pasar a todos**. ¿Qué debió hacer?',
+              opciones: ['Dejar pasar a todos: frenar el tráfico es peor', 'No dejar pasar a nadie hasta que vuelva la lista', 'Preguntarle a cada piloto si pasó por el portal'],
+              correcta: 1,
+              explica: 'Si un control no puede revisar, lo seguro es cerrar. Una aduana cerrada molesta un rato; una aduana abierta deja entrar piratas a los datos de todas las empresas. Y al piloto no se le pregunta: es justamente de quien desconfías.',
+              luego: () => bautizo({
+                pares: [
+                  ['El portal oficial', 'Azure Front Door'],
+                  ['El sello del portal', 'X-Azure-FDID'],
+                  ['El pasaporte', 'token JWT'],
+                  ['La Oficina de Pasaportes', 'WorkOS'],
+                  ['Cada empresa del planeta', 'tenant'],
+                  ['La empresa escrita en el pasaporte', 'claim'],
+                  ['La bandera que pinta el piloto', 'header'],
+                  ['El robot de aduana', 'YARP'],
+                  ['La zona de la aduana, compartida por todos', 'Application Plane'],
+                  ['Las compuertas de cada zona', 'nginx'],
+                  ['Dejar pasar cuando no puede revisar', 'fail-open'],
+                ],
+                real: 'Todo lo que llega a app.sincoerp.ai entra por [[Azure Front Door]]. Detrás está el [[YARP]] del [[Application Plane]]: revisa el [[token JWT]] que firmó [[WorkOS]] y el sello [[X-Azure-FDID]], borra el [[header]] X-Tenant-Id que traiga la petición y lo vuelve a escribir con el [[tenant]] del [[claim]] tenant_id. Luego entrega al [[nginx]] de cada producto, que reparte por ruta sin revisar tokens. La auditoría señaló un riesgo de [[fail-open]] en esa revisión: hay que confirmar que, si falta la configuración, el YARP rechace en vez de dejar pasar.',
+                luego: () => terminarSector(def),
+              }),
+            });
+          }
+        }
+      }
+      // ficha
+      if (['ronda', 'presion'].includes(S.fase)) {
+        const n = S.cola[0], r = S.fase === 'presion' ? 3 : S.ronda;
+        if (!cerca(P.puerta, 230)) ficha('<div class="ficha-t">Aduana</div><p>Acércate a la puerta de la aduana para revisar la nave.</p>');
+        else if (!n || Math.abs(n.x - (P.puerta.x - 70)) > 30) ficha('<div class="ficha-t">Aduana</div><p class="tenue">Esperando la siguiente nave…</p>');
+        else {
+          const E = EMPRESAS;
+          ficha(`<div class="ficha-t">Nave en la aduana</div><dl>
+            <dt>Llegó por</dt><dd>${n.portal ? '<span class="si">Portal oficial · sello ✓</span>' : '<span class="no">Cinturón de asteroides · sin sello</span>'}</dd>
+            ${r >= 2 ? `<dt>Pasaporte</dt><dd><span class="bandera" style="background:${E[n.e].c}"></span>${E[n.e].n} · ${n.firma ? '<span class="oro">firma dorada</span>' : '<span class="no">garabato</span>'}</dd>` : ''}
+            ${r >= 3 ? `<dt>Bandera</dt><dd><span class="bandera" style="background:${E[n.b].c}"></span>${E[n.b].n}</dd>` : ''}
+            </dl><div class="acciones-f">
+            <button data-acc="pasar"><kbd>1</kbd>Dejar pasar</button>
+            <button data-acc="rechazar"><kbd>2</kbd>Rechazar</button>
+            ${r >= 3 ? '<button data-acc="cambiar"><kbd>3</kbd>Pasar con la empresa del pasaporte</button>' : ''}</div>`);
+        }
+      } else if (S.fase === 'robot') {
+        ficha(`<div class="ficha-t">Robot de aduana</div><dl>
+          <dt>Revisadas bien</dt><dd class="si">${S.rok}</dd>
+          <dt>Piratas dentro</dt><dd class="${S.rfilt ? 'no' : ''}">${S.rfilt}</dd>
+          <dt>En la fila</dt><dd>${S.cola.length}</dd></dl>
+          <div class="acciones-f">${S.sabot ? '<span class="no">Sin lista de sellos válidos</span>' : '<button data-acc="sabotear"><kbd>1</kbd>Quitarle al robot la lista de sellos válidos</button>'}</div>`);
+      }
+    },
+    usar() {
+      if (['ronda', 'presion'].includes(S.fase)) flotante('Decide con la ficha: 1, 2 o 3', nave.x, nave.y - 30, '#98a0cf');
+    },
+    accion(a) {
+      if (a === 'sabotear' && S.fase === 'robot' && !S.sabot) {
+        S.sabot = true; S.ts = 0;
+        decir('Sin la lista, el robot decidió no frenar el tráfico: **deja pasar todo lo que no puede revisar**. Mira las naves que vienen del cinturón de asteroides.');
+      } else if (['pasar', 'rechazar', 'cambiar'].includes(a)) decidir(a);
+    },
+    objetivo() {
+      if (S.fase === 'ronda') return [`Ronda ${S.ronda} de 3 · revisa cada nave`, `nave ${Math.min(S.hechas + 1, 6)}/6 · bien ${S.ok} · errores ${S.err} · filtraciones ${S.filt}`];
+      if (S.fase === 'presion') return ['Llegan más naves', `⏱ ${Math.ceil(S.t)} s · en la fila ${S.cola.length} · revisadas ${S.revisadas}`];
+      if (S.fase === 'robot') return [S.sabot ? 'El robot sin lista de sellos' : 'El robot revisa por ti', `bien ${S.rok} · piratas dentro ${S.rfilt}`];
+      return null;
+    },
+    dibujar(c) {
+      c.textAlign = 'center';
+      // portal
+      const g = performance.now() / 600;
+      c.strokeStyle = '#4fd1ff'; c.lineWidth = 5;
+      c.beginPath(); c.arc(P.portal.x, P.portal.y, 46, 0, 6.283); c.stroke();
+      c.strokeStyle = '#4fd1ff55'; c.lineWidth = 2;
+      c.beginPath(); c.arc(P.portal.x, P.portal.y, 32, g, g + 4); c.stroke();
+      c.fillStyle = '#4fd1ff'; c.font = '600 13px "Chakra Petch", sans-serif'; c.fillText('PORTAL OFICIAL', P.portal.x, P.portal.y - 60);
+      // cinturón
+      c.fillStyle = '#5a4a3a'; rocas.forEach(o => { c.beginPath(); c.arc(o.x, o.y, o.r, 0, 6.283); c.fill(); });
+      c.fillStyle = '#98a0cf'; c.fillText('CINTURÓN DE ASTEROIDES', P.cint.x, P.cint.y + 70);
+      // planeta con zonas
+      c.fillStyle = '#1b2a66'; c.beginPath(); c.arc(P.planeta.x, P.planeta.y, 100, 0, 6.283); c.fill();
+      EMPRESAS.forEach((e, k) => {
+        const a = Math.PI + (k - 1) * 0.8;
+        c.beginPath(); c.moveTo(P.planeta.x, P.planeta.y); c.arc(P.planeta.x, P.planeta.y, 100, a - 0.4, a + 0.4); c.closePath();
+        c.fillStyle = e.c + '55'; c.fill();
+        const z = zona(k); c.fillStyle = e.c; c.fillRect(z.x - 5, z.y - 5, 10, 10);
+        c.font = '600 12px "Chakra Petch", sans-serif'; c.fillText(e.n.toUpperCase(), P.planeta.x + Math.cos(a) * 60, P.planeta.y + Math.sin(a) * 60 + 4);
+      });
+      c.strokeStyle = '#4fd1ff66'; c.lineWidth = 2; c.beginPath(); c.arc(P.planeta.x, P.planeta.y, 100, 0, 6.283); c.stroke();
+      c.fillStyle = '#eef0ff'; c.font = '700 14px "Chakra Petch", sans-serif'; c.fillText('PLANETA COSMOS', P.planeta.x, P.planeta.y + 130);
+      // puerta de aduana
+      c.fillStyle = '#1b2a66'; c.fillRect(P.puerta.x - 8, cy - 90, 16, 64); c.fillRect(P.puerta.x - 8, cy + 26, 16, 64);
+      c.fillStyle = S.sabot ? '#ff4d6d' : '#ffb547'; c.fillRect(P.puerta.x - 3, cy - 26, 6, 52);
+      c.fillStyle = '#ffb547'; c.font = '600 13px "Chakra Petch", sans-serif'; c.fillText('ADUANA', P.puerta.x, cy - 102);
+      if (S.fase === 'robot' || (S.fase === 'espera' && S.sabot)) {
+        c.fillStyle = '#ffb547'; c.fillRect(P.puerta.x - 12, cy + 96, 24, 20);
+        c.fillStyle = '#050714'; c.fillRect(P.puerta.x - 7, cy + 102, 4, 4); c.fillRect(P.puerta.x + 3, cy + 102, 4, 4);
+        c.font = '600 11px "Chakra Petch", sans-serif'; c.fillStyle = '#ffb547'; c.fillText('ROBOT', P.puerta.x, cy + 132);
+        if (S.cola[0]) { c.strokeStyle = (S.sabot ? '#ff4d6d' : '#ffb547') + '88'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(P.puerta.x, cy + 96); c.lineTo(S.cola[0].x, S.cola[0].y); c.stroke(); }
+      }
+      if (['ronda', 'presion'].includes(S.fase) && cerca(P.puerta, 230)) {
+        c.setLineDash([5, 5]); c.strokeStyle = '#ffb54788'; c.lineWidth = 2; c.beginPath(); c.arc(P.puerta.x, cy, 120, 0, 6.283); c.stroke(); c.setLineDash([]);
+      }
+      // naves
+      const naveCarga = n => {
+        c.save(); c.translate(n.x, n.y);
+        c.fillStyle = n.pirata && !n.sale ? '#ff4d6d' : '#c9cff5';
+        c.beginPath(); c.moveTo(14, 0); c.lineTo(-10, -9); c.lineTo(-6, 0); c.lineTo(-10, 9); c.closePath(); c.fill();
+        c.fillStyle = EMPRESAS[n.b].c; c.fillRect(-16, -14, 9, 7);
+        c.restore();
+      };
+      S.cola.forEach(naveCarga); S.idas.forEach(naveCarga);
+    },
+  };
+}
+
+// =====================================================================
+// SECTOR 3 · El buzón — avisar sin esperar, y aguantar los repetidos
+// =====================================================================
+function iniciarBuzon(def) {
+  const [cx, cy] = def.centro;
+  const E = { x: cx - 320, y: cy }, R = { x: cx + 320, y: cy }, B = { x: cx + 170, y: cy + 130 };
+  const S = { fase: 'intro', reloj: 0, pila: 3, carga: false, entregadas: 0, t: 0, tMano: 0, tBuzon: 0, espera: 0,
+    buzon: 0, drenar: 0, viajes: [], relojPila: 5, avisoSueno: false,
+    ids: ['FAC-2201', 'FAC-2210', 'FAC-2102', 'FAC-2201', 'FAC-2120', 'FAC-2210', 'FAC-2012', 'FAC-2102', 'FAC-2221', 'FAC-2120'],
+    ids2: ['FAC-3301', 'FAC-3302', 'FAC-3301', 'FAC-3303', 'FAC-3302', 'FAC-3304'],
+    idx: 0, tf: 0, vistos: [], dobles: 0, sinPagar: 0, relojReg: 0 };
+  const PERIODO = 11, DESPIERTA = 6;
+  const despierta = () => (S.reloj % PERIODO) < DESPIERTA;
+  const montos = ['1.250.000', '480.300', '2.900.000', '77.000', '640.500', '3.100.250', '915.000'];
+
+  decir('Dos planetas de OXP. **Entradas** recibe las facturas de los proveedores; **Radicación** las registra para pagarlas. Radicación se duerme un rato cada tanto: la están actualizando. Tu trabajo: **recoge una factura en Entradas (E) y entrégala en Radicación (E).** Entrega 5.',
+    ['Empezar', () => { S.fase = 'mano'; S.t = 0; S.entregadas = 0; S.espera = 0; }]);
+
+  function iniciarRepetidos() {
+    S.fase = 'repe'; S.idx = 0; S.tf = 3.5; S.vistos = []; S.dobles = 0; S.sinPagar = 0;
+    decir('El buzón tiene una regla: si no está seguro de que Radicación recibió una factura, **se la entrega otra vez**. Así ninguna se pierde. Ahora tú eres Radicación: por cada factura decide si la radicas (y se paga) o si ya la habías radicado. No tienes registro: usa tu memoria. Tienes 3,5 segundos por factura.');
+  }
+  function decidirRepe(acc) {
+    if (S.fase !== 'repe') return;
+    const id = S.ids[S.idx], visto = S.vistos.includes(id);
+    if (acc === 'radicar') {
+      if (visto) { S.dobles++; flotante(`¡${id} pagada dos veces!`, R.x, R.y - 90, '#ff4d6d'); }
+      else { S.vistos.push(id); flotante('radicada', R.x, R.y - 90, '#43e6a0'); }
+    } else {
+      if (!visto) { S.sinPagar++; flotante(`${id} quedó sin pagar`, R.x, R.y - 90, '#ff4d6d'); }
+      else flotante('ignorada ✓', R.x, R.y - 90, '#43e6a0');
+    }
+    S.idx++; S.tf = 3.5;
+    if (S.idx >= S.ids.length) {
+      S.fase = 'espera'; ficha(null);
+      decir(`Pagaste dos veces **${S.dobles}** facturas y dejaste **${S.sinPagar}** sin pagar. Fueron 10; Radicación recibe miles al día.`,
+        ['¿Qué construimos?', () => eleccion({
+          titulo: 'Las facturas llegan repetidas',
+          pregunta: '¿Cómo evitas pagar dos veces sin depender de tu memoria?',
+          opciones: [
+            { t: 'Pedirle al buzón que nunca repita', ok: false, porque: 'Para no repetir nunca, el buzón tendría que saber con certeza que cada entrega llegó, y a veces la confirmación se pierde en el camino. Es mucho más fácil que quien recibe aguante el repetido.' },
+            { t: 'Revisar a fin de mes qué se pagó dos veces', ok: false, porque: 'Para entonces el dinero ya salió. Hay que evitarlo en el momento.' },
+            { t: 'Un registro: anotar cada factura radicada y mirarlo antes de radicar', ok: true, porque: 'Con el registro, recibir la misma factura dos veces da el mismo resultado que recibirla una vez.' },
+          ],
+          luego: () => { S.fase = 'registro'; S.idx = 0; S.vistos = []; S.relojReg = 0.6; decir('Ahora Radicación tiene un registro. Mira cómo trata los repetidos.'); },
+        })]);
+    }
+  }
+
+  return {
+    centro: { x: cx, y: cy },
+    update(dt) {
+      S.reloj += dt;
+      if (S.fase === 'mano' || S.fase === 'buzon') {
+        S.t += dt;
+        S.relojPila -= dt;
+        if (S.relojPila <= 0) { S.relojPila = 5; S.pila = Math.min(12, S.pila + 1); }
+      }
+      if (S.fase === 'mano' && S.carga && cerca(R, 130) && !despierta()) S.espera += dt;
+      if (S.fase === 'buzon' && despierta() && S.buzon > 0) {
+        S.drenar -= dt;
+        if (S.drenar <= 0) { S.drenar = 0.6; S.buzon--; S.viajes.push({ x: B.x, y: B.y }); }
+      }
+      for (let k = S.viajes.length - 1; k >= 0; k--) {
+        const v = S.viajes[k], dx = R.x - v.x, dy = R.y - v.y, l = Math.hypot(dx, dy), s = 260 * dt;
+        if (l > s) { v.x += dx / l * s; v.y += dy / l * s; } else { S.viajes.splice(k, 1); chispa(R.x, R.y, '#b48cff', 8); }
+      }
+      if (S.fase === 'repe') {
+        S.tf -= dt;
+        if (S.tf <= 0) { flotante('No decidiste: se radicó sola', R.x, R.y - 110, '#ffb547'); decidirRepe('radicar'); }
+        if (S.fase === 'repe') {
+          const id = S.ids[S.idx];
+          ficha(`<div class="ficha-t">Mesa de Radicación · factura ${S.idx + 1} de ${S.ids.length}</div>
+            <div class="grande">${id}</div><span class="tenue">$ ${montos[S.idx % montos.length]}</span>
+            <div class="barra-t"><i style="width:${Math.max(0, S.tf / 3.5 * 100)}%"></i></div>
+            <div class="acciones-f"><button data-acc="radicar"><kbd>1</kbd>Radicar y pagar</button><button data-acc="ignorar"><kbd>2</kbd>Ya está radicada: ignorar</button></div>`);
+        }
+      }
+      if (S.fase === 'registro') {
+        S.relojReg -= dt;
+        if (S.relojReg <= 0 && S.idx < S.ids2.length) {
+          S.relojReg = 1.1;
+          const id = S.ids2[S.idx++];
+          if (S.vistos.includes(id)) flotante(`${id}: ya estaba, ignorada`, R.x, R.y - 90, '#43e6a0');
+          else { S.vistos.push(id); flotante(`${id}: radicada y anotada`, R.x, R.y - 90, '#b48cff'); }
+        }
+        ficha(`<div class="ficha-t">Registro de Radicación</div><div class="registro">${S.vistos.map(esc).join('<br>') || '—'}</div>`);
+        if (S.idx >= S.ids2.length && S.relojReg <= 0) {
+          S.fase = 'espera'; ficha(null);
+          prediccion({
+            pregunta: 'Radicación necesita preguntarle a **Impuestos**, otro producto, cuánto retener de cada factura. Si lo llama directo y espera la respuesta, y un día Impuestos está caído, ¿qué pasa?',
+            opciones: ['Nada: Radicación sigue igual', 'Radicación se queda esperando y deja de radicar', 'Impuestos responde cuando vuelva, sin que nadie haga nada'],
+            correcta: 1,
+            explica: 'Es lo mismo que te pasó con la factura en la mano: quien espera queda atado al otro. Por eso los productos de Cosmos también se avisan entre ellos con un buzón, uno compartido por todos.',
+            luego: () => bautizo({
+              pares: [
+                ['Llevar la factura y esperar a que Radicación despierte', 'petición síncrona'],
+                ['El buzón', 'cola de mensajes'],
+                ['Dejar la factura y seguir con lo tuyo', 'mensajería asíncrona'],
+                ['El buzón dentro de OXP', 'RabbitMQ'],
+                ['El buzón entre productos', 'Azure Service Bus'],
+                ['El buzón que entrega otra vez si duda', 'entrega al menos una vez'],
+                ['El registro de facturas radicadas', 'idempotencia'],
+              ],
+              real: 'Dentro de OXP, Entradas deja sus avisos en [[RabbitMQ]] y Radicación los lee de su [[cola de mensajes]] Radicacion-From-EntradasExchange: eso es [[mensajería asíncrona]]. Entre productos (Contabilidad, Impuestos, Estructura organizacional) hay un solo [[Azure Service Bus]], con un canal por tipo de aviso. Cosmos guarda cada aviso en su base de datos antes de enviarlo, para no perder ninguno; por eso la entrega es [[entrega al menos una vez]] y cada servicio que recibe necesita [[idempotencia]]. Las pantallas, en cambio, sí hacen [[petición síncrona]]: esperan la respuesta del servidor.',
+              luego: () => terminarSector(def),
+            }),
+          });
+        }
+      }
+    },
+    usar() {
+      if (S.fase !== 'mano' && S.fase !== 'buzon') return;
+      if (cerca(E, 110)) {
+        if (S.carga) flotante('Ya llevas una factura', nave.x, nave.y - 30, '#98a0cf');
+        else if (S.pila > 0) { S.carga = true; S.pila--; }
+        else flotante('No hay facturas: espera', nave.x, nave.y - 30, '#98a0cf');
+        return;
+      }
+      if (S.fase === 'buzon' && cerca(B, 80)) {
+        if (!S.carga) { flotante('Primero recoge en Entradas', nave.x, nave.y - 30, '#98a0cf'); return; }
+        S.carga = false; S.buzon++; S.entregadas++; chispa(B.x, B.y, '#b48cff', 10);
+        if (S.entregadas >= 5) {
+          S.tBuzon = S.t; S.fase = 'espera';
+          decir(`Con el buzón: **5 facturas en ${Math.round(S.tBuzon)} s**. A mano te tomó ${Math.round(S.tMano)} s. Nunca te quedaste esperando: Radicación las saca cuando despierta.`, ['Seguir', iniciarRepetidos]);
+        }
+        return;
+      }
+      if (cerca(R, 120)) {
+        if (S.fase === 'buzon') { flotante('Usa el buzón: no esperes', nave.x, nave.y - 30, '#98a0cf'); return; }
+        if (!S.carga) { flotante('Primero recoge en Entradas', nave.x, nave.y - 30, '#98a0cf'); return; }
+        if (!despierta()) {
+          flotante('Zzz… está dormida', R.x, R.y - 90, '#b48cff');
+          if (!S.avisoSueno) { S.avisoSueno = true; decir('Radicación está dormida: la están actualizando. Tú esperas con la factura en la mano, y la pila de Entradas sigue creciendo.'); }
+          return;
+        }
+        S.carga = false; S.entregadas++; chispa(R.x, R.y, '#43e6a0', 10);
+        if (S.entregadas >= 5) {
+          S.tMano = S.t; S.fase = 'espera';
+          decir(`Entregaste 5 facturas en **${Math.round(S.tMano)} s**, y **${Math.round(S.espera)} s** los pasaste esperando a que Radicación despertara. En Entradas quedaron ${S.pila} esperando.`,
+            ['¿Qué construimos?', () => eleccion({
+              titulo: 'Esperar a que el otro despierte',
+              pregunta: '¿Qué construimos para que Entradas no tenga que esperar a Radicación?',
+              opciones: [
+                { t: 'Una nave más rápida', ok: false, porque: 'Llegar más rápido no sirve si al llegar Radicación duerme: igual te quedas esperando.' },
+                { t: 'Un buzón junto a Radicación: dejas la factura y te vas; ella las saca cuando despierta', ok: true, porque: 'Con el buzón, Entradas y Radicación ya no necesitan estar despiertas al mismo tiempo. Las facturas esperan en el buzón, no en tu mano.' },
+                { t: 'Que Radicación nunca duerma', ok: false, porque: 'Todo servicio se detiene alguna vez: una actualización, un reinicio, una falla. Hay que diseñar contando con eso.' },
+              ],
+              luego: () => { S.fase = 'buzon'; S.t = 0; S.entregadas = 0; S.pila = Math.max(S.pila, 3); decir('Ahora hay un **buzón** junto a Radicación. Deja la factura ahí (E) y vuelve por la siguiente. Entrega 5.'); },
+            })]);
+        }
+        return;
+      }
+      flotante('Acércate a Entradas, al buzón o a Radicación', nave.x, nave.y - 30, '#98a0cf');
+    },
+    accion(a) { if (a === 'radicar' || a === 'ignorar') decidirRepe(a); },
+    objetivo() {
+      if (S.fase === 'mano') return ['Lleva 5 facturas de Entradas a Radicación', `entregadas ${S.entregadas}/5 · ⏱ ${Math.round(S.t)} s · esperando ${Math.round(S.espera)} s`];
+      if (S.fase === 'buzon') return ['Deja 5 facturas en el buzón', `entregadas ${S.entregadas}/5 · ⏱ ${Math.round(S.t)} s · en el buzón ${S.buzon}`];
+      if (S.fase === 'repe') return ['Eres Radicación: no pagues dos veces', `pagos dobles ${S.dobles} · sin pagar ${S.sinPagar}`];
+      if (S.fase === 'registro') return ['Radicación con registro', `${S.idx}/${S.ids2.length}`];
+      return null;
+    },
+    dibujar(c) {
+      c.textAlign = 'center';
+      const dsp = despierta(), resto = dsp ? DESPIERTA - (S.reloj % PERIODO) : PERIODO - (S.reloj % PERIODO);
+      // Entradas
+      c.fillStyle = '#123a33'; c.beginPath(); c.arc(E.x, E.y, 72, 0, 6.283); c.fill();
+      c.strokeStyle = '#43e6a0'; c.lineWidth = 3; c.stroke();
+      c.fillStyle = '#43e6a0'; c.font = '700 14px "Chakra Petch", sans-serif'; c.fillText('ENTRADAS', E.x, E.y - 88);
+      for (let i = 0; i < S.pila; i++) { c.fillStyle = '#eef0ff'; c.fillRect(E.x - 14 + (i % 4) * 8, E.y + 30 - Math.floor(i / 4) * 12 - 20, 18, 10); }
+      c.fillStyle = '#98a0cf'; c.font = '600 12px "Chakra Petch", sans-serif'; c.fillText(`${S.pila} facturas`, E.x, E.y + 96);
+      // Radicación
+      c.fillStyle = dsp ? '#2a1f55' : '#14102a'; c.beginPath(); c.arc(R.x, R.y, 72, 0, 6.283); c.fill();
+      c.strokeStyle = dsp ? '#b48cff' : '#4a3a7a'; c.lineWidth = 3; c.stroke();
+      c.strokeStyle = '#b48cff'; c.lineWidth = 4;
+      c.beginPath(); c.arc(R.x, R.y, 82, -Math.PI / 2, -Math.PI / 2 + 6.283 * (resto / (dsp ? DESPIERTA : PERIODO - DESPIERTA))); c.stroke();
+      c.fillStyle = '#b48cff'; c.font = '700 14px "Chakra Petch", sans-serif'; c.fillText('RADICACIÓN', R.x, R.y - 98);
+      c.font = '600 12px "Chakra Petch", sans-serif'; c.fillStyle = dsp ? '#43e6a0' : '#98a0cf';
+      c.fillText(dsp ? `despierta · se duerme en ${Math.ceil(resto)} s` : `dormida · despierta en ${Math.ceil(resto)} s`, R.x, R.y + 106);
+      if (!dsp) { c.fillStyle = '#b48cff'; c.font = '700 22px "Chakra Petch", sans-serif'; c.fillText('z z z', R.x, R.y + 8); }
+      // buzón
+      if (['buzon', 'repe', 'registro', 'espera', 'fin'].includes(S.fase) && (S.tMano > 0)) {
+        c.fillStyle = '#2a1f55'; c.fillRect(B.x - 26, B.y - 20, 52, 40);
+        c.strokeStyle = '#b48cff'; c.lineWidth = 2; c.strokeRect(B.x - 26, B.y - 20, 52, 40);
+        c.fillStyle = '#b48cff'; c.fillRect(B.x - 14, B.y - 8, 28, 4);
+        c.font = '600 12px "Chakra Petch", sans-serif'; c.fillText(`BUZÓN · ${S.buzon}`, B.x, B.y + 38);
+      }
+      S.viajes.forEach(v => { c.fillStyle = '#eef0ff'; c.fillRect(v.x - 8, v.y - 5, 16, 10); });
+      // pistas de E
+      if (S.fase === 'mano' || S.fase === 'buzon') {
+        const pts = [E, R].concat(S.fase === 'buzon' ? [B] : []);
+        pts.forEach(p => {
+          if (cerca(p, p === B ? 80 : 120)) { c.fillStyle = '#ffb547'; c.font = '700 14px "Chakra Petch", sans-serif'; c.fillText('E', p.x, p.y - (p === B ? 32 : 116)); }
+        });
+      }
+      if (S.carga) { c.fillStyle = '#eef0ff'; c.fillRect(nave.x - 8, nave.y + 16, 16, 10); }
+    },
+  };
+}
+
+// =====================================================================
+// Mapa y motor
+// =====================================================================
+const SECTORES = [
+  { id: 'astillero', nombre: 'El astillero', sub: 'Mantener algo encendido', centro: [0, -560], color: '#4fd1ff', iniciar: iniciarAstillero },
+  { id: 'aduana', nombre: 'La aduana', sub: 'Quién entra y a qué empresa', centro: [980, -60], color: '#ffb547', iniciar: iniciarAduana },
+  { id: 'buzon', nombre: 'El buzón', sub: 'Avisar sin esperar', centro: [0, 680], color: '#b48cff', iniciar: iniciarBuzon },
+];
+const PROXIMOS = ['La base', 'La bodega y la grúa', 'La bóveda', 'El Archivo', 'Los planetas', 'El hiperespacio', 'El faro', 'La Estación de Control', 'El observatorio', 'El escudo']
+  .map((n, i) => { const a = 2.4 + i * 0.62, r = 2100 + (i % 3) * 180; return { n, x: Math.cos(a) * r, y: Math.sin(a) * r }; });
+
+const abierto = i => i === 0 || est.h.includes(SECTORES[i - 1].id);
+let activo = null, actual = null;
+
+function entrar(def) {
+  activo = def; actual = def.iniciar(def); destino = null;
+  nave.vx = nave.vy = 0;
+}
+function terminarSector(def) {
+  const nuevo = !est.h.includes(def.id);
+  if (nuevo) est.h.push(def.id);
+  est.e += 5; guardar();
+  ficha(null); mostrarF(false);
+  activo = null; actual = null;
+  const [cx, cy] = def.centro;
+  const a = Math.atan2(nave.y - cy, nave.x - cx);
+  nave.x = cx + Math.cos(a) * 340; nave.y = cy + Math.sin(a) * 340;
+  const sig = SECTORES.find((s, i) => abierto(i) && !est.h.includes(s.id));
+  if (sig) decir(`Sector completo. **${sig.nombre}** ya está abierto: sigue la flecha dorada. Puedes repasar los nombres en el Glosario.`);
+  else decir(`Completaste los ${SECTORES.length} sectores de esta versión. Los otros ${PROXIMOS.length} llegarán con este mismo formato: primero a mano, después la solución, al final el nombre. Abre el Glosario para repasar.`);
+}
+
+const lienzo = $('#lienzo'), ctx = lienzo.getContext('2d');
 let W = 0, H = 0, DPR = 1;
-function redimensionar() { DPR = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight; lienzo.width = W * DPR; lienzo.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
-addEventListener('resize', redimensionar); redimensionar();
-const azar = (s => () => (s = (s * 16807) % 2147483647) / 2147483647)(42);
-
-// ══════════════════════ Estado ══════════════════════
-const est = {
-  nave: { x: 0, y: 260, vx: 0, vy: 0, ang: -Math.PI / 2, motor: false },
-  destino: null, teclas: {}, cam: { x: 0, y: 0 }, t: 0,
-  hechos: new Set(), estrellas: 0, abierto: null, etapa: 0, naves: [], nacimientos: {}, chispas: [],
-};
-try { const g = JSON.parse(localStorage.getItem('mision-cosmos') || '{}'); (g.hechos || []).forEach(x => est.hechos.add(x)); est.estrellas = g.estrellas || 0; } catch {}
-function guardar() { try { localStorage.setItem('mision-cosmos', JSON.stringify({ hechos: [...est.hechos], estrellas: est.estrellas })); } catch {} }
-const siguiente = () => SECTORES.find(s => !est.hechos.has(s.id));
-const desbloqueado = s => SECTORES.indexOf(s) === 0 || est.hechos.has(SECTORES[SECTORES.indexOf(s) - 1].id);
-
-// ══════════════════════ Fondo: estrellas en capas y nebulosas ══════════════════════
-const estrellas = Array.from({ length: 700 }, () => ({ x: azar() * 6000 - 3000, y: azar() * 4400 - 2200, p: [0.15, 0.35, 0.7][Math.floor(azar() * 3)], b: azar() }));
-const nebulosas = [[-1500, -700, 900, '255,181,71'], [900, -900, 1000, '180,140,255'], [-300, 900, 1100, '79,209,255'], [1700, 700, 800, '67,230,160']];
-function fondo() {
-  ctx.fillStyle = '#050714'; ctx.fillRect(0, 0, W, H);
-  for (const [x, y, r, c] of nebulosas) {
-    const sx = (x - est.cam.x) * 0.3 + W / 2, sy = (y - est.cam.y) * 0.3 + H / 2;
-    const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * 0.6); g.addColorStop(0, `rgba(${c},0.09)`); g.addColorStop(1, 'rgba(5,7,20,0)');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  }
-  for (const s of estrellas) {
-    let x = ((s.x - est.cam.x * s.p) % 6000 + 9000) % 6000 - 3000 + W / 2, y = ((s.y - est.cam.y * s.p) % 4400 + 6600) % 4400 - 2200 + H / 2;
-    if (x < -2 || y < -2 || x > W + 2 || y > H + 2) continue;
-    ctx.globalAlpha = 0.3 + 0.7 * Math.abs(Math.sin(est.t * 0.008 + s.b * 9));
-    ctx.fillStyle = s.b > 0.9 ? '#ffd9a0' : '#cfd6ff'; const z = s.p > 0.5 ? 1.8 : 1; ctx.fillRect(x, y, z, z);
-  }
-  ctx.globalAlpha = 1;
+function ajustar() {
+  DPR = Math.min(2, window.devicePixelRatio || 1); W = innerWidth; H = innerHeight;
+  lienzo.width = W * DPR; lienzo.height = H * DPR;
 }
-const P = (x, y) => [x - est.cam.x + W / 2, y - est.cam.y + H / 2];
+addEventListener('resize', ajustar); ajustar();
 
-// ══════════════════════ Estructuras ══════════════════════
-function halo(x, y, r, rgb, a) { const g = ctx.createRadialGradient(x, y, r * 0.2, x, y, r * 2.2); g.addColorStop(0, `rgba(${rgb},${a})`); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 2.2, 0, 7); ctx.fill(); }
-function esfera(x, y, r, color, sombra = '#0a1a3a') { const g = ctx.createRadialGradient(x - r * 0.4, y - r * 0.4, r * 0.1, x, y, r); g.addColorStop(0, '#ffffff'); g.addColorStop(0.3, color); g.addColorStop(1, sombra); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
-const DIBUJOS = {
-  anillo(x, y, f) {         // la base: red privada
-    ctx.strokeStyle = K.cian; ctx.lineWidth = 3; ctx.globalAlpha = f; ctx.beginPath(); ctx.ellipse(x, y, 120 * f, 46 * f, 0, 0, 7); ctx.stroke();
-    ctx.lineWidth = 1; ctx.setLineDash([6, 6]); for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse(x, y, (40 + i * 26) * f, (15 + i * 10) * f, 0, 0, 7); ctx.stroke(); } ctx.setLineDash([]);
-    for (let i = 0; i < 8; i++) { const a = i / 8 * 6.28 + est.t * 0.004; ctx.fillStyle = K.cian; ctx.fillRect(x + Math.cos(a) * 120 * f - 3, y + Math.sin(a) * 46 * f - 3, 6, 6); } ctx.globalAlpha = 1;
-  },
-  astillero(x, y, f) {      // donde corren los contenedores
-    ctx.globalAlpha = f; ctx.strokeStyle = '#9fb0e0'; ctx.lineWidth = 2; ctx.strokeRect(x - 90, y - 34, 180, 68);
-    for (let i = 0; i < 6; i++) { const on = (Math.floor(est.t / 30) + i) % 6 !== 0; ctx.fillStyle = on ? K.cian : K.ok; ctx.fillRect(x - 80 + i * 28, y - 20, 20 * f, 40 * f); }
-    ctx.fillStyle = '#9fb0e0'; ctx.fillRect(x - 100, y - 4, 200, 8); ctx.globalAlpha = 1;
-  },
-  bodega(x, y, f) {         // el registro de imágenes + la grúa del pipeline
-    ctx.globalAlpha = f; for (let i = 0; i < 9; i++) { ctx.fillStyle = ['#c98a54', '#a8703f', '#e0a36b'][i % 3]; ctx.fillRect(x - 60 + (i % 3) * 40, y - 10 - Math.floor(i / 3) * 26, 36, 22); }
-    ctx.strokeStyle = K.ok; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + 80, y + 20); ctx.lineTo(x + 80, y - 90); ctx.lineTo(x - 20, y - 90); ctx.stroke();
-    const g = (Math.sin(est.t * 0.03) + 1) / 2; ctx.beginPath(); ctx.moveTo(x - 20 + g * 60, y - 90); ctx.lineTo(x - 20 + g * 60, y - 60); ctx.stroke(); ctx.globalAlpha = 1;
-  },
-  boveda(x, y, f) {         // secretos
-    ctx.globalAlpha = f; ctx.fillStyle = '#1a2150'; ctx.beginPath(); ctx.arc(x, y, 52 * f, 0, 7); ctx.fill(); ctx.strokeStyle = K.oro; ctx.lineWidth = 3; ctx.stroke();
-    ctx.save(); ctx.translate(x, y); ctx.rotate(est.t * 0.01); for (let i = 0; i < 6; i++) { ctx.rotate(Math.PI / 3); ctx.fillStyle = K.oro; ctx.fillRect(18, -3, 22 * f, 6); } ctx.restore();
-    ctx.fillStyle = K.oro; ctx.beginPath(); ctx.arc(x, y, 9, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
-  },
-  archivo(x, y, f) {        // el event store
-    ctx.globalAlpha = f; ctx.fillStyle = '#03040c'; ctx.beginPath(); ctx.arc(x, y, 44 * f, 0, 7); ctx.fill();
-    ctx.strokeStyle = K.ok; for (let i = 0; i < 4; i++) { ctx.globalAlpha = f * (0.8 - i * 0.15); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(x, y, (64 + i * 16) * f, (16 + i * 4) * f, -0.25 + Math.sin(est.t * 0.01) * 0.05, 0, 7); ctx.stroke(); }
-    ctx.globalAlpha = 1;
-  },
-  faro(x, y, f) {           // el frontend
-    ctx.globalAlpha = f; ctx.fillStyle = '#cfe9ff'; ctx.beginPath(); ctx.moveTo(x - 16, y + 50); ctx.lineTo(x + 16, y + 50); ctx.lineTo(x + 8, y - 40); ctx.lineTo(x - 8, y - 40); ctx.fill();
-    const a = est.t * 0.02; ctx.fillStyle = 'rgba(67,230,160,0.18)'; ctx.beginPath(); ctx.moveTo(x, y - 44); ctx.lineTo(x + Math.cos(a) * 260, y - 44 + Math.sin(a) * 80); ctx.lineTo(x + Math.cos(a + 0.25) * 260, y - 44 + Math.sin(a + 0.25) * 80); ctx.fill();
-    ctx.fillStyle = K.ok; ctx.beginPath(); ctx.arc(x, y - 46, 9, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
-  },
-  portal(x, y, f) {         // Front Door
-    halo(x, y, 50 * f, '79,209,255', 0.35); ctx.globalAlpha = f;
-    for (let i = 0; i < 3; i++) { ctx.strokeStyle = i ? 'rgba(79,209,255,0.5)' : K.cian; ctx.lineWidth = i ? 2 : 4; ctx.beginPath(); ctx.ellipse(x, y, (34 + i * 14) * f, (70 + i * 18) * f, 0, 0, 7); ctx.stroke(); }
-    ctx.save(); ctx.translate(x, y); ctx.rotate(est.t * 0.03); ctx.setLineDash([3, 8]); ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.arc(0, 0, 22, 0, 7); ctx.stroke(); ctx.restore(); ctx.setLineDash([]); ctx.globalAlpha = 1;
-  },
-  aduana(x, y, f) {         // el Gateway
-    ctx.save(); ctx.translate(x, y); ctx.rotate(est.t * 0.005); ctx.globalAlpha = f; ctx.strokeStyle = K.cian; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 0, 56 * f, 0, 7); ctx.stroke();
-    for (let i = 0; i < 8; i++) { ctx.rotate(Math.PI / 4); ctx.fillStyle = '#cfe9ff'; ctx.fillRect(50 * f, -5, 14, 10); } ctx.restore();
-    ctx.globalAlpha = f; ctx.fillStyle = '#163a66'; ctx.beginPath(); ctx.arc(x, y, 24 * f, 0, 7); ctx.fill(); ctx.strokeStyle = K.cian; ctx.stroke(); ctx.globalAlpha = 1;
-  },
-  estacion(x, y, f) {       // Control Plane
-    halo(x, y, 70 * f, '255,181,71', 0.45); ctx.globalAlpha = f; esfera(x, y, 46 * f, K.oro, '#8a3d10');
-    ctx.strokeStyle = 'rgba(255,181,71,0.45)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(x, y, 130 * f, 52 * f, 0, 0, 7); ctx.stroke();
-    for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28 + est.t * 0.006; esfera(x + Math.cos(a) * 130 * f, y + Math.sin(a) * 52 * f, 9 * f, K.oro, '#5a2a10'); } ctx.globalAlpha = 1;
-  },
-  hiperespacio(x, y, f) {   // la mensajería
-    halo(x, y, 40 * f, '180,140,255', 0.5); ctx.save(); ctx.translate(x, y); ctx.rotate(est.t * 0.03); ctx.globalAlpha = f; ctx.strokeStyle = K.lila; ctx.lineWidth = 3;
-    for (let i = 0; i < 4; i++) { ctx.rotate(Math.PI / 2); ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(46, -14, 40, 28); ctx.stroke(); } ctx.restore();
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 7, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
-  },
-  orbita(x, y, f) {         // RabbitMQ: rutas cortas dentro del producto
-    ctx.globalAlpha = f; ctx.strokeStyle = K.naranja; ctx.lineWidth = 2;
-    for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse(x, y, (30 + i * 22) * f, (12 + i * 9) * f, est.t * 0.004 * (i + 1), 0, 7); ctx.stroke(); }
-    for (let i = 0; i < 5; i++) { const a = est.t * 0.03 + i * 1.25; ctx.fillStyle = K.naranja; ctx.beginPath(); ctx.arc(x + Math.cos(a) * 52 * f, y + Math.sin(a) * 21 * f, 3, 0, 7); ctx.fill(); }
-    ctx.globalAlpha = 1;
-  },
-  pasaporte(x, y, f) {      // WorkOS: la identidad del usuario y de su tenant
-    ctx.globalAlpha = f; ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(est.t * 0.01) * 0.12);
-    ctx.fillStyle = '#1a2150'; ctx.strokeStyle = K.oro; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(-52 * f, -34 * f, 104 * f, 68 * f, 8); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = K.oro; ctx.beginPath(); ctx.arc(-26 * f, -2, 13 * f, 0, 7); ctx.fill();
-    ctx.fillStyle = '#98a0cf'; for (let i = 0; i < 3; i++) ctx.fillRect(-4, -14 + i * 12, 44 * f, 4);
-    ctx.restore(); ctx.globalAlpha = 1;
-  },
-  planetas(x, y, f) {       // los productos del Application Plane
-    const ps = [[-90, 10, 44, '#3fb6e8'], [70, -30, 34, '#5c8cff'], [120, 60, 26, '#4bc4b0']];
-    for (const [dx, dy, r, c] of ps) { halo(x + dx, y + dy, r * f, '79,209,255', 0.15); esfera(x + dx, y + dy, r * f, c); }
-    for (let i = 0; i < 4; i++) { const a = i * 1.6 + est.t * 0.008; esfera(x - 90 + Math.cos(a) * 70 * f, y + 10 + Math.sin(a) * 40 * f, 7 * f, '#8fdcff'); }
-  },
-  escudo(x, y, f) {         // hardening
-    ctx.globalAlpha = f * (0.5 + Math.sin(est.t * 0.05) * 0.15); ctx.strokeStyle = K.ok; ctx.lineWidth = 2; ctx.beginPath();
-    for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28; ctx.lineTo(x + Math.cos(a) * 70 * f, y + Math.sin(a) * 70 * f); } ctx.closePath(); ctx.stroke();
-    ctx.fillStyle = 'rgba(67,230,160,0.07)'; ctx.fill(); ctx.globalAlpha = 1;
-  },
-  observatorio(x, y, f) {   // métricas
-    ctx.globalAlpha = f; ctx.fillStyle = '#cfd6ff'; ctx.beginPath(); ctx.arc(x, y + 10, 34 * f, Math.PI, 0); ctx.fill();
-    ctx.save(); ctx.translate(x, y); ctx.rotate(-0.6 + Math.sin(est.t * 0.01) * 0.3); ctx.fillStyle = '#9fb0e0'; ctx.fillRect(-6, -40 * f, 12, 40 * f); ctx.restore();
-    ctx.strokeStyle = K.ok; ctx.lineWidth = 2; ctx.beginPath(); for (let i = 0; i < 12; i++) ctx.lineTo(x - 50 + i * 9, y + 50 - Math.abs(Math.sin(i * 0.9 + est.t * 0.02)) * 20); ctx.stroke(); ctx.globalAlpha = 1;
-  },
-};
-function dibujarSector(s) {
-  const [x, y] = P(s.x, s.y);
-  if (x < -400 || y < -400 || x > W + 400 || y > H + 400) return;
-  const hecho = est.hechos.has(s.id), libre = desbloqueado(s);
-  if (hecho) {
-    const n = est.nacimientos[s.id]; const f = n ? Math.min(1, (est.t - n) / 90) : 1;
-    DIBUJOS[s.estructura](x, y, f);
-    if (n && f < 1) for (let i = 0; i < 3; i++) est.chispas.push({ x: s.x + (azar() - 0.5) * 200, y: s.y + (azar() - 0.5) * 120, vx: (azar() - 0.5) * 2, vy: (azar() - 0.5) * 2, v: 40, c: K.oro });
-  } else {
-    // el plano (blueprint) del sector: punteado; brilla si está desbloqueado
-    ctx.strokeStyle = libre ? K.oro : '#2a3470'; ctx.globalAlpha = libre ? 0.5 + Math.sin(est.t * 0.06) * 0.3 : 0.6; ctx.setLineDash([5, 7]); ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(x, y, 70, 0, 7); ctx.stroke(); ctx.setLineDash([]);
-    if (libre) { ctx.beginPath(); ctx.arc(x, y, 70 + (est.t % 60), 0, 7); ctx.globalAlpha = 0.3 * (1 - (est.t % 60) / 60); ctx.stroke(); }
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = libre ? K.oro : '#3a4480'; ctx.font = '700 26px "Chakra Petch", sans-serif'; ctx.textAlign = 'center'; ctx.fillText(libre ? '⬢' : '🔒', x, y + 9);
+const cam = { x: nave.x, y: nave.y, z: 1 };
+const fondo = Array.from({ length: 220 }, () => ({ x: Math.random(), y: Math.random(), d: 0.15 + Math.random() * 0.6, r: Math.random() < 0.1 ? 1.6 : 0.9 }));
+
+function actualizar(dt) {
+  let ix = 0, iy = 0;
+  if (teclas.has('arrowleft') || teclas.has('a')) ix--;
+  if (teclas.has('arrowright') || teclas.has('d')) ix++;
+  if (teclas.has('arrowup') || teclas.has('w')) iy--;
+  if (teclas.has('arrowdown') || teclas.has('s')) iy++;
+  if (ix || iy) destino = null;
+  else if (destino) {
+    const dx = destino.x - nave.x, dy = destino.y - nave.y, l = Math.hypot(dx, dy);
+    if (l < 12) destino = null; else { ix = dx / l; iy = dy / l; if (l < 80) { ix *= l / 80; iy *= l / 80; } }
   }
-  ctx.textAlign = 'center';
-  ctx.fillStyle = hecho ? K.texto : libre ? K.oro : '#5a64a0'; ctx.font = '700 13px "Chakra Petch", sans-serif';
-  ctx.fillText(`${SECTORES.indexOf(s) + 1} · ${s.nombre.toUpperCase()}`, x, y + 100);
-  ctx.fillStyle = K.tenue; ctx.font = '12px "Atkinson Hyperlegible", sans-serif';
-  ctx.fillText(hecho ? s.lema : libre ? 'acércate para construir' : 'bloqueado', x, y + 117);
-  ctx.textAlign = 'start';
-}
-// Las rutas entre sectores construidos (la plataforma conectándose)
-function rutas() {
-  for (const [a, b, c] of CONEXIONES) {
-    const A = SECTORES.find(s => s.id === a), B = SECTORES.find(s => s.id === b);
-    if (!A || !B || !est.hechos.has(a) || !est.hechos.has(b)) continue;
-    const [ax, ay] = P(A.x, A.y), [bx, by] = P(B.x, B.y);
-    ctx.strokeStyle = c; ctx.globalAlpha = 0.18; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.quadraticCurveTo((ax + bx) / 2, (ay + by) / 2 - 60, bx, by); ctx.stroke(); ctx.globalAlpha = 1;
+  const il = Math.hypot(ix, iy); if (il > 1) { ix /= il; iy /= il; }
+  const k = Math.min(1, dt * 6);
+  nave.vx += (ix * 360 - nave.vx) * k; nave.vy += (iy * 360 - nave.vy) * k;
+  nave.x += nave.vx * dt; nave.y += nave.vy * dt;
+  if (Math.hypot(nave.vx, nave.vy) > 20) nave.ang = Math.atan2(nave.vy, nave.vx);
+
+  if (activo) {
+    const [cx, cy] = activo.centro, dx = nave.x - cx, dy = nave.y - cy, l = Math.hypot(dx, dy);
+    if (l > 540) { nave.x = cx + dx / l * 540; nave.y = cy + dy / l * 540; }
+    actual.update(dt);
   }
+
+  for (let i = flotantes.length - 1; i >= 0; i--) { const f = flotantes[i]; f.t -= dt; f.y -= 26 * dt; if (f.t <= 0) flotantes.splice(i, 1); }
+  for (let i = particulas.length - 1; i >= 0; i--) { const p = particulas[i]; p.t -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.96; p.vy *= 0.96; if (p.t <= 0) particulas.splice(i, 1); }
 }
 
-// ══════════════════════ La nave y su astronauta ══════════════════════
-function dibujarNave() {
-  const n = est.nave, [x, y] = P(n.x, n.y);
-  ctx.save(); ctx.translate(x, y); ctx.rotate(n.ang + Math.PI / 2);
-  if (n.motor) { const l = 14 + Math.random() * 10; const g = ctx.createLinearGradient(0, 14, 0, 14 + l); g.addColorStop(0, '#fff'); g.addColorStop(0.4, K.oro); g.addColorStop(1, 'rgba(255,77,109,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(-6, 12); ctx.lineTo(6, 12); ctx.lineTo(0, 14 + l); ctx.fill(); }
-  ctx.fillStyle = '#dfe7ff'; ctx.beginPath(); ctx.moveTo(0, -22); ctx.quadraticCurveTo(12, -6, 11, 14); ctx.lineTo(-11, 14); ctx.quadraticCurveTo(-12, -6, 0, -22); ctx.fill();
-  ctx.fillStyle = K.cian; ctx.beginPath(); ctx.moveTo(-11, 4); ctx.lineTo(-20, 16); ctx.lineTo(-10, 14); ctx.fill(); ctx.beginPath(); ctx.moveTo(11, 4); ctx.lineTo(20, 16); ctx.lineTo(10, 14); ctx.fill();
-  // la cabina con el astronauta (casco blanco, visor dorado)
-  ctx.fillStyle = '#0c1a3a'; ctx.beginPath(); ctx.arc(0, -6, 6.5, 0, 7); ctx.fill();
-  ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0, -6, 4.6, 0, 7); ctx.fill();
-  ctx.fillStyle = K.oro; ctx.beginPath(); ctx.ellipse(0, -5.4, 3, 2.1, 0, 0, 7); ctx.fill();
-  ctx.restore();
-}
-function moverNave() {
-  const n = est.nave, k = est.teclas, empuje = 0.22, giro = 0.065;
-  let manual = false;
-  if (k.ArrowLeft || k.a) { n.ang -= giro; manual = true; }
-  if (k.ArrowRight || k.d) { n.ang += giro; manual = true; }
-  n.motor = !!(k.ArrowUp || k.w);
-  if (k.ArrowDown || k.s) { n.vx *= 0.93; n.vy *= 0.93; manual = true; }
-  if (n.motor || manual) est.destino = null;
-  if (est.destino) {        // piloto automático: gira hacia el destino y acelera
-    const dx = est.destino.x - n.x, dy = est.destino.y - n.y, d = Math.hypot(dx, dy);
-    const objetivo = Math.atan2(dy, dx); let dif = ((objetivo - n.ang + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
-    n.ang += Math.max(-giro, Math.min(giro, dif));
-    n.motor = d > 60 && Math.abs(dif) < 0.9;
-    if (d < 60) { n.vx *= 0.9; n.vy *= 0.9; if (d < 20) est.destino = null; }
+function cercano() {
+  for (let i = 0; i < SECTORES.length; i++) {
+    const s = SECTORES[i], d = Math.hypot(nave.x - s.centro[0], nave.y - s.centro[1]);
+    if (d < 240) return { s, i };
   }
-  if (n.motor) { n.vx += Math.cos(n.ang) * empuje; n.vy += Math.sin(n.ang) * empuje; }
-  n.vx *= 0.985; n.vy *= 0.985; const v = Math.hypot(n.vx, n.vy); if (v > 7) { n.vx *= 7 / v; n.vy *= 7 / v; }
-  n.x += n.vx; n.y += n.vy;
-  n.x = Math.max(-2600, Math.min(2600, n.x)); n.y = Math.max(-1800, Math.min(1800, n.y));
-  est.cam.x += (n.x - est.cam.x) * 0.08; est.cam.y += (n.y - est.cam.y) * 0.08;
-  // ¿llegó a un sector desbloqueado y sin construir?
-  if (!est.abierto) for (const s of SECTORES) if (!est.hechos.has(s.id) && desbloqueado(s) && Math.hypot(s.x - n.x, s.y - n.y) < 70) { abrirConsola(s); break; }
+  return null;
 }
 
-// ══════════════════════ Naves de tráfico (la prueba de cada sector) ══════════════════════
-function lanzar(ruta, color) {
-  const pts = ruta.map(id => { const s = SECTORES.find(x => x.id === id); return [s.x + (azar() - 0.5) * 30, s.y + (azar() - 0.5) * 30]; });
-  if (pts.length > 1) est.naves.push({ pts, color, t: 0 });
+function revisarEntrada() {
+  if (activo || pausa) return;
+  const c = cercano();
+  if (c && abierto(c.i) && !est.h.includes(c.s.id)) entrar(c.s);
 }
-function moverTrafico() {
-  est.naves = est.naves.filter(nv => {
-    const tramos = nv.pts.length - 1, prog = nv.t / (tramos * 110); if (prog >= 1) return false;
-    const i = Math.min(tramos - 1, Math.floor(prog * tramos)), f = prog * tramos - i;
-    const [ax, ay] = nv.pts[i], [bx, by] = nv.pts[i + 1];
-    const mx = (ax + bx) / 2, my = (ay + by) / 2 - 60, u = 1 - f;
-    const x = u * u * ax + 2 * u * f * mx + f * f * bx, y = u * u * ay + 2 * u * f * my + f * f * by;
-    nv.estela = nv.estela || []; nv.estela.push([x, y]); if (nv.estela.length > 14) nv.estela.shift();
-    nv.estela.forEach(([ex, ey], k) => { const [sx, sy] = P(ex, ey); ctx.globalAlpha = k / 14 * 0.6; ctx.fillStyle = nv.color; ctx.beginPath(); ctx.arc(sx, sy, 1 + k / 7, 0, 7); ctx.fill(); });
-    const [sx, sy] = P(x, y); ctx.globalAlpha = 1; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(sx, sy, 3, 0, 7); ctx.fill();
-    nv.t++; return true;
+
+let objPrevio = '';
+function pintarObjetivo() {
+  let o = actual && actual.objetivo ? actual.objetivo() : null;
+  if (!activo) {
+    const c = cercano();
+    if (c && est.h.includes(c.s.id)) o = [`${c.s.nombre} · completo`, 'Pulsa E para jugarlo otra vez'];
+    else if (c && !abierto(c.i)) o = [`${c.s.nombre} · cerrado`, 'Completa el sector anterior para abrirlo'];
+    else {
+      const sig = SECTORES.find((s, i) => abierto(i) && !est.h.includes(s.id));
+      o = sig ? [`Rumbo a ${sig.nombre}`, sig.sub] : ['Todos los sectores completos', 'Repite el que quieras: acércate y pulsa E'];
+    }
+  }
+  const txt = o ? o.join('|') : '';
+  if (txt === objPrevio) return;
+  objPrevio = txt;
+  $('#objetivo').hidden = !o;
+  if (o) { $('#obj-t').textContent = o[0]; $('#obj-c').textContent = o[1] || ''; }
+}
+
+function usar() {
+  if (pausa) return;
+  if (actual) { actual.usar(); return; }
+  const c = cercano();
+  if (c && est.h.includes(c.s.id)) entrar(c.s);
+}
+function disparar() { if (!pausa && actual && actual.disparar) actual.disparar(); }
+
+function dibujar() {
+  const c = ctx;
+  c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  c.fillStyle = '#050714'; c.fillRect(0, 0, W, H);
+  // cámara
+  let tx = nave.x, ty = nave.y, tz = Math.max(0.6, Math.min(1, Math.min(W, H) / 760));
+  if (activo) {
+    tx = activo.centro[0] * 0.6 + nave.x * 0.4; ty = activo.centro[1] * 0.6 + nave.y * 0.4;
+    tz = Math.max(0.42, Math.min(1, Math.min(W / 1150, H / 820)));
+  }
+  cam.x += (tx - cam.x) * 0.08; cam.y += (ty - cam.y) * 0.08; cam.z += (tz - cam.z) * 0.06;
+  // estrellas
+  fondo.forEach(s => {
+    const x = ((s.x * W * 3 - cam.x * s.d) % W + W) % W, y = ((s.y * H * 3 - cam.y * s.d) % H + H) % H;
+    c.fillStyle = `rgba(220,225,255,${0.25 + s.d})`; c.fillRect(x, y, s.r, s.r);
   });
-}
-function chispas() {
-  est.chispas = est.chispas.filter(c => { c.x += c.vx; c.y += c.vy; c.v--; const [x, y] = P(c.x, c.y); ctx.globalAlpha = c.v / 40; ctx.fillStyle = c.c; ctx.fillRect(x, y, 2, 2); ctx.globalAlpha = 1; return c.v > 0; });
-}
+  c.setTransform(DPR * cam.z, 0, 0, DPR * cam.z, DPR * (W / 2 - cam.x * cam.z), DPR * (H / 2 - cam.y * cam.z));
+  c.textAlign = 'center';
 
-// ══════════════════════ Minimapa y COSMO ══════════════════════
-const mapa = $('mapa'), mctx = mapa.getContext('2d');
-function minimapa() {
-  mctx.clearRect(0, 0, 360, 260); const k = 360 / 5600;
-  const m = (x, y) => [(x + 2800) * k, (y + 1950) * (260 / 3900)];
-  for (const s of SECTORES) {
-    const [x, y] = m(s.x, s.y); const hecho = est.hechos.has(s.id);
-    mctx.fillStyle = hecho ? K.ok : desbloqueado(s) ? K.oro : '#3a4480'; mctx.beginPath(); mctx.arc(x, y, hecho ? 6 : 5, 0, 7); mctx.fill();
-  }
-  const [nx, ny] = m(est.nave.x, est.nave.y); mctx.fillStyle = '#fff'; mctx.beginPath(); mctx.arc(nx, ny, 5, 0, 7); mctx.fill();
-  mctx.strokeStyle = K.cian; mctx.lineWidth = 2; mctx.beginPath(); mctx.arc(nx, ny, 9 + Math.sin(est.t * 0.1) * 2, 0, 7); mctx.stroke();
-}
-const cara = $('cara'), cctx = cara.getContext('2d');
-function dibujarCosmo() {   // el copiloto: un robot redondo que parpadea
-  cctx.clearRect(0, 0, 108, 108); cctx.fillStyle = '#dfe7ff'; cctx.beginPath(); cctx.arc(54, 58, 38, 0, 7); cctx.fill();
-  cctx.fillStyle = '#0c1a3a'; cctx.beginPath(); cctx.roundRect(26, 40, 56, 32, 14); cctx.fill();
-  const ojo = Math.floor(est.t / 8) % 40 === 0 ? 1 : 7; cctx.fillStyle = K.cian;
-  cctx.beginPath(); cctx.ellipse(42, 56, 6, ojo, 0, 0, 7); cctx.fill(); cctx.beginPath(); cctx.ellipse(66, 56, 6, ojo, 0, 0, 7); cctx.fill();
-  cctx.strokeStyle = K.oro; cctx.lineWidth = 3; cctx.beginPath(); cctx.moveTo(54, 20); cctx.lineTo(54, 8); cctx.stroke(); cctx.fillStyle = K.oro; cctx.beginPath(); cctx.arc(54, 7, 5, 0, 7); cctx.fill();
-}
-function decir(texto, tecla = '') { $('radio-texto').textContent = texto; $('radio-tecla').textContent = tecla; }
-
-// ══════════════════════ La consola de construcción ══════════════════════
-const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const ETAPAS = ['Briefing', 'Predice', 'Ensambla', 'Construye', 'Prueba', 'Bitácora'];
-function abrirConsola(s) {
-  est.abierto = s; est.etapa = 0; est.nave.vx *= 0.2; est.nave.vy *= 0.2; est.destino = null; est.elegidas = new Set();
-  $('consola').hidden = false; pintarEtapa();
-}
-function cerrarConsola() {
-  $('consola').hidden = true; const s = est.abierto; est.abierto = null;
-  if (s && !est.hechos.has(s.id)) { est.nave.x = s.x; est.nave.y = s.y + 170; est.nave.vx = 0; est.nave.vy = 0; }
-}
-function cabecera(s) {
-  return `<header><span class="sector">Sector ${SECTORES.indexOf(s) + 1} de ${SECTORES.length} · ${s.taller}</span><h2>${s.nombre}</h2></header>
-    <div class="etapas">${ETAPAS.map((e, i) => `<i class="${i < est.etapa ? 'hecha' : i === est.etapa ? 'ahora' : ''}" title="${e}"></i>`).join('')}</div>
-    <h3>${ETAPAS[est.etapa]}</h3>`;
-}
-function pintarEtapa() {
-  const s = est.abierto, caja = $('caja');
-  let cuerpo = '', siguienteTxt = 'Siguiente ›', bloquear = false;
-  switch (est.etapa) {
-    case 0: cuerpo = `<p>${esc(s.briefing)}</p>`; siguienteTxt = 'A la consola ›'; break;
-    case 1: cuerpo = `<p><strong>${esc(s.prediccion.pregunta)}</strong></p><div class="opciones">${s.prediccion.opciones.map(([t], i) => `<button data-o="${i}">${esc(t)}</button>`).join('')}</div><div class="nota" id="nota"></div>`; bloquear = true; break;
-    case 2: cuerpo = `<p>${esc(s.ensamblaje.instruccion)}</p><div class="piezas">${s.ensamblaje.piezas.map((p, i) => `<button class="pieza" data-p="${i}"><b>${esc(p[0])}</b><span>${esc(p[1])}</span></button>`).join('')}</div><div class="nota" id="nota">Elige las ${s.ensamblaje.piezas.filter(p => p[2]).length} piezas que necesita este sector.</div>`; bloquear = true; break;
-    case 3: cuerpo = `<p>${esc(s.construye)}</p>`; siguienteTxt = 'Construir ⬢'; break;
-    case 4: cuerpo = `<p>${esc(s.prueba.texto)}</p><p class="nota">Las naves de prueba ya están volando por lo que construiste.</p>`; break;
-    case 5: cuerpo = `<p>${esc(s.aprendiste)}</p>${s.codigo ? `<pre>${s.codigo.replace(/</g, '&lt;')}</pre>` : ''}<p class="fuente">${esc(s.fuente)}</p>`; siguienteTxt = 'Volver a la nave ✓'; break;
-  }
-  caja.innerHTML = cabecera(s) + cuerpo + `<div class="acciones">${est.etapa === 0 ? '<button class="boton" id="c-salir">Ahora no</button>' : ''}<button class="boton oro" id="c-sig" ${bloquear ? 'disabled' : ''}>${siguienteTxt}</button></div>`;
-  $('c-sig').onclick = avanzar; if ($('c-salir')) $('c-salir').onclick = cerrarConsola;
-  if (est.etapa === 1) caja.querySelectorAll('[data-o]').forEach(b => b.onclick = () => {
-    const i = +b.dataset.o, [, ok, fb] = s.prediccion.opciones[i];
-    caja.querySelectorAll('[data-o]').forEach((x, j) => { x.disabled = true; if (s.prediccion.opciones[j][1]) x.classList.add('bien'); });
-    if (!ok) b.classList.add('mal'); else ganar(3);
-    $('nota').className = 'nota ' + (ok ? 'bien' : 'mal'); $('nota').innerHTML = `<b>${ok ? '+3 ★ Bien.' : 'No.'}</b> ${esc(fb)}`;
-    $('c-sig').disabled = false;
+  // próximos sectores
+  PROXIMOS.forEach(p => {
+    c.strokeStyle = '#28327066'; c.lineWidth = 2; c.setLineDash([4, 8]);
+    c.beginPath(); c.arc(p.x, p.y, 120, 0, 6.283); c.stroke(); c.setLineDash([]);
+    c.fillStyle = '#5a628f'; c.font = '600 16px "Chakra Petch", sans-serif'; c.fillText(p.n.toUpperCase(), p.x, p.y);
+    c.font = '500 12px "Chakra Petch", sans-serif'; c.fillText('próximamente', p.x, p.y + 20);
   });
-  if (est.etapa === 2) {
-    const total = s.ensamblaje.piezas.filter(p => p[2]).length; let errores = 0;
-    caja.querySelectorAll('[data-p]').forEach(b => b.onclick = () => {
-      const [nombre, , ok, porque] = s.ensamblaje.piezas[+b.dataset.p];
-      b.disabled = true;
-      if (ok) { b.classList.add('elegida'); est.elegidas.add(nombre); }
-      else { b.classList.add('rechazada'); b.querySelector('span').textContent = porque; errores++; }
-      const listo = est.elegidas.size === total;
-      $('nota').className = 'nota ' + (ok ? 'bien' : 'mal');
-      $('nota').innerHTML = ok ? `<b>Encaja.</b> ${esc(porque)}` : `<b>No encaja.</b> ${esc(porque)}`;
-      if (listo) { const premio = Math.max(1, 3 - errores); ganar(premio); $('nota').innerHTML += ` <b>Ensamblaje completo: +${premio} ★</b>`; $('c-sig').disabled = false; caja.querySelectorAll('[data-p]').forEach(x => x.disabled = true); }
-    });
+  // sectores
+  SECTORES.forEach((s, i) => {
+    if (s === activo) return;
+    const [x, y] = s.centro, hecho = est.h.includes(s.id), ab = abierto(i);
+    const pul = 1 + Math.sin(performance.now() / 400) * 0.03;
+    c.strokeStyle = ab ? s.color : '#283270'; c.lineWidth = hecho ? 3 : 5;
+    if (!ab) c.setLineDash([6, 8]);
+    c.beginPath(); c.arc(x, y, 200 * (ab && !hecho ? pul : 1), 0, 6.283); c.stroke(); c.setLineDash([]);
+    c.fillStyle = ab ? s.color : '#5a628f'; c.font = '700 13px "Chakra Petch", sans-serif';
+    c.fillText(`SECTOR ${i + 1}`, x, y - 16);
+    c.font = '700 26px "Chakra Petch", sans-serif'; c.fillText(s.nombre.toUpperCase(), x, y + 14);
+    c.font = '500 14px "Atkinson Hyperlegible", sans-serif'; c.fillStyle = '#98a0cf';
+    c.fillText(hecho ? '✓ completo' : ab ? s.sub : 'cerrado', x, y + 40);
+  });
+  if (actual) actual.dibujar(c);
+
+  // partículas y nave
+  particulas.forEach(p => { c.globalAlpha = Math.max(0, p.t); c.fillStyle = p.c; c.fillRect(p.x - 2, p.y - 2, 4, 4); });
+  c.globalAlpha = 1;
+  c.save(); c.translate(nave.x, nave.y); c.rotate(nave.ang);
+  if (Math.hypot(nave.vx, nave.vy) > 40) { c.fillStyle = '#ffb547'; c.beginPath(); c.moveTo(-12, -5); c.lineTo(-22 - Math.random() * 8, 0); c.lineTo(-12, 5); c.fill(); }
+  c.fillStyle = '#eef0ff'; c.beginPath(); c.moveTo(18, 0); c.lineTo(-12, -11); c.lineTo(-7, 0); c.lineTo(-12, 11); c.closePath(); c.fill();
+  c.fillStyle = '#4fd1ff'; c.beginPath(); c.arc(3, 0, 4, 0, 6.283); c.fill();
+  c.restore();
+  if (destino) { c.strokeStyle = '#4fd1ff66'; c.lineWidth = 1.5; c.beginPath(); c.arc(destino.x, destino.y, 10, 0, 6.283); c.stroke(); }
+  flotantes.forEach(f => { c.globalAlpha = Math.min(1, f.t); c.fillStyle = f.c; c.font = '700 15px "Chakra Petch", sans-serif'; c.fillText(f.txt, f.x, f.y); });
+  c.globalAlpha = 1;
+
+  // flecha al siguiente sector
+  if (!activo) {
+    const sig = SECTORES.find((s, i) => abierto(i) && !est.h.includes(s.id));
+    if (sig) {
+      c.setTransform(DPR, 0, 0, DPR, 0, 0);
+      const sx = W / 2 + (sig.centro[0] - cam.x) * cam.z, sy = H / 2 + (sig.centro[1] - cam.y) * cam.z;
+      const m = 60;
+      if (sx < m || sx > W - m || sy < m + 60 || sy > H - m - 80) {
+        const a = Math.atan2(sy - H / 2, sx - W / 2);
+        const ex = Math.max(m, Math.min(W - m, W / 2 + Math.cos(a) * W)), ey = Math.max(m + 60, Math.min(H - m - 80, H / 2 + Math.sin(a) * H));
+        c.save(); c.translate(ex, ey); c.rotate(a);
+        c.fillStyle = '#ffb547'; c.beginPath(); c.moveTo(16, 0); c.lineTo(-8, -10); c.lineTo(-8, 10); c.closePath(); c.fill();
+        c.restore();
+      }
+    }
   }
-}
-function ganar(n) { est.estrellas += n; hud(); guardar(); }
-function avanzar() {
-  const s = est.abierto;
-  if (est.etapa === 3) {   // construir: la estructura nace en el espacio
-    est.hechos.add(s.id); est.nacimientos[s.id] = est.t; guardar(); hud();
-    $('consola').hidden = true; est.etapa = 4;
-    decir(s.radioConstruido, '');
-    setTimeout(() => { for (let i = 0; i < 4; i++) setTimeout(() => lanzar(s.prueba.ruta, s.prueba.color), i * 500); $('consola').hidden = false; pintarEtapa(); }, 1700);
-    return;
-  }
-  if (est.etapa === 5) { cerrarConsola(); const sig = siguiente(); decir(sig ? `Listo. El siguiente sector es «${sig.nombre}». Pulsa «Rumbo al siguiente» o vuela tú.` : '¡Construiste toda la plataforma! Vuela por ella y mira el tráfico de verdad.', sig ? 'Flechas o WASD para pilotar · clic en el espacio para ir ahí' : ''); return; }
-  est.etapa++; pintarEtapa();
 }
 
-// ══════════════════════ HUD y bitácora ══════════════════════
-function hud() {
-  $('h-sectores').textContent = `${est.hechos.size}/${SECTORES.length}`;
-  $('h-barra').style.width = (est.hechos.size / SECTORES.length * 100) + '%';
-  $('h-estrellas').textContent = est.estrellas;
+let ultimo = performance.now(), relojObj = 0;
+function bucle(ahora) {
+  const dt = Math.min(0.05, (ahora - ultimo) / 1000); ultimo = ahora;
+  if (!pausa) { actualizar(dt); revisarEntrada(); }
+  relojObj -= dt; if (relojObj <= 0) { relojObj = 0.15; pintarObjetivo(); }
+  dibujar();
+  requestAnimationFrame(bucle);
 }
-$('b-rumbo').onclick = () => { const s = siguiente(); if (s) { est.destino = { x: s.x, y: s.y }; decir(`Fijando rumbo a «${s.nombre}». Piloto automático.`, 'Cualquier tecla de dirección te devuelve el control'); } };
-$('b-bitacora').onclick = () => {
-  est.abierto = { bitacora: true }; $('consola').hidden = false;
-  $('caja').innerHTML = `<header><span class="sector">Bitácora del astronauta</span><h2>La plataforma, sector por sector</h2></header>
-    <div class="bitacora">${SECTORES.map((s, i) => `<div class="fila ${est.hechos.has(s.id) ? 'hecho' : ''}"><span class="num">${est.hechos.has(s.id) ? '✓' : i + 1}</span><div>${s.nombre}<small>${s.taller} · ${s.lema}</small></div>
-      <button class="boton" data-ir="${s.id}" ${desbloqueado(s) ? '' : 'disabled'}>${est.hechos.has(s.id) ? 'Repasar' : 'Ir'}</button></div>`).join('')}</div>
-    <div class="acciones"><button class="boton" id="c-reiniciar">Reiniciar misión</button><button class="boton oro" id="c-cerrar">Cerrar</button></div>`;
-  $('c-cerrar').onclick = () => { $('consola').hidden = true; est.abierto = null; };
-  $('c-reiniciar').onclick = () => { est.hechos.clear(); est.estrellas = 0; guardar(); hud(); $('consola').hidden = true; est.abierto = null; est.nave.x = 0; est.nave.y = 260; decir(INTRO); };
-  $('caja').querySelectorAll('[data-ir]').forEach(b => b.onclick = () => {
-    const s = SECTORES.find(x => x.id === b.dataset.ir); $('consola').hidden = true; est.abierto = null;
-    if (est.hechos.has(s.id)) { est.nave.x = s.x; est.nave.y = s.y + 150; abrirConsola(s); est.etapa = 5; pintarEtapa(); }
-    else est.destino = { x: s.x, y: s.y };
-  });
+
+// ---------- Entrada ----------
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (k === 'escape' && !$('#def').hidden) { cerrarDef(); return; }
+  if (pausa) return;
+  if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', ' '].includes(k)) e.preventDefault();
+  if (e.target.tagName === 'INPUT') return;
+  teclas.add(k);
+  if (k === 'e') usar();
+  if (k === 'f') disparar();
+  if (k === 'enter' && $('#racc') && document.activeElement.tagName !== 'BUTTON') $('#racc').click();
+  if (['1', '2', '3'].includes(k)) {
+    const bs = document.querySelectorAll('#ficha button[data-acc]');
+    if (bs[+k - 1]) bs[+k - 1].click();
+  }
+});
+addEventListener('keyup', e => teclas.delete(e.key.toLowerCase()));
+addEventListener('blur', () => teclas.clear());
+lienzo.addEventListener('pointerdown', e => {
+  if (pausa) return;
+  destino = { x: cam.x + (e.clientX - W / 2) / cam.z, y: cam.y + (e.clientY - H / 2) / cam.z };
+});
+document.addEventListener('click', e => {
+  const ch = e.target.closest('.chip');
+  if (ch) { definir(ch.dataset.t, !!ch.dataset.gl); return; }
+  const a = e.target.closest('button[data-acc]');
+  if (a && actual && actual.accion) actual.accion(a.dataset.acc);
+});
+document.addEventListener('input', e => {
+  if (e.target.dataset && e.target.dataset.acc && actual && actual.accion) actual.accion(e.target.dataset.acc, e.target.value);
+});
+$('#b-e').onclick = usar;
+$('#b-f').onclick = disparar;
+$('#b-glosario').onclick = glosario;
+$('#b-reinicio').onclick = function () {
+  if (this.dataset.ok) { est = { h: [], g: [], e: 0 }; guardar(); location.reload(); return; }
+  this.dataset.ok = '1'; this.textContent = '¿Seguro?';
+  setTimeout(() => { delete this.dataset.ok; this.textContent = 'Reiniciar'; }, 3000);
 };
 
-// ══════════════════════ Entrada ══════════════════════
-addEventListener('keydown', e => { if (!$('consola').hidden) { if (e.key === 'Escape' && est.abierto?.bitacora) { $('consola').hidden = true; est.abierto = null; } return; } est.teclas[e.key.length === 1 ? e.key.toLowerCase() : e.key] = true; if (e.key.startsWith('Arrow') || e.key === ' ') e.preventDefault(); });
-addEventListener('keyup', e => { est.teclas[e.key.length === 1 ? e.key.toLowerCase() : e.key] = false; });
-lienzo.addEventListener('pointerdown', e => { est.destino = { x: e.clientX - W / 2 + est.cam.x, y: e.clientY - H / 2 + est.cam.y }; });
+// ---------- COSMO ----------
+(function cara() {
+  const k = $('#cara').getContext('2d');
+  k.fillStyle = '#1b2a66'; k.beginPath(); k.arc(48, 52, 36, 0, 6.283); k.fill();
+  k.strokeStyle = '#4fd1ff'; k.lineWidth = 3; k.stroke();
+  k.fillStyle = '#4fd1ff'; k.fillRect(30, 44, 12, 8); k.fillRect(54, 44, 12, 8);
+  k.fillStyle = '#ffb547'; k.fillRect(38, 64, 20, 4);
+  k.strokeStyle = '#ffb547'; k.beginPath(); k.moveTo(48, 16); k.lineTo(48, 6); k.stroke();
+  k.fillStyle = '#ffb547'; k.beginPath(); k.arc(48, 6, 4, 0, 6.283); k.fill();
+})();
 
-// ══════════════════════ Bucle ══════════════════════
-let ultimoTrafico = 0;
-function cuadro() {
-  est.t++;
-  fondo(); rutas();
-  SECTORES.forEach(dibujarSector);
-  if (est.destino) { const [x, y] = P(est.destino.x, est.destino.y); ctx.strokeStyle = K.cian; ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.arc(x, y, 10 + Math.sin(est.t * 0.15) * 3, 0, 7); ctx.stroke(); ctx.globalAlpha = 1; }
-  if (est.t - ultimoTrafico > 50 && est.naves.length < 18) {   // tráfico ambiente por lo ya construido
-    const vivas = TRAFICO.filter(r => r[0].every(id => est.hechos.has(id)));
-    if (vivas.length) { const [r, c] = vivas[Math.floor(azar() * vivas.length)]; lanzar(r, c); } ultimoTrafico = est.t;
-  }
-  moverTrafico(); chispas();
-  if ($('consola').hidden) moverNave();
-  dibujarNave(); minimapa(); dibujarCosmo();
-  requestAnimationFrame(cuadro);
-}
-
-// ══════════════════════ CONTENIDO ══════════════════════
-// Fuente: los repos de Cosmos-SincoERP (ObligacionesPorPagar.*, .github, blog-ingenieria), leídos el 5 oct 2026.
-// Lo que esos repos no muestran va marcado «por confirmar».
-const FUENTE_REPOS = 'Fuente: repos de Cosmos-SincoERP leídos el 5 oct 2026';
-SECTORES.push(
-{ id: 'base', nombre: 'La base', lema: 'infraestructura como código', taller: 'Lab 1', estructura: 'anillo', x: 0, y: 0,
-  briefing: 'Antes de lanzar nada, necesitas un lugar donde existir: una suscripción de Azure, grupos de recursos y una red. Y nadie quiere crearlos a mano en el portal, porque mañana nadie sabría cómo se crearon. En Cosmos, cada bounded context describe su infraestructura en Terraform, en un repo propio.',
-  prediccion: { pregunta: 'Producción y desarrollo de Cosmos, ¿dónde viven?', opciones: [
-    ['En la misma suscripción, con nombres distintos', false, 'Prod vive en una suscripción propia: un error en dev no puede tocarla.'],
-    ['En suscripciones separadas', true, 'Sí: prod tiene su propia suscripción (ADR-0003 de .github).'],
-    ['Prod en Azure y dev en las laptops', false, 'Dev también vive en Azure, con sus propias VMs y Key Vault.']] },
-  ensamblaje: { instruccion: 'Arma la base. ¿Qué piezas la componen?', piezas: [
-    ['Repo *.Infraestructura con Terraform', 'Cada bounded context declara su infraestructura como código.', true, 'La infraestructura se revisa en PRs como cualquier código.'],
-    ['Estado remoto de Terraform', 'Un storage account por BC guarda el tfstate (sttfstate<bc>eus2001).', true, 'El estado vive en Azure, no en la laptop de nadie, ni en el repo.'],
-    ['Login de Terraform con OIDC', 'El runner hospedado de GitHub entra a Azure sin secretos guardados.', true, 'Federated credentials: no hay clave que robar.'],
-    ['Crear la red a mano en el portal', 'Clic, clic, clic.', false, 'Nadie podría reproducirla ni saber quién la cambió.']] },
-  construye: 'Aplicas el Terraform: aparece el anillo base, con su red y sus subredes. Todo lo que construyas después se apoya aquí.',
-  radioConstruido: 'Base en órbita. Desde aquí lanzaremos todo lo demás.',
-  prueba: { texto: 'Un plan de Terraform recorre la base y no encuentra cambios: lo que existe es exactamente lo que dice el código.', ruta: ['base', 'base'], color: K.cian },
-  aprendiste: 'La infraestructura de Cosmos es código: un repo *.Infraestructura por bounded context, estado remoto por BC y Terraform autenticado por OIDC, con prod en otra suscripción.',
-  codigo: 'uses: Cosmos-SincoERP/.github/.github/workflows/_reusable-terraform-apply.yml@v1\n# backend: sttfstate<bc>eus2001 · auth: OIDC',
-  fuente: FUENTE_REPOS + ' · .github/workflows/README.md, adr/0003. Los repos *.Infraestructura no estuvieron accesibles: red y NSG, por confirmar.' },
-
-{ id: 'astillero', nombre: 'El astillero', lema: 'Docker Swarm, una VM por BC', taller: 'Lab 2-3', estructura: 'astillero', x: 480, y: -260,
-  briefing: 'Tus servicios necesitan dónde correr y alguien que los levante si se caen. En Cosmos cada bounded context tiene su propia VM con Docker Swarm, por entorno: OXP dev, OXP prod, Impuestos, Contabilidad… Swarm compara lo que pediste con lo que hay, y corrige.',
-  prediccion: { pregunta: 'Un contenedor de Radicación se cae a las 3 a. m. ¿Qué pasa?', opciones: [
-    ['Queda caído hasta que alguien entre a la VM', false, 'Eso pasaría con contenedores sueltos.'],
-    ['Swarm lo vuelve a levantar', true, 'Sí: el servicio pide 1 réplica; si hay 0, Swarm arranca otra.']] },
-  ensamblaje: { instruccion: 'Arma el astillero de Obligaciones por Pagar.', piezas: [
-    ['Un stack de Swarm por producto', 'Todos los servicios de OXP en el stack obligaciones-por-pagar.', true, 'Se despliega con docker stack deploy.'],
-    ['Redes overlay oxp-public y oxp-internal', 'Las crea el cloud-init de la VM.', true, 'payment-polling solo vive en la interna: no se expone.'],
-    ['Actualización start-first con rollback', 'Arranca la versión nueva antes de bajar la vieja.', true, 'Si la nueva falla, Swarm vuelve a la anterior.'],
-    ['Un clúster compartido por todos los productos', 'Una sola VM gigante.', false, 'Cosmos aísla por bounded context: una VM por BC y entorno.']] },
-  construye: 'El astillero se arma y los primeros servicios encienden sus luces. Hoy es un solo nodo con una réplica por servicio; la documentación planea tres nodos en prod.',
-  radioConstruido: 'Astillero encendido. Ojo: es un solo nodo. Si la VM cae, cae todo el producto.',
-  prueba: { texto: 'Matas un contenedor y Swarm lo relanza: las luces se apagan y vuelven a encender.', ruta: ['astillero', 'base', 'astillero'], color: K.ok },
-  aprendiste: 'Cada bounded context corre en su propia VM con Docker Swarm, por entorno. Swarm mantiene las réplicas pedidas y hace rollback. Hoy son un nodo y una réplica, sin alta disponibilidad.',
-  codigo: 'docker stack deploy --with-registry-auth -c deploy/stack.prod.yml obligaciones-por-pagar\n# deploy: { replicas: 1, update_config: { order: start-first, failure_action: rollback } }',
-  fuente: FUENTE_REPOS + ' · */deploy/stack.prod.yml, _reusable-deploy-swarm.yml' },
-
-{ id: 'bodega', nombre: 'La bodega y la grúa', lema: 'ACR + GitHub Actions', taller: 'Lab 4-5', estructura: 'bodega', x: 960, y: -60,
-  briefing: 'Cada cambio tiene que convertirse en una imagen, guardarse y llegar al astillero sin que nadie copie archivos a mano. La grúa es un runner de GitHub dentro de la VM; la bodega, un Azure Container Registry por bounded context.',
-  prediccion: { pregunta: 'Para desplegar en producción, ¿se vuelve a compilar la imagen?', opciones: [
-    ['Sí, se compila de nuevo desde main', false, 'Entonces lo que va a prod no sería lo que probaste en dev.'],
-    ['No: prod promueve la misma imagen que corre en dev', true, 'Sí: prod lee el tag que tiene dev y despliega esa misma imagen.']] },
-  ensamblaje: { instruccion: 'Arma la cadena de entrega.', piezas: [
-    ['Workflows reusables de Cosmos-SincoERP/.github', 'tests, build-push, deploy-swarm, deploy-front, cleanup-acr.', true, 'Todos los repos usan la misma cadena, versionada (@v1).'],
-    ['Runner self-hosted en la VM', 'Build, push y deploy corren dentro de la red, por runner group de cada BC.', true, 'GitHub no entra a la VM: el runner sale hacia GitHub.'],
-    ['Tags pr-N-<sha> y main-<sha>', 'Cada imagen dice de qué commit salió.', true, 'Así prod puede promover exactamente lo que se probó.'],
-    ['Aprobación para prod', 'workflow_dispatch sobre main, solo el team prod-infra-approvers.', true, 'Nadie despliega a prod por accidente.'],
-    ['Un ACR público en Docker Hub', 'Más fácil de compartir.', false, 'Las imágenes del ERP no son públicas: cada BC tiene su ACR privado.']] },
-  construye: 'La grúa empieza a mover cajas: build → push al ACR → deploy al astillero.',
-  radioConstruido: 'Cadena de entrega lista. Dato curioso: prod descarga del ACR de dev, a propósito.',
-  prueba: { texto: 'Un merge a main sale de la bodega como imagen y aterriza en el astillero.', ruta: ['bodega', 'astillero'], color: K.ok },
-  aprendiste: 'CI/CD con workflows reusables y runner self-hosted en la VM, un ACR por BC, imágenes con el sha del commit, y promoción a prod de la misma imagen con aprobación del team prod-infra-approvers.',
-  codigo: 'runs-on: [self-hosted, azure, swarm-deploy]\naz login --identity && az acr login -n croxpdeveus2001',
-  fuente: FUENTE_REPOS + ' · .github/workflows, main-deploy-prod.yml, adr/0003' },
-
-{ id: 'boveda', nombre: 'La bóveda', lema: 'Key Vault → Swarm secrets', taller: 'Lab 4', estructura: 'boveda', x: 1320, y: -420,
-  briefing: 'Los servicios necesitan claves: la base, RabbitMQ, Service Bus, Storage, OpenAI. Si van en appsettings, viven para siempre en git y en la imagen. En Cosmos viven en un Key Vault por entorno y llegan al contenedor como Swarm secrets.',
-  prediccion: { pregunta: 'La VM necesita leer el Key Vault. ¿Con qué se identifica?', opciones: [
-    ['Con un usuario y contraseña guardados en la VM', false, 'Esa contraseña sería otro secreto que proteger.'],
-    ['Con la Managed Identity de la VM', true, 'Sí: az login --identity, y la VM tiene el rol Key Vault Secrets User.']] },
-  ensamblaje: { instruccion: 'Arma el camino de un secreto.', piezas: [
-    ['Key Vault por entorno', 'kv-oxp-dev-eus2-001 y kv-oxp-prod-eus2-001.', true, 'Dev y prod no comparten secretos.'],
-    ['Swarm secret versionado por hash', 'El deploy crea <prefix>_<nombre>_v<sha8> y limpia los huérfanos.', true, 'Cambiar un secreto crea uno nuevo: no hay que reiniciar a mano.'],
-    ['Lectura con AddKeyPerFile', 'La app lee los archivos de /run/secrets.', true, 'El secreto nunca pasa por una variable de entorno visible.'],
-    ['El secreto en appsettings.json', 'Cómodo para probar.', false, 'Queda en git y en la imagen del ACR. La auditoría encontró casos así: hay que rotarlos.']] },
-  construye: 'La bóveda gira y se sella. Cada servicio recibe solo los secretos que necesita.',
-  radioConstruido: 'Bóveda sellada. Pendiente de la vida real: rotar las credenciales que quedaron versionadas en dos repos.',
-  prueba: { texto: 'Un deploy pide sus secretos a la bóveda y los monta en el astillero.', ruta: ['boveda', 'bodega', 'astillero'], color: K.oro },
-  aprendiste: 'Los secretos viven en un Key Vault por entorno. El job de deploy los lee con la identidad de la VM y los convierte en Swarm secrets versionados por hash, que la app lee de /run/secrets.',
-  codigo: 'az keyvault secret show --vault-name kv-oxp-dev-eus2-001 --name pg-cs-radicaciondb\n# → docker secret create radicacion_pg_cs_radicaciondb_v<sha8>\nbuilder.Configuration.AddKeyPerFile("/run/secrets")',
-  fuente: FUENTE_REPOS + ' · _reusable-deploy-swarm.yml, Radicacion Program.cs' },
-
-{ id: 'archivo', nombre: 'El Archivo', lema: 'Postgres + Marten', taller: 'Lab 6', estructura: 'archivo', x: 980, y: -800,
-  briefing: 'Los contenedores son efímeros; los hechos no. Cada servicio guarda su diario de eventos con Marten en Postgres: una base por servicio. Y todos los clientes comparten tablas, separados por tenant_id.',
-  prediccion: { pregunta: 'Ferretería Sur y Constructora Andes usan Radicación. ¿Dónde están sus datos?', opciones: [
-    ['En bases separadas, una por cliente', false, 'Eso sería «base por tenant». El código usa otro modelo.'],
-    ['En las mismas tablas, separados por tenant_id', true, 'Sí: Marten en modo Conjoined. La decisión formal (ADR-0001) sigue pendiente.']] },
-  ensamblaje: { instruccion: 'Arma el Archivo.', piezas: [
-    ['Una base por servicio', 'pg-cs-radicaciondb, pg-cs-entradasdb…', true, 'Cada bounded context es dueño de sus datos.'],
-    ['Marten con TenancyStyle.Conjoined', 'Eventos y documentos llevan tenant_id.', true, 'Un tenant nuevo empieza a escribir sin aprovisionar nada.'],
-    ['Outbox durable de Wolverine', 'Los mensajes salen en la misma transacción del hecho.', true, 'Nunca hay un hecho sin su mensaje, ni un mensaje sin su hecho.'],
-    ['Una base compartida entre BCs', 'Menos conexiones.', false, 'Acoplaría los bounded contexts por la base.']] },
-  construye: 'El Archivo empieza a girar: cada hecho que entra se queda, en orden, con su tenant.',
-  radioConstruido: 'Archivo en línea. Si el tenant viniera de un header falso, se leerían datos de otro cliente: por eso importa la aduana.',
-  prueba: { texto: 'Los servicios del astillero escriben sus hechos en el Archivo.', ruta: ['astillero', 'archivo'], color: K.ok },
-  aprendiste: 'Una base Postgres por servicio, Marten en modo Conjoined (todos los tenants en las mismas tablas, separados por tenant_id) y el outbox de Wolverine en la misma base.',
-  codigo: 'opts.Events.TenancyStyle = TenancyStyle.Conjoined;\nopts.Policies.AllDocumentsAreMultiTenanted();',
-  fuente: FUENTE_REPOS + ' · Entradas ServicesCollectionExtensions.cs. Que sea PostgreSQL Flexible lo dice la documentación; en código, por confirmar.' },
-
-{ id: 'planetas', nombre: 'Los planetas', lema: 'los productos y sus bounded contexts', taller: 'Lab 3', estructura: 'planetas', x: 380, y: -980,
-  briefing: 'Ahora sí, los productos. Obligaciones por Pagar es un planeta con lunas: Entradas recibe documentos, Reconocimiento los lee, Radicación radica las obligaciones. Cada uno separa su API de comandos de su API de consultas.',
-  prediccion: { pregunta: 'Radicación tiene radicacion-comandos-api y radicacion-consultas-api. ¿Por qué dos?', opciones: [
-    ['Porque una es de dev y otra de prod', false, 'Las dos corren en cada entorno.'],
-    ['Escribir y leer son modelos distintos (CQRS)', true, 'Sí: comandos escribe hechos; consultas lee proyecciones.']] },
-  ensamblaje: { instruccion: 'Lanza los servicios de Obligaciones por Pagar.', piezas: [
-    ['entradas-api', 'Hace polling a Sinco y publica cada documento.', true, 'Es la puerta de los documentos.'],
-    ['reconocimiento-comandos/consultas', 'Extrae datos con Document Intelligence.', true, 'Event sourcing con Marten.'],
-    ['radicacion-comandos/consultas', 'Radica la obligación.', true, 'Más un payment-polling, solo en la red interna.'],
-    ['Servidores MCP', 'radicacion-*-mcp-server para el Asistente.', true, 'El Asistente usa herramientas de cada BC.'],
-    ['Un monolito con todo junto', 'Un solo despliegue.', false, 'Cada BC se despliega y escala por su cuenta.']] },
-  construye: 'Los planetas aparecen en órbita, cada uno con sus lunas.',
-  radioConstruido: 'Productos en órbita. Cada luna escucha en el puerto 8080 dentro del astillero.',
-  prueba: { texto: 'Los servicios arrancan en el astillero y empiezan a escribir en el Archivo.', ruta: ['astillero', 'planetas', 'archivo'], color: K.cian },
-  aprendiste: 'Obligaciones por Pagar son varios bounded contexts (Entradas, Reconocimiento, Radicación, Integraciones), cada uno con APIs de comandos y de consultas, más servidores MCP para el Asistente.',
-  codigo: 'radicacion-comandos-api · radicacion-consultas-api · radicacion-payment-polling (oxp-internal)\nreconocimiento-comandos-api · reconocimiento-consultas-api · entradas-api',
-  fuente: FUENTE_REPOS + ' · Radicacion/deploy/stack.prod.yml' },
-
-{ id: 'orbita', nombre: 'La órbita local', lema: 'RabbitMQ dentro del producto', taller: 'Lab 9', estructura: 'orbita', x: -180, y: -700,
-  briefing: 'Entradas recibe un documento y Radicación tiene que enterarse. Si Entradas la llamara por HTTP y Radicación estuviera caída, el documento se perdería. Dentro del producto, los mensajes viajan por RabbitMQ con Wolverine.',
-  prediccion: { pregunta: 'En la siguiente vuelta del polling, Entradas publica el mismo documento otra vez. ¿Qué debería pasar?', opciones: [
-    ['Radicación lo radica dos veces', false, 'Una obligación duplicada puede terminar en un pago doble.'],
-    ['Radicación lo reconoce por su clave de negocio y lo ignora', true, 'Sí: idempotencia. La auditoría encontró que hoy falta (accionable T2).']] },
-  ensamblaje: { instruccion: 'Conecta Entradas con Radicación.', piezas: [
-    ['Un exchange por servicio', 'Entradas publica en su exchange.', true, 'Wolverine lo crea con AutoProvision.'],
-    ['La cola Radicacion-From-EntradasExchange', 'Radicación escucha lo que publica Entradas.', true, 'Si Radicación cae, los mensajes esperan en la cola.'],
-    ['Idempotencia por clave de negocio', 'Documento de Sinco + tipo de fuente.', true, 'Un mensaje puede llegar dos veces; el efecto debe ocurrir una.'],
-    ['Llamada HTTP de Entradas a Radicación', 'Directo y rápido.', false, 'Si Radicación está caída, se pierde el documento.']] },
-  construye: 'La órbita local empieza a girar entre las lunas del planeta.',
-  radioConstruido: 'Órbita local activa. Recuerda: idempotencia por clave de negocio, todavía pendiente en el código real.',
-  prueba: { texto: 'Un documento viaja de Entradas a Radicación por la órbita local.', ruta: ['planetas', 'orbita', 'planetas'], color: K.naranja },
-  aprendiste: 'Dentro de un producto, los bounded contexts se hablan por RabbitMQ con Wolverine: exchanges por servicio, colas por consumidor, outbox durable. La idempotencia por clave de negocio es la defensa contra el duplicado.',
-  codigo: 'opts.HabilitarRabbitMq("RabbitMQ");\n// cola: Radicacion-From-EntradasExchange',
-  fuente: FUENTE_REPOS + ' · Entradas ServicesCollectionExtensions.cs, Radicacion Program.cs. Dónde corre RabbitMQ: por confirmar.' },
-
-{ id: 'hiper', nombre: 'El hiperespacio', lema: 'Azure Service Bus entre productos', taller: 'Lab 9', estructura: 'hiperespacio', x: -700, y: -960,
-  briefing: 'Obligaciones por Pagar necesita saber lo que pasa en Contabilidad, Impuestos y Estructura Organizacional, que viven en otras VMs. Entre productos, los eventos viajan por Azure Service Bus.',
-  prediccion: { pregunta: 'Contabilidad publica un evento. ¿Cómo llega a Radicación?', opciones: [
-    ['Radicación consulta a Contabilidad cada minuto', false, 'Eso es polling: lento y acoplado.'],
-    ['Por un topic de Service Bus con una suscripción de OXP', true, 'Sí: un topic por evento y la suscripción oxp-from-contabilidad.']] },
-  ensamblaje: { instruccion: 'Abre el hiperespacio.', piezas: [
-    ['Un topic por evento', 'Cada tipo de evento tiene su topic.', true, 'Así lo configura Wolverine en el código (no «un topic por BC», como dice un documento).'],
-    ['Suscripciones oxp-from-*', 'oxp-from-contabilidad, -impuestos, -estructura-organizacional.', true, 'Cada consumidor tiene su suscripción: no se pisan.'],
-    ['El tenant en el sobre del mensaje', 'DeliveryOptions.TenantId.', true, 'El consumidor sabe de qué cliente es el evento.'],
-    ['Una llamada HTTP de Radicación a Impuestos', 'Ya existe en el código.', false, 'Existe, y la topología la prohíbe: si Impuestos cae, Radicación falla. Es deuda, no diseño.']] },
-  construye: 'Se abre el corredor de hiperespacio. Los eventos de otros productos empiezan a llegar.',
-  radioConstruido: 'Hiperespacio abierto. Hoy se entra con una cadena de conexión SAS; el plan es pasar a Managed Identity (ADR-004).',
-  prueba: { texto: 'Un evento de Contabilidad cruza el hiperespacio hasta Obligaciones por Pagar.', ruta: ['hiper', 'planetas'], color: K.lila },
-  aprendiste: 'Entre productos, Azure Service Bus: un topic por evento y una suscripción por consumidor; el tenant viaja en el sobre. Hoy hay un solo namespace, se entra por SAS y no se usan sesiones.',
-  codigo: '// suscripciones: oxp-from-contabilidad · oxp-from-impuestos · oxp-from-estructura-organizacional\nConnectionStrings__AzureServiceBus  # SAS hoy; plan: Managed Identity',
-  fuente: FUENTE_REPOS + ' · MensajeriaWolverineExtensions.cs, topologia-equipos-despliegue.md' },
-
-{ id: 'faro', nombre: 'El faro', lema: 'el frontend', taller: 'Lab 7', estructura: 'faro', x: -1220, y: -640,
-  briefing: 'La gente necesita una pantalla. El front de OXP es React servido como archivos estáticos. El mismo build tiene que servir en dev y en prod sin recompilarse.',
-  prediccion: { pregunta: '¿Cómo sabe el front a qué API llamar en cada entorno?', opciones: [
-    ['La URL va compilada dentro del bundle', false, 'Entonces habría que compilar una vez por entorno.'],
-    ['Lee un env.js generado en el despliegue', true, 'Sí: window.__APP_CONFIG__, generado desde el Key Vault.']] },
-  ensamblaje: { instruccion: 'Enciende el faro.', piezas: [
-    ['React 19 + Vite + Module Federation', 'El front de OXP, como micro-frontend.', true, 'Se integra con los fronts de los demás productos.'],
-    ['Storage static website compartido', 'stfrontappl{dev,prod}eus2001, bajo /oxp/releases/<sha>/.', true, 'Cada release vive en su carpeta: volver atrás es cambiar un puntero.'],
-    ['env.js desde Key Vault', 'Secretos front-oxp-*, con las vars del Environment como prioridad.', true, 'Un solo build para todos los entornos.'],
-    ['Un servidor web propio en la VM', 'Más control.', false, 'Para archivos estáticos, el Storage es más barato y no se cae con la VM.']] },
-  construye: 'El faro se enciende y empieza a barrer el espacio.',
-  radioConstruido: 'Faro encendido. Todavía no hay puerta de entrada: eso viene en el portal.',
-  prueba: { texto: 'Un navegador descarga el front y su env.js.', ruta: ['faro', 'faro'], color: K.ok },
-  aprendiste: 'El front es React con Module Federation, servido desde un Storage static website compartido por los fronts del plano, con releases por sha y un env.js generado en el despliegue.',
-  codigo: 'window.__APP_CONFIG__ = { /* generado desde Key Vault: front-oxp-* */ }',
-  fuente: FUENTE_REPOS + ' · Front/src/shared/plataforma/env.ts, deploy-new.yml' },
-
-{ id: 'pasaporte', nombre: 'El pasaporte', lema: 'WorkOS: quién eres y de qué tenant', taller: 'Lab 8', estructura: 'pasaporte', x: -1560, y: -160,
-  briefing: 'Antes de dejar entrar a alguien, hay que saber quién es y a qué empresa pertenece. Cosmos usa WorkOS: cada empresa cliente es una organización de WorkOS, y el token de cada usuario dice su tenant.',
-  prediccion: { pregunta: 'El claim tenant_id del token, ¿qué contiene?', opciones: [
-    ['El id de la organización de WorkOS (org_…)', false, 'Ese es el id de WorkOS, no el de Cosmos.'],
-    ['El TenantId de Cosmos, guardado como external_id de la organización', true, 'Sí: el Control Plane crea la organización con ExternalId = TenantId.']] },
-  ensamblaje: { instruccion: 'Emite el pasaporte.', piezas: [
-    ['WorkOS AuthKit en el front', 'El login, con dominio propio auth.sincoerp.ai.', true, 'La identidad no se programa a mano.'],
-    ['Organización = tenant', 'La crea el Control Plane (UserManagement).', true, 'Así cada usuario queda atado a su empresa.'],
-    ['Plantilla JWT con tenant_id y user_email', 'Configurada en el dashboard de WorkOS.', true, 'Todo el sistema confía en esos claims.'],
-    ['El tenant elegido en un combo del front', 'El usuario escoge su empresa.', false, 'Cualquiera podría escoger la empresa de otro.']] },
-  construye: 'El pasaporte queda emitido. Cada usuario lleva su tenant firmado.',
-  radioConstruido: 'Pasaportes listos. Ahora falta alguien que los revise en la entrada.',
-  prueba: { texto: 'Un usuario inicia sesión y recibe su token con el tenant.', ruta: ['pasaporte', 'faro'], color: K.oro },
-  aprendiste: 'WorkOS es la identidad: cada empresa es una organización con ExternalId = TenantId, y el JWT lleva tenant_id y user_email. El tenant sale del token firmado, nunca de lo que elige el usuario.',
-  codigo: '// claims: { tenant_id: "<TenantId de Cosmos>", user_email: "..." }',
-  fuente: FUENTE_REPOS + ' · Front/docs/contratos/identidad-tenant.md, sesion.ts' },
-
-{ id: 'portal', nombre: 'El portal', lema: 'Azure Front Door', taller: 'Lab 8', estructura: 'portal', x: -1180, y: 300,
-  briefing: 'Los usuarios llegan desde internet a app.sincoerp.ai. Hace falta una sola puerta global, cerca de ellos, que mande cada petición a donde corresponde: /api/oxp, /api/impu, el front…',
-  prediccion: { pregunta: '¿Cómo sabe la aduana que una petición vino por el portal?', opciones: [
-    ['Por la IP del usuario', false, 'La IP del usuario no dice por dónde entró.'],
-    ['Por el header X-Azure-FDID con el id de este Front Door', true, 'Sí: Front Door lo pone y la aduana lo compara con el esperado.']] },
-  ensamblaje: { instruccion: 'Abre el portal.', piezas: [
-    ['Dominios app. y dev.sincoerp.ai', 'La entrada de producción y de desarrollo.', true, 'Cada entorno con su dominio.'],
-    ['Rutas por producto', '/api/oxp, /api/impu, /api/terc…', true, 'El portal ya sabe a qué producto va cada petición.'],
-    ['Header X-Azure-FDID', 'Marca cada petición con el id del portal.', true, 'Sin él, una petición directa se haría pasar por legítima.'],
-    ['Un Front Door por servicio', 'Uno para cada API.', false, 'La entrada es una sola, con rutas.']] },
-  construye: 'El portal se abre en el borde de la galaxia.',
-  radioConstruido: 'Portal abierto. Las peticiones ya pueden entrar… hasta la aduana.',
-  prueba: { texto: 'Peticiones de usuarios entran por el portal.', ruta: ['portal', 'faro'], color: K.cian },
-  aprendiste: 'Front Door es la única entrada: dominios por entorno, rutas por producto y el header X-Azure-FDID que prueba que la petición pasó por él.',
-  codigo: 'https://app.sincoerp.ai/api/oxp/...  ·  /api/impu/...  ·  /api/terc/...',
-  fuente: FUENTE_REPOS + ' · Front env.ts. La configuración del Front Door y el WAF: por confirmar.' },
-
-{ id: 'aduana', nombre: 'Las aduanas', lema: 'YARP del plano + nginx del producto', taller: 'Lab 8', estructura: 'aduana', x: -640, y: 520,
-  briefing: 'Pasar el portal no basta: alguien tiene que revisar el pasaporte. La aduana central es un YARP en la VM del Application Plane; dentro de cada producto hay una segunda aduana, nginx, que reparte a cada servicio.',
-  prediccion: { pregunta: 'El navegador manda un header X-Tenant-Id con la empresa de otro. ¿Qué hace la aduana YARP?', opciones: [
-    ['Lo deja pasar: viene del navegador', false, 'Eso sería leer y escribir datos de otro cliente.'],
-    ['Lo borra y pone el tenant del claim del token', true, 'Sí: borra X-Tenant-Id y X-User-Id entrantes y los reinyecta desde el JWT.']] },
-  ensamblaje: { instruccion: 'Arma las aduanas.', piezas: [
-    ['YARP del Application Plane', 'Valida el JWT de WorkOS y X-Azure-FDID; responde 401, 400 o 403.', true, 'Es el único lugar donde se confía en el token.'],
-    ['Reinyectar X-Tenant-Id y X-User-Id', 'Desde los claims, borrando los que trajo el cliente.', true, 'Anti-spoofing, con test que lo fija.'],
-    ['nginx del producto', 'Reparte por prefijo: /api/radicacion/comandos/, /api/entradas/…', true, 'No valida JWT: confía en lo que le manda el YARP.'],
-    ['Validar el JWT en cada servicio', 'Cada API revisa el token.', false, 'Los servicios confían en los headers de la aduana (TrustedHeadersTenantContext).']] },
-  construye: 'Las dos aduanas encienden sus anillos.',
-  radioConstruido: 'Aduanas en servicio. Riesgos reales: del YARP al nginx el tráfico va por HTTP, y el NSG de Impuestos está abierto a internet.',
-  prueba: { texto: 'Una petición pasa el portal, la aduana YARP y el nginx de OXP, y llega a Radicación.', ruta: ['portal', 'aduana', 'planetas', 'archivo'], color: K.cian },
-  aprendiste: 'Dos aduanas: el YARP del plano valida el JWT y el FDID y reinyecta el tenant; el nginx de cada producto reparte por prefijo. Los servicios leen el tenant de headers que solo pone la aduana.',
-  codigo: 'Front Door → YARP (vm-appl) → nginx del BC (:80) → radicacion-comandos-api (:8080)',
-  fuente: FUENTE_REPOS + ' · Gateway/nginx/conf.d/default.conf, identidad-tenant.md. El código del YARP (repo ApplicationPlane): por confirmar.' },
-
-{ id: 'estacion', nombre: 'La Estación de Control', lema: 'el Control Plane', taller: 'Lab 10', estructura: 'estacion', x: 520, y: 780,
-  briefing: 'Todo lo anterior sirve a clientes que ya existen. ¿Quién da de alta a una empresa nueva, crea su organización en WorkOS, la activa en cada producto y la suspende si no paga? El Control Plane.',
-  prediccion: { pregunta: 'Textiles Norte firma con Sinco. ¿Qué parte del sistema se entera primero?', opciones: [
-    ['El producto que compró', false, 'Los productos atienden tenants que ya existen.'],
-    ['El Control Plane, por Onboarding', true, 'Sí: la experiencia SaaS empieza en la estación.']] },
-  ensamblaje: { instruccion: 'Arma la estación.', piezas: [
-    ['Onboarding', 'Recibe al tenant nuevo (por ahora administrado por Sinco).', true, 'La puerta del cliente.'],
-    ['Tenant Manager', 'Registrado → Activado → Suspendido → Inactivo → Destruido.', true, 'Cada cambio de estado tiene consecuencias en los productos.'],
-    ['TenantProvisioning por producto', 'Repos *.TenantProvisioning (OXP, Contabilidad, Impuestos, Asistente…).', true, 'El puente: activa al tenant en cada producto.'],
-    ['UserManagement', 'Crea la organización de WorkOS con ExternalId = TenantId.', true, 'Ata la identidad al tenant.'],
-    ['Que cada producto dé sus propias altas', 'Cada uno a su manera.', false, 'El cliente tendría una experiencia distinta en cada producto.']] },
-  construye: 'La estación se enciende en el centro del sistema.',
-  radioConstruido: 'Estación en línea. Con Conjoined, activar un tenant puede ser solo empezar a escribir con su tenant_id.',
-  prueba: { texto: 'Nace un tenant: la estación crea su organización y lo activa en Obligaciones por Pagar.', ruta: ['estacion', 'pasaporte', 'estacion', 'planetas'], color: K.oro },
-  aprendiste: 'El Control Plane da la experiencia SaaS: Onboarding, Tenant Manager con el ciclo de vida, TenantProvisioning por producto y UserManagement con WorkOS. Facturación y Metrics están en el diseño.',
-  codigo: 'Cosmos.ControlPlane · ObligacionesPorPagar.TenantProvisioning · Cosmos.Contabilidad.TenantOnboarding',
-  fuente: FUENTE_REPOS + ' · .github/docs/repos-manifest.yml, blog «La forma de la plataforma». Los repos del Control Plane no estuvieron accesibles: su código, por confirmar.' },
-
-{ id: 'observatorio', nombre: 'El observatorio', lema: 'trazas, logs y métricas', taller: 'Lab 10', estructura: 'observatorio', x: 1160, y: 520,
-  briefing: 'Con todo funcionando, la pregunta es: ¿cómo sabes que funciona? Los servicios emiten trazas y métricas por OpenTelemetry, y los logs se consultan en Kibana.',
-  prediccion: { pregunta: 'Las proyecciones van atrasadas y Radicación decide con datos viejos. ¿Quién lo ve hoy?', opciones: [
-    ['Un panel de rezago en el observatorio', false, 'No existe: la auditoría encontró que nadie mide el rezago (hueco L6).'],
-    ['Nadie, todavía', true, 'Así es. Es justo lo que CosmosLens viene a cubrir.']] },
-  ensamblaje: { instruccion: 'Arma el observatorio.', piezas: [
-    ['OpenTelemetry hacia otel-agent', 'Trazas y métricas de Marten y Wolverine.', true, 'Un solo protocolo para todo.'],
-    ['Serilog a consola y OTel', 'Logs estructurados.', true, 'Se buscan en Kibana/Elastic (con Teleport).'],
-    ['/healthz con chequeo de Postgres', 'Swarm sabe si el servicio está sano.', true, 'El Dockerfile del gateway también trae HEALTHCHECK.'],
-    ['Console.WriteLine', 'Rápido.', false, 'Sin nivel ni contexto: no se puede alertar.']] },
-  construye: 'El observatorio abre su cúpula.',
-  radioConstruido: 'Observatorio abierto. Le falta un panel: el rezago de las proyecciones.',
-  prueba: { texto: 'Las trazas de los servicios llegan al observatorio.', ruta: ['planetas', 'observatorio'], color: K.ok },
-  aprendiste: 'OpenTelemetry hacia un otel-agent, Serilog, Kibana para logs y /healthz para la salud. Falta medir el rezago de las proyecciones.',
-  codigo: 'OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-agent:4317',
-  fuente: FUENTE_REPOS + ' · Cosmos.Infraestructure/HostExtensiones.cs, stack.prod.yml' },
-
-{ id: 'escudo', nombre: 'El escudo', lema: 'lo que todavía falta proteger', taller: 'Lab 11', estructura: 'escudo', x: 1640, y: 120,
-  briefing: 'El último sector no está construido en la plataforma real: es el que te toca construir a ti. El ADR-0003 dice que hoy no hay private endpoints, ni peering, ni DNS privado. Y la auditoría dejó una lista de riesgos abiertos.',
-  prediccion: { pregunta: '¿Cuál de estos riesgos deja leer y escribir datos de otro cliente?', opciones: [
-    ['El tráfico HTTP entre el YARP y el nginx', false, 'Es grave (sin cifrar), pero no cambia de tenant.'],
-    ['Un tenant tomado de un header que el cliente controla', true, 'Sí: con Conjoined, el tenant equivocado es acceso cruzado. Por eso la aduana lo reinyecta desde el claim.']] },
-  ensamblaje: { instruccion: 'Elige qué escudos levantar primero.', piezas: [
-    ['Rotar las credenciales versionadas', 'Storage y ERP en appsettings de dos repos.', true, 'Siguen en el historial de git hasta que se roten.'],
-    ['TLS del YARP al nginx', 'Hoy va por HTTP a cloudapp.azure.com:80.', true, 'Sin TLS, cualquiera en el camino lee el tráfico.'],
-    ['Service Bus con Managed Identity', 'En vez de la cadena SAS.', true, 'Es el plan del ADR-004.'],
-    ['Private endpoints para los datos', 'Que la base no tenga puerta pública.', true, 'Es el hardening que el ADR-0003 dejó pendiente.'],
-    ['Abrir más puertos para depurar', 'Temporalmente.', false, 'Lo temporal se queda: así quedó abierto el NSG de Impuestos.']] },
-  construye: 'Levantas el escudo alrededor de todo lo que construiste.',
-  radioConstruido: 'Escudo arriba. Misión completa: construiste la plataforma Cosmos de punta a punta.',
-  prueba: { texto: 'El escudo cubre toda la plataforma.', ruta: ['escudo', 'estacion', 'planetas', 'aduana'], color: K.ok },
-  aprendiste: 'Lo que falta: rotar credenciales, TLS entre aduanas, Managed Identity para Service Bus, private endpoints y cerrar los NSG abiertos. El escudo es trabajo pendiente de la plataforma real.',
-  codigo: '# pendientes reales: rotar secretos · TLS YARP→nginx · ASB con MI (ADR-004) · private endpoints (ADR-0003)',
-  fuente: FUENTE_REPOS + ' · adr/0003, AUDITORIA y ACCIONABLES del Application Plane' },
-);
-const CONEXIONES = [
-  ['base', 'astillero', K.cian], ['bodega', 'astillero', K.ok], ['boveda', 'astillero', K.oro], ['astillero', 'archivo', K.ok],
-  ['astillero', 'planetas', K.cian], ['planetas', 'orbita', K.naranja], ['hiper', 'planetas', K.lila], ['faro', 'portal', K.ok],
-  ['pasaporte', 'faro', K.oro], ['portal', 'aduana', K.cian], ['aduana', 'planetas', K.cian], ['estacion', 'pasaporte', K.oro],
-  ['estacion', 'planetas', K.oro], ['estacion', 'hiper', K.lila], ['planetas', 'observatorio', K.ok], ['escudo', 'estacion', K.ok],
-];
-const TRAFICO = [
-  [['bodega', 'astillero'], K.ok], [['astillero', 'archivo'], K.ok], [['planetas', 'orbita', 'planetas'], K.naranja], [['hiper', 'planetas'], K.lila],
-  [['portal', 'aduana', 'planetas'], K.cian], [['faro', 'portal'], K.ok], [['estacion', 'hiper', 'planetas'], K.oro], [['planetas', 'observatorio'], K.ok],
-];
-const INTRO = 'Hola, astronauta. Vamos a construir la plataforma Cosmos sector por sector. El primero, «La base», brilla en dorado: vuela hasta él.';
-
-hud();
-decir(est.hechos.size ? `Hola de nuevo. Llevas ${est.hechos.size} de ${SECTORES.length} sectores. Pulsa «Rumbo al siguiente».` : INTRO, 'Flechas o WASD para pilotar · clic en el espacio para ir ahí · Rumbo al siguiente para piloto automático');
-requestAnimationFrame(cuadro);
+actualizarHud();
+if (!est.h.length) decir('Soy COSMO, tu copiloto. Vamos a construir **Cosmos**: un software que usan muchas empresas a la vez. Cada sector es una pieza. En cada uno primero lo haces a mano, sientes el problema, eliges qué construir, y solo al final aprendes cómo se llama. **Vuela al anillo azul**: flechas o WASD, o toca donde quieras ir.');
+else decir(`Bienvenido de vuelta. Llevas ${est.h.length} de ${SECTORES.length} sectores. Sigue la flecha dorada.`);
+window.mision = { est, SECTORES, entrar, nave, get actual() { return actual; } };
+requestAnimationFrame(bucle);
 </script>
-
