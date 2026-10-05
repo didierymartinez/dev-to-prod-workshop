@@ -186,7 +186,9 @@ Cada `case` es "si el hecho es de **este tipo**, recíbelo ya convertido (`r`, `
 >     public void Aplicar(EmpresaReactivada e) { Suspendida = false; Reactivaciones++; }
 > }
 > ```
-> Funciona, y se parece a lo que un framework hace por dentro (un `Aplicar` por tipo, enrutado solo). **Pero** `(dynamic)` enruta en ejecución y **el compilador deja de verificarte los tipos**: si te falta un `Aplicar`, el error sale al correr el programa, no al compilar (y es más lento). Por eso **nos quedamos con el `switch`** de arriba: la misma idea, pero tipada.
+> Funciona, y se parece a lo que un framework hace por dentro (un `Aplicar` por tipo, enrutado solo). **Pero** `(dynamic)` enruta en ejecución y **el compilador deja de revisar esa llamada**: si escribes mal el nombre de un método o le cambias la firma, compila igual y revienta al correr (`RuntimeBinderException`), y además es más lento. Con el `switch`, el compilador sí revisa cada `case`: si renombras `PlanCambiado`, el `case` deja de compilar. Por eso **nos quedamos con el `switch`**: la misma idea, pero tipada.
+>
+> ⚠️ **Lo que el `switch` NO te da.** Si te **falta** un `case`, el compilador no avisa: el hecho simplemente no se aplica y el estado sale mal, sin ningún error. (Con `dynamic`, al menos, faltar un `Aplicar` revienta al correr.) Ese hueco silencioso volverá a aparecer, y tendrá nombre, en [El agregado recuerda](el-agregado-recuerda.md).
 >
 > 🌱 Guarda eso sí la **forma** —un `Aplicar` por tipo—: la volverás a encontrar más adelante, con un enrutador seguro en vez de `dynamic`. Cuando la veas, recuerda que aquí ya decidiste por qué el enrutado en ejecución no te sirve.
 
@@ -218,6 +220,8 @@ En tres saltos —separar, subir a una base, y rutear por tipo— pasaste de un 
 
 - [ ] `dotnet run` imprime **lo mismo** que en la sección anterior (`plan Premium`, `reactivada 1 vez/veces`): refactorizaste sin cambiar el comportamiento.
 - [ ] Agrega un hecho nuevo, p. ej. `public record NombreCorregido(string Nuevo);`, y manéjalo con **un solo `case`** en el `switch` (`case NombreCorregido n: Nombre = n.Nuevo; break;`).
+- [ ] **Predice antes de correr:** comenta la rama `case EmpresaReactivada` del `switch`. ¿Compila? ¿Qué imprime? Escribe tu predicción, córrelo, compara, y restaura la línea.
+- [ ] **Dale un segundo hijo a la base:** crea `public record FacturaEmitida(decimal Total);`, `public record FacturaPagada();` y una clase `Factura : AggregateRoot` con `Total` y `Pagada`. Su `Aplicar` maneja sus dos hechos; `AggregateRoot` **no se toca**. Rehidrata una factura con `Load` e imprime su estado. Ese es el motivo de la base: el motor se escribió una vez y ya sirve a dos agregados.
 - [ ] Intenta `new AggregateRoot()` y observa que **no compila**: una clase abstracta no se instancia sola (por eso sirve para compartir el motor, no para usarse directa).
 - [ ] Explica, con la consecuencia concreta, por qué el motor va en una **clase abstracta** y no en una interfaz.
 
@@ -227,7 +231,7 @@ En tres saltos —separar, subir a una base, y rutear por tipo— pasaste de un 
 
 Piensa la respuesta a esto (es tu reflexión de la sección):
 
-> 💭 ¿Por qué el motor (`Load`) vive en la base `AggregateRoot` y el `Aplicar` en cada entidad? ¿Qué ganó el `switch` frente al `if`? …y ¿qué habrías perdido si hubieras elegido el enrutado con `dynamic`? Esa última déjala también en tu `DECISIONES.md`: elegiste enrutado tipado — el compilador avisa si falta un `Aplicar`.
+> 💭 ¿Por qué el motor (`Load`) vive en la base `AggregateRoot` y el `Aplicar` en cada entidad? ¿Qué ganó el `switch` frente al `if`? …y ¿qué habrías perdido si hubieras elegido el enrutado con `dynamic`? Esa última déjala también en tu `DECISIONES.md`: elegiste enrutado tipado — el compilador revisa cada `case`, aunque no avisa si falta uno.
 
 Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
 
