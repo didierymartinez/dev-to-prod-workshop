@@ -14,7 +14,7 @@ La `Empresa` (el agregado) se concentra en **vivir y hacer cumplir sus reglas**:
 
 ## El handler: primer intento (con los parámetros sueltos)
 
-Quieres que el `Program.cs` solo **cree un handler y le pida la operación** —directo, con sus valores—, así:
+Quieres que el `Program.cs` solo **cree un handler y le pida la operación** —directo, con sus valores—. **Reemplaza** el código suelto de la sección anterior por esto:
 
 ```csharp
 var stream = new EventStream<Empresa>();
@@ -30,7 +30,7 @@ Console.WriteLine(stream.Get().Suspendida ? "suspendida" : "activa");   // suspe
 > 🛠️ **Inténtalo tú.** Crea `EmpresaCommandHandlers` que reciba el `EventStream<Empresa>` por **constructor**. Dale **un método por operación, con sus parámetros sueltos** —`CambiarPlan(string nuevoPlan)` y `Suspender(string motivo)`—: cada uno **carga** (`Get`), pide a la empresa que **decida**, y **guarda** (`Append`) el hecho. **Ojo:** `Suspender` puede devolver `null` (idempotencia, [Decidir el futuro](decidir-el-futuro.md)) → en ese caso **no** guardes nada.
 
 > [!NOTE]
-> 🆕 **Idioma de C#: el constructor primario.** `public class EmpresaCommandHandlers(EventStream<Empresa> stream)` declara el parámetro `stream` **en la cabecera de la clase** (un *constructor primario*, C# 12+): queda disponible en todos los métodos sin que escribas un campo ni un constructor aparte. Es azúcar para el clásico `private readonly EventStream<Empresa> _stream; public EmpresaCommandHandlers(EventStream<Empresa> stream) { _stream = stream; }`. Es la misma idea posicional del `record`, ahora en una `class` — y la verás en todos los handlers de aquí en adelante.
+> **El constructor primario, otra vez.** Ya lo usaste en la `ReglaDeNegocioException` de [Decidir el futuro](decidir-el-futuro.md). Aquí rinde más: en `public class EmpresaCommandHandlers(EventStream<Empresa> stream)`, el parámetro `stream` queda disponible **en todos los métodos** de la clase, sin que escribas un campo ni un constructor aparte. Lo verás en todos los handlers de aquí en adelante.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -85,12 +85,14 @@ public class SuspenderHandler(EventStream<Empresa> stream)
 ```
 </details>
 
-Para ejecutar uno, **eliges la clase y la llamas a mano**:
+Como borraste `EmpresaCommandHandlers`, el código suelto deja de compilar. Para ejecutar cada operación, ahora **eliges la clase y la llamas a mano**. **Reemplaza** las tres líneas de `handlers` por:
 
 ```csharp
-var handler = new SuspenderHandler(stream);
-handler.Handle("falta de pago");
+new CambiarPlanHandler(stream).Handle("Premium");
+new SuspenderHandler(stream).Handle("falta de pago");
 ```
+
+Corre `dotnet run`: debe imprimir `suspendida`, igual que antes.
 
 Funciona. Pero fíjate: **tú** decides, para cada comando, **qué handler crear**. Más adelante querrás un **único punto** que reciba un comando *cualquiera* y lo lleve a su handler solo, sin que quien lo envía conozca la clase. Eso lo construirás en [El despachador](el-despachador.md).
 
@@ -117,6 +119,7 @@ Pero fíjate **cómo** ejecutas un comando: eliges la **clase del handler a mano
 
 - [ ] Moviste el ciclo "cargar → actuar → guardar" del `Program.cs` a una clase handler **por comando** (`CambiarPlanHandler`, `SuspenderHandler`), cada una con su `Handle` recibiendo los **parámetros sueltos**.
 - [ ] El handler de suspender respeta la idempotencia: si `Suspender` devuelve `null`, **no** hace `Append`.
+- [ ] **Predice antes de correr:** agrega al final `new CambiarPlanHandler(stream).Handle("Básico");`. ¿Qué pasa y **quién** lo decide: el handler o la empresa? Escribe tu predicción, córrelo y compara. Después borra la línea.
 
 ---
 

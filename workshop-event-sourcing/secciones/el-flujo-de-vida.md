@@ -106,7 +106,7 @@ public class EventStream<T> where T : AggregateRoot, new()
 > [!NOTE]
 > **¿Y ese `where T : AggregateRoot, new()`?** Es la **restricción especial** que prometimos. Le exige dos cosas al tipo `T` — que sea un `AggregateRoot` (para poder llamarle `.Load(...)`) y que tenga un **constructor sin parámetros** (eso significa `new()`, para crear uno vacío con `new T()`). Sin esas dos garantías, el compilador no te dejaría usar `.Load` ni `new T()` dentro de la clase.
 
-Y arriba, **reemplaza** tu `var historia = …; var empresa = new Empresa(historia);` por el stream: créalo, **anota** los hechos con `Append`, y luego pídele la empresa con `Get`:
+Y arriba, **reemplaza** todo el código suelto de la sección anterior (las cinco variables de hechos, `var historia = …` y `var empresa = new Empresa(historia);`) por el stream: créalo, **anota** los hechos con `Append`, y luego pídele la empresa con `Get`:
 
 ```csharp
 var stream = new EventStream<Empresa>();
@@ -149,7 +149,8 @@ Pero hoy los hechos que anotas los **fabricas a mano**, sin que nadie vigile las
 - [ ] `dotnet run` imprime `Constructora Andes: plan Premium`, con los hechos **anotados por `Append`** y la empresa obtenida vía `.Get()` (sin `new Empresa(historia)` ni `new List<object>{ … }` sueltos por ahí).
 - [ ] El consumidor escribe y lee sin tocar la lista cruda: solo `Append(...)` y `.Get()`.
 - [ ] Intenta `new EventStream<string>()` y observa que **no compila**: `string` no es un `AggregateRoot`, y la restricción `where` lo impide.
-- [ ] Quítale a `Empresa` el constructor `public Empresa() { }` y mira el error: sin constructor sin parámetros, `new T()` deja de compilar — eso es lo que exige el `new()` del `where`.
+- [ ] Cambia el constructor de `Empresa` por uno que **exija** un parámetro (`public Empresa(string nombre) { Nombre = nombre; }`) y mira el error: `CS0310 … must be a non-abstract type with a public parameterless constructor`. Sin constructor sin parámetros, `EventStream<T>` no puede hacer `new T()`: eso es lo que exige el `new()` del `where`. (Ojo: si solo **borras** `public Empresa() { }` sin poner otro, C# crea uno vacío por su cuenta y todo sigue compilando.) Restaura el constructor vacío.
+- [ ] Si hiciste la `Factura` de [Refactorizando el motor](refactorizando-el-motor.md): usa `new EventStream<Factura>()`, anota sus hechos con `Append` y pídela con `Get()`. **No toques `EventStream`**: es la prueba de que el genérico sirve para cualquier agregado.
 
 ---
 

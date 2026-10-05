@@ -33,7 +33,7 @@ Fíjate en algo importante: `CambiarPlan` **no** toca la propiedad `Plan`. Solo 
 
 ## El ciclo de vida: cargar → actuar → guardar
 
-El `EventStream` de [El flujo de vida](el-flujo-de-vida.md) ya sabe leer (`Get`) y escribir (`Append`). Lo que faltaba era **quién produce** el hecho que se va a guardar. Hasta ahora lo fabricábamos a mano; desde esta sección, lo produce la **empresa**. El ciclo completo, sobre el stream de una empresa, queda así:
+El `EventStream` de [El flujo de vida](el-flujo-de-vida.md) ya sabe leer (`Get`) y escribir (`Append`). Lo que faltaba era **quién produce** el hecho que se va a guardar. Hasta ahora lo fabricábamos a mano; desde esta sección, lo produce la **empresa**. **Reemplaza** el código suelto de la sección anterior (el `var stream`, los `Append` y el `Console.WriteLine`) por el ciclo completo:
 
 ```csharp
 // una empresa vive sobre SU stream (uno solo por ahora; el almacén para MUCHAS llega después)
@@ -91,6 +91,9 @@ stream.Append(orden2.Suspender("falta de pago"));   // hoy emite OTRA VEZ → el
 
 El agregado es el **guardián de las reglas**, así que la defensa nace **dentro** de la `Empresa`, mirando su estado **antes** de emitir.
 
+> [!NOTE]
+> 🆕 **Idioma de C#: una excepción propia con constructor primario.** Una excepción tuya es una clase que **hereda** de `Exception`. La forma corta es `public class ReglaDeNegocioException(string mensaje) : Exception(mensaje);`: el parámetro `mensaje` se declara **en la cabecera de la clase** (un *constructor primario*, C# 12+) y se le pasa a la base con `: Exception(mensaje)`. Equivale al clásico `public ReglaDeNegocioException(string mensaje) : base(mensaje) { }`. Es la misma idea posicional del `record`, ahora en una `class`, y la verás en los handlers más adelante.
+
 > 🛠️ **Inténtalo tú.** **🔁 Modifica** los dos métodos que ya escribiste —sin crear otra `Empresa` ni otro agregado— para que: `CambiarPlan` **lance** una `ReglaDeNegocioException` (una clase de excepción pequeña, que creas aparte como hiciste con los `record`) si la empresa está `Suspendida` (la operación es **inválida**), y `Suspender` **devuelva `null`** si ya está `Suspendida` (es **redundante**, no un error → su tipo de retorno pasa a `EmpresaSuspendida?`). *(`Reactivar()` queda igual.)*
 
 > [!NOTE]
@@ -104,9 +107,6 @@ Primero, la excepción (al final, con las demás clases):
 ```csharp
 public class ReglaDeNegocioException(string mensaje) : Exception(mensaje);
 ```
-
-> [!NOTE]
-> 🆕 **Idioma de C#: el constructor primario.** `class ReglaDeNegocioException(string mensaje)` declara el parámetro `mensaje` **en la cabecera de la clase** (un *constructor primario*, C# 12+): queda disponible sin que escribas un campo ni un constructor aparte. Aquí lo encadenamos a la base con `: Exception(mensaje)`. Es azúcar para el clásico `public ReglaDeNegocioException(string mensaje) : base(mensaje) { }`. Es la misma idea posicional del `record`, ahora en una `class` — y la verás en los handlers más adelante.
 
 Y en tu `Empresa`, **reemplaza** esos dos métodos:
 
@@ -132,27 +132,38 @@ public EmpresaSuspendida? Suspender(string motivo)
 
 </details>
 
+<details>
+<summary>👉 La respuesta del 🔮: ¿por qué la guarda va en `decide` y no en `Aplicar`?</summary>
+
+Porque `Aplicar` también corre al **rejugar** la historia ya archivada. Si `Aplicar` pudiera rechazar un hecho, el día que la regla cambie (o que un hecho viejo no la cumpla) la empresa **dejaría de poder cargarse**: el replay reventaría sobre algo que ya pasó. Un hecho archivado no se vuelve a juzgar; se aplica. Las reglas se revisan **una sola vez**, al decidir.
+</details>
+
+### Antes de correr: no metas `null` en el diario
+
+`Suspender` ahora puede devolver `null`, y `Append` acepta cualquier `object`: si le pasas el `null`, lo archiva. **Cambia las dos líneas del demo** que hacen `stream.Append(ordenN.Suspender(...))` por esta forma, que comprueba antes de archivar:
+
+```csharp
+var h1 = orden1.Suspender("falta de pago");
+if (h1 is not null) stream.Append(h1);
+
+var h2 = orden2.Suspender("falta de pago");   // orden2 viene recargada: Suspendida = true → null
+if (h2 is not null) stream.Append(h2);
+```
+
+Corre `dotnet run`: `orden2` venía **recargada** (`Suspendida = true`), así que `Suspender` devuelve `null` y queda **un solo** `EmpresaSuspendida`. ✓
+
 ### 🔍 La trampa: la guarda no basta sin recargar
 
-Con la guarda puesta, vuelve a correr el demo de arriba: `orden2` venía **recargada** (`Suspendida = true`), así que `Suspender` devuelve `null` → queda **un solo** `EmpresaSuspendida`. ✓
-
-Pero la guarda **sola** no basta. Si reúsas la **misma** instancia sin recargar, no dispara:
+La guarda **sola** no basta. Si reúsas la **misma** instancia sin recargar, no dispara (solo léelo):
 
 ```csharp
 var e = stream.Get();              // Suspendida = false
-stream.Append(e.Suspender("x"));   // emite (ok)
-stream.Append(e.Suspender("x"));   // ⚠ ¡emite OTRA VEZ! e.Suspendida SIGUE en false:
+var x1 = e.Suspender("x");         // emite (ok)
+var x2 = e.Suspender("x");         // ⚠ ¡emite OTRA VEZ! e.Suspendida SIGUE en false:
                                    //   decide no mutó e → el if (Suspendida) nunca se cumple
 ```
 
 El `if` solo no logra la idempotencia. La logra **recargar** entre órdenes: el `Get()` rehidrata desde el diario. Es justo lo que hará el [Command Handler](el-command-handler.md) en cada comando.
-
-Y como `Suspender` ahora puede devolver `null`, **comprueba antes de archivar** (no metas `null` en el diario):
-
-```csharp
-var hecho = orden2.Suspender("falta de pago");
-if (hecho is not null) stream.Append(hecho);
-```
 
 > [!IMPORTANT]
 > 🏷️ **Dos motivos distintos para NO emitir un hecho — no los confundas:**
@@ -166,7 +177,7 @@ if (hecho is not null) stream.Append(hecho);
 
 ## 🧪 Pruébalo desde ya (solo léelo por ahora)
 
-`Suspender` y `CambiarPlan` son **funciones puras**: reciben un estado (la historia previa) y devuelven un hecho (o lo rechazan). Eso significa que se pueden probar **sin base de datos ni mocks**. Aquí **no** vamos a montar el proyecto de pruebas todavía (lo haremos en su propia sección); **lee** este bloque solo para ver la **forma** —*Given* (historia previa) → *When* (actuar) → *Then* (verificar el hecho)—, no para ejecutarlo aún:
+`Suspender` y `CambiarPlan` son **funciones puras**: reciben un estado (la historia previa) y devuelven un hecho (o lo rechazan). Eso significa que se pueden probar **sin base de datos ni mocks**. Aquí **no** vamos a montar el proyecto de pruebas todavía (lo haremos en [Verde, y roto](verde-y-roto.md)); **lee** este bloque solo para ver la **forma** —*Given* (historia previa) → *When* (actuar) → *Then* (verificar el hecho)—, no para ejecutarlo aún. (El `.Should()` es de una librería de aserciones; cuando montes los tests usarás el `Assert` de xUnit, que dice lo mismo.)
 
 ```csharp
 // montamos una empresa desde su historia previa (Given) — sin base de datos, en memoria
@@ -212,6 +223,7 @@ Pero ese ciclo **cargar → actuar → guardar** está suelto en el `Program.cs`
 - [ ] `dotnet run` muestra el plan cambiado tras `CambiarPlan` + `Append` + recargar (sobre un solo `EventStream`).
 - [ ] `Suspender` sobre una empresa **ya suspendida** devuelve `null` (idempotencia), **sin** lanzar.
 - [ ] `CambiarPlan` sobre una empresa suspendida **lanza** `ReglaDeNegocioException` (validación).
+- [ ] **Predice antes de correr:** sobre la empresa del demo (ya suspendida), ¿qué pasa si llamas `Reactivar()`, archivas el hecho, recargas y luego llamas `CambiarPlan("Básico")`? ¿Lanza o emite? Escribe tu predicción, córrelo y compara.
 - [ ] Explica por qué `CambiarPlan` **no** modifica la propiedad `Plan` directamente (decidir ≠ aplicar).
 
 ---

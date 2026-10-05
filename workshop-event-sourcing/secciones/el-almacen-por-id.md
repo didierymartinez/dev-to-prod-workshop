@@ -61,7 +61,7 @@ public class EventStore
 Fíjate: el **id es siempre un parámetro**. El almacén no sabe de empresas ni de replay: solo guarda y entrega cajones por su rótulo. Es de **bajo nivel**.
 
 > [!WARNING]
-> **No llames al almacén directo desde tu handler.** `GetEvents` y `AppendEvent` son plomería interna: los llama el `EventStream` que construyes enseguida. Tu handler usará `stream.Get()` y `stream.Append(hecho)`; al `store` solo le pides el stream con `AbrirStream`. Llamar `store.AppendEvent(id, hecho)` tú mismo **funciona aquí** (el stream solo reenvía), pero es un hábito que se rompe: en [Concurrencia optimista](concurrencia-optimista.md) `AppendEvent` pasa a recibir un **sobre con versión**, y saltarte el stream te salta ese control.
+> **No llames al almacén directo desde tu handler.** `GetEvents` y `AppendEvent` son plomería interna: los llama el `EventStream` que construyes enseguida. Tu handler usará `stream.Get()` y `stream.Append(hecho)`; al `store` solo le pides el stream (con el método `AbrirStream` que construyes en el Paso 2). Llamar `store.AppendEvent(id, hecho)` tú mismo **funciona aquí** (el stream solo reenvía), pero es un hábito que se rompe: en [Concurrencia optimista](concurrencia-optimista.md) `AppendEvent` pasa a recibir un **sobre con versión**, y saltarte el stream te salta ese control.
 
 > [!NOTE]
 > 🌱 **Semilla — este no será tu único almacén.** El de hoy guarda en RAM, perfecto para aprender. Pero más adelante nacerán **hermanos con otros propósitos**: uno contra una **base de datos real** para producción y uno **en memoria pensado para tests**. El día que existan varios, extraeremos una interfaz `IEventStore` para poder **intercambiarlos sin tocar el resto del código**.
@@ -103,9 +103,11 @@ public class EventStream<T> where T : AggregateRoot, new()
 ```
 </details>
 
+> ⚠️ **Tu código suelto deja de compilar aquí, y es esperado.** El `new EventStream<Empresa>()` de arriba ya no existe: el stream ahora pide `(store, id)`. **Borra todo el código suelto** (el `var stream`, el despachador y las llamadas); en el Paso 2 lo reemplazas por un ejemplo nuevo. Las clases de abajo se quedan.
+
 ### Paso 2 · Que el almacén te lo entregue: `AbrirStream`
 
-Quieres poder pedirle el stream al almacén y usarlo así —sin armarlo a mano—:
+Quieres poder pedirle el stream al almacén y usarlo así —sin armarlo a mano—. Escribe este ejemplo como tu nuevo código suelto:
 
 ```csharp
 var store = new EventStore();
@@ -160,15 +162,31 @@ public class SuspenderHandler(EventStore store) : ICommandHandler<SuspenderEmpre
 }
 ```
 
-`CambiarPlanHandler` cambia **igual**: recibe el `EventStore`, abre por `cmd.EmpresaId` y lee `cmd.NuevoPlan`.
+`CambiarPlanHandler` cambia **igual**: recibe el `EventStore`, abre por `cmd.EmpresaId` y lee `cmd.NuevoPlan`:
+
+```csharp
+public class CambiarPlanHandler(EventStore store) : ICommandHandler<CambiarPlanDeEmpresa>
+{
+    public void Handle(CambiarPlanDeEmpresa cmd)
+    {
+        var stream = store.AbrirStream<Empresa>(cmd.EmpresaId);
+        stream.Append(stream.Get().CambiarPlan(cmd.NuevoPlan));
+    }
+}
+```
 </details>
 
 ## Probémoslo: un almacén, muchas empresas
 
-Ahora sí — el dolor del inicio, resuelto. **Un** despachador, handlers registrados **una vez**, y el `EmpresaId` del comando elige la empresa:
+Ahora sí — el dolor del inicio, resuelto. **Un** despachador, handlers registrados **una vez**, y el `EmpresaId` del comando elige la empresa. **Reemplaza** el ejemplo del Paso 2 por este:
 
 ```csharp
 var store = new EventStore();
+
+// la historia previa de cada empresa (todavía no hay un comando para registrar)
+store.AbrirStream<Empresa>("emp-7").Append(new EmpresaRegistrada("Constructora Andes", "Básico"));
+store.AbrirStream<Empresa>("emp-9").Append(new EmpresaRegistrada("Ferretería Sur", "Básico"));
+
 var despachador = new Despachador();
 despachador.Registrar(new SuspenderHandler(store));      // ← el ALMACÉN, no un stream; UNA vez
 despachador.Registrar(new CambiarPlanHandler(store));
@@ -177,8 +195,11 @@ despachador.Enviar(new SuspenderEmpresa("emp-7", "falta de pago"));    // empres
 despachador.Enviar(new CambiarPlanDeEmpresa("emp-9", "Premium"));      // empresa 9 — mismo handler
 
 var andes = store.AbrirStream<Empresa>("emp-7").Get();
-Console.WriteLine($"emp-7: suspendida={andes.Suspendida}");
-// emp-7: suspendida=True
+var sur   = store.AbrirStream<Empresa>("emp-9").Get();
+Console.WriteLine($"emp-7 {andes.Nombre}: suspendida={andes.Suspendida}");
+Console.WriteLine($"emp-9 {sur.Nombre}: plan {sur.Plan}");
+// emp-7 Constructora Andes: suspendida=True
+// emp-9 Ferretería Sur: plan Premium
 ```
 
 `dotnet run`: dos empresas en el mismo almacén, cada una en su cajón, con handlers que se registraron **una sola vez**.
@@ -213,6 +234,7 @@ Pero falta un peligro que aparece justo cuando hay **muchos escritores** sobre e
 - [ ] `dotnet run` escribe y lee **dos** empresas distintas (`emp-7`, `emp-9`) **siempre a través del stream**, nunca tocando el `store` directo.
 - [ ] Los handlers se registran **una sola vez** (reciben el `EventStore`, no un stream), y el comando trae su `EmpresaId`.
 - [ ] Sigue el id con la vista: `AbrirStream(id)` → `store.AppendEvent(id, …)` → `_cajones[id]` — es el **mismo** string, sin transformarse en el camino.
+- [ ] **Predice antes de correr:** envía `new SuspenderEmpresa("emp-99", "x")` a una empresa que **nunca** se registró. ¿Lanza? ¿Qué queda en el cajón `emp-99`, y qué regla le falta a `Empresa`? Escribe tu predicción, córrelo y compara.
 - [ ] Explica por qué el diseño de [El despachador](el-despachador.md) no escalaba a dos empresas (pista: la llave del despachador es el **tipo** del comando).
 
 ---

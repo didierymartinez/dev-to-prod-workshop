@@ -54,6 +54,13 @@ public class SuspenderHandler(EventStream<Empresa> stream)
 ```
 </details>
 
+Como cambió la firma de `Handle`, el código suelto deja de compilar. **🔁 Cambia** las dos llamadas para que cada una envíe su comando:
+
+```csharp
+new CambiarPlanHandler(stream).Handle(new CambiarPlanDeEmpresa("Premium"));
+new SuspenderHandler(stream).Handle(new SuspenderEmpresa("falta de pago"));
+```
+
 > [!NOTE]
 > **¿Por qué un `record`?** Además de darle a cada intención un **tipo** propio (lo que el ruteo necesita), una vez expresada no debería **alterarse en tránsito**: el `record` la hace **inmutable** y comparable por su contenido (un DTO limpio). Y de regalo: como ahora es **un dato con tipo**, puede **viajar** (llegar de una API o una cola), **loguearse**, **encolarse** o **reintentarse** — algo que un `string` suelto no permitía.
 
@@ -93,19 +100,26 @@ public class SuspenderHandler(EventStream<Empresa> stream) : ICommandHandler<Sus
 </details>
 
 > [!NOTE]
-> **¿Y por qué una interfaz, no una clase abstracta como `AggregateRoot`?** En [Refactorizando el motor](refactorizando-el-motor.md) elegiste una **clase abstracta** porque había **código y estado compartidos** que heredar (el bucle `Load`, el `Id`). Aquí es al revés: los handlers **no comparten implementación** —el `Handle` de uno no tiene nada que ver con el del otro—, así que no hay nada que heredar. Solo necesitas un **contrato**: *"sé manejar `TCommand`"*. Eso es una **interfaz** (y un handler puede cumplir varias; una clase base le gastaría su única herencia).
+> **¿Y por qué una interfaz, no una clase abstracta como `AggregateRoot`?** En [Refactorizando el motor](refactorizando-el-motor.md) elegiste una **clase abstracta** porque había **código compartido** que heredar (el bucle `Load`). Aquí es al revés: los handlers **no comparten implementación** —el `Handle` de uno no tiene nada que ver con el del otro—, así que no hay nada que heredar. Solo necesitas un **contrato**: *"sé manejar `TCommand`"*. Eso es una **interfaz** (y un handler puede cumplir varias; una clase base le gastaría su única herencia).
 
 ## 🔧 La tabla, a mano primero
 
 Con las dos piezas en mano, el despachador es una **tabla** que mapea **el tipo del comando** a una función que lo maneja: registras cada handler una vez, y despachar es **buscar por el tipo** del comando que llega. Antes de envolverla en una clase, **constrúyela a mano** — para *ver* qué guarda.
 
-> 🛠️ **Inténtalo tú.** Crea un `Dictionary<Type, Action<object>>`. Por cada handler **agrega una entrada**: la llave es `typeof(SuComando)` y el valor una lambda que recibe el comando como `object`, lo **castea** a su tipo concreto y llama `Handle`. Luego despacha buscando por `comando.GetType()`.
+> [!NOTE]
+> 🆕 **Idioma de C#: funciones como valores, y tipos en ejecución.** Para armar la tabla necesitas cinco piezas nuevas:
+> - **Una lambda** es una función sin nombre, escrita en el lugar: `(object comando) => suspender.Handle(...)` se lee "dado un `comando`, haz esto".
+> - **`Action<object>`** es el **tipo** de una función que recibe un `object` y no devuelve nada. Así se guarda una lambda en una variable o en un diccionario.
+> - **`typeof(SuspenderEmpresa)`** te da el tipo de una clase que **escribes en el código**. **`comando.GetType()`** te da el tipo **real** del objeto que tienes en la mano, en ejecución. Si el `comando` es un `SuspenderEmpresa`, los dos dan lo mismo: por eso sirven como llave y como búsqueda.
+> - **Un cast `(SuspenderEmpresa)comando`** le dice al compilador "trata este `object` como un `SuspenderEmpresa`". Si en ejecución no lo es, lanza `InvalidCastException`.
+
+> 🛠️ **Inténtalo tú.** **Reemplaza** las dos llamadas del código suelto por una tabla. Crea un `Dictionary<Type, Action<object>>`. Por cada handler **agrega una entrada**: la llave es `typeof(SuComando)` y el valor una lambda que recibe el comando como `object`, lo **castea** a su tipo concreto y llama `Handle`. Luego despacha buscando por `comando.GetType()`.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```csharp
-var stream = new EventStream<Empresa>();   // el mismo stream de las secciones anteriores
+// (el var stream y su Append de EmpresaRegistrada siguen arriba, como antes)
 var cambiarPlan = new CambiarPlanHandler(stream);
 var suspender   = new SuspenderHandler(stream);
 
@@ -175,7 +189,7 @@ _handlers[typeof(T)] = comando => handler.Handle((T)comando);
 > [!NOTE]
 > 💡 **El truco de la lambda — y por qué `Registrar` es más seguro, no solo más corto.** El genérico `T` solo existe al **registrar** (ahí C# sabe que es `SuspenderEmpresa`). La lambda `comando => handler.Handle((T)comando)` **captura** ese `T` y queda como un `Action<object>` uniforme, así la tabla es homogénea aunque cada handler reciba un comando distinto. Y como la llave, el cast y el handler son **el mismo `T`**, ya **no puedes** desalinearlos como en el `Add` a mano: el compilador lo garantiza. Sin `dynamic`, sin reflexión — solo un diccionario y un delegado.
 
-Úsalo: registras cada handler una vez, y despachas comandos que llegan **como `object`**, sin saber qué clase los maneja:
+Úsalo: **reemplaza** la tabla a mano del código suelto por el `Despachador`. Registras cada handler una vez, y despachas comandos que llegan **como `object`**, sin saber qué clase los maneja:
 
 ```csharp
 var despachador = new Despachador();
@@ -221,6 +235,7 @@ Pero todo esto sigue sobre **una sola** empresa, en un stream suelto. ¿Y cuando
 - [ ] Cada comando es un **`record`** propio, y los handlers reciben su comando (`Handle(CambiarPlanDeEmpresa)`), no un `string`.
 - [ ] Tus handlers implementan **`ICommandHandler<T>`**, y tu `Despachador` enruta un `object comando` a su handler por `comando.GetType()`, **sin** `switch` y sin nombrar clases.
 - [ ] Explicas por qué el despachador **necesita** las dos piezas: el `record` (para rutear por tipo — con `string` colisionarían) y la interfaz (para llamar `Handle` de forma tipada sin reflexión/`dynamic`).
+- [ ] **Predice antes de correr:** crea `public record ReactivarEmpresa();` y envíalo con `despachador.Enviar(new ReactivarEmpresa())` **sin** registrar ningún handler para él. ¿Compila? ¿Qué pasa al correr, y por qué el compilador no lo detecta? Escribe tu predicción, córrelo y compara.
 - [ ] Explicas qué tendría que darte una herramienta para jubilar tu Despachador: armar la tabla sola (tu `Registrar`) y rutear por tipo (tu `Enviar`).
 
 ---

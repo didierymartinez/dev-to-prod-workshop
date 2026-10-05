@@ -34,12 +34,14 @@ Necesitamos algo que el compilador **no nos deje mutar**. En C# eso es un `recor
 public record EmpresaRegistrada(string Nombre, string Plan);
 ```
 
-Un `record` nos da, sin escribir más, justo lo que un hecho necesita: es **inmutable** y se compara **por su contenido**, no por referencia. Pruébalo:
+Un `record` nos da, sin escribir más, justo lo que un hecho necesita: es **inmutable** y se compara **por su contenido**, no por referencia. Pruébalo: escribe estas dos líneas arriba, en el código suelto, y corre `dotnet run`.
 
 ```csharp
 var evento = new EmpresaRegistrada("Constructora Andes", "Básico");
 evento.Plan = "Premium";   // ❌ error de compilación: el pasado queda en piedra
 ```
+
+El compilador se niega: `error CS8852: Init-only property or indexer 'EmpresaRegistrada.Plan' can only be assigned in an object initializer…`. Las propiedades de un `record` posicional solo se asignan al crearlo. **Ahora borra esas dos líneas**: el proyecto no compila mientras sigan ahí.
 
 > 🛠️ **Inténtalo tú.** El diario de "Constructora Andes" también anota que le cambiaron el plan, que la suspendieron y que la reactivaron. Crea, junto a `EmpresaRegistrada`, un `record` para cada uno de esos tres hechos — piensa qué dato mínimo necesita cargar cada uno (un cambio de plan necesita el plan nuevo; una suspensión, el motivo; una reactivación no necesita ningún dato extra).
 
@@ -140,7 +142,7 @@ empresa.Plan = "Enterprise";   // ❌ error de compilación
 > 🛠️ **Inténtalo tú.** Crea una clase `Empresa`: mete las cuatro variables como **propiedades** (de solo-lectura desde fuera: `{ get; private set; }`), y en el **constructor** recibe `IEnumerable<object> historia` (una "cualquier cosa recorrible con `foreach`" — tu `List` lo es) y corre adentro el mismo `foreach` que acabas de escribir. Luego, arriba, **reemplaza** las variables sueltas por `var empresa = new Empresa(historia);` e imprime su estado. **Ve e inténtalo**, y luego te muestro una forma:
 
 > [!NOTE]
-> 🆕 **Idioma de C#: `{ get; private set; }`.** Una propiedad que se **lee** desde cualquier parte pero solo se **escribe** dentro de su propia clase. El `get;` es público; el `private set;` deja la asignación reservada al código de `Empresa` (su constructor, en este caso). Por eso de afuera puedes hacer `empresa.Plan`, pero `empresa.Plan = "X"` no compila. Es el equivalente a escribir un campo privado con una propiedad de solo lectura, en una sola línea — y es justo lo que protege la coherencia del agregado.
+> 🆕 **Idioma de C#: `{ get; private set; }`.** Una propiedad que se **lee** desde cualquier parte pero solo se **escribe** dentro de su propia clase. El `get;` es público; el `private set;` deja la asignación reservada al código de `Empresa` (su constructor, en este caso). Por eso de afuera puedes hacer `empresa.Plan`, pero `empresa.Plan = "X"` no compila. Es el equivalente a escribir un campo privado con una propiedad de solo lectura, en una sola línea — y es justo lo que protege la coherencia de la empresa.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -193,8 +195,8 @@ No guardaste el estado: lo **reconstruiste** a partir de los hechos. Un `record`
 ## ✅ Compruébalo
 
 - [ ] `dotnet run` imprime el estado reconstruido (`plan Premium`, `reactivada 1 vez/veces`).
-- [ ] Agrega `new PlanCambiado("Enterprise")` al final de `historia` y vuelve a correr: el estado refleja "Enterprise" **sin que toques el replay**.
-- [ ] Toma el primer hecho con `if (historia[0] is EmpresaRegistrada r)` e intenta `r.Plan = "X"`: observa que **no compila**: el pasado no se edita.
+- [ ] **Predice antes de correr:** mueve `reactivada` al **final** de `historia` (después de `suspendida2`). ¿Qué imprime ahora? Escribe tu predicción, corre `dotnet run` y compara. Si fallaste, ¿qué parte del replay no tenías clara?
+- [ ] Toma el primer hecho con `if (historia[0] is EmpresaRegistrada r)` e intenta `r.Plan = "X"`: observa que **no compila** (el pasado no se edita), y **borra la línea** después.
 - [ ] Explica con tus palabras por qué un hecho se modela como `record` y no como una clase mutable.
 
 ---
