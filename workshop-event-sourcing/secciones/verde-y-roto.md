@@ -87,14 +87,67 @@ Fíjate en la **forma** de ese test, porque la vas a repetir siempre: preparas u
 
 Construiste dos tests para la misma acción. El que afirma el estado pasó verde con el motor roto; el que afirma el **hecho emitido** lo cazó. La razón es la que vienes viendo desde que el agregado empezó a acumular: en event sourcing, lo que una decisión **produce** son sus eventos —es su salida real, lo que se guarda y lo que todo lo demás leerá—; el estado del objeto es solo un paso intermedio del replay. Por eso el test honesto afirma los hechos. Ese patrón *dado–cuando–entonces sobre los eventos emitidos* es como se prueban los sistemas event-sourced.
 
+## 🔧 Dos tests más, por tu cuenta
+
+Ahora que conoces la forma, úsala para cazar dos errores que hoy pasarían verdes.
+
+### Paso 1 · La idempotencia
+
+> 🛠️ **Inténtalo tú.** Borra el `if (Suspendida) return;` de `Suspender` y corre `dotnet test`: los dos tests siguen **verdes**, porque ninguno suspende dos veces. Ese comportamiento no está cubierto. Escribe el test que lo cace: **dado** una empresa registrada, **cuando** la suspendes dos veces, **entonces** entre sus hechos sin confirmar hay **un solo** `EmpresaSuspendida`. *(Para contar los que cumplen una condición: `Assert.Single(coleccion, x => x is EmpresaSuspendida)`.)* Córrelo sin la guarda (rojo) y con la guarda (verde).
+
+<details>
+<summary>👉 Muéstrame una forma de hacerlo</summary>
+
+```csharp
+[Fact]
+public void Suspender_dos_veces_emite_un_solo_hecho()
+{
+    var empresa = new Empresa();
+    empresa.Load(new object[] { new EmpresaRegistrada("Andes", "Básico") });
+
+    empresa.Suspender("falta de pago");
+    empresa.Suspender("falta de pago");
+
+    Assert.Single(empresa.SinConfirmar, h => h is EmpresaSuspendida);
+}
+```
+</details>
+
+### Paso 2 · La historia duplicada
+
+> 🛠️ **Inténtalo tú.** En [El agregado recuerda](el-agregado-recuerda.md) rompiste `Load` para que usara `Emitir`, y la historia se duplicó sin que nada lanzara. Escribe el test que lo habría cazado. Pista: después de un `Load`, ¿cuántos hechos sin confirmar debería tener la empresa? *(Para afirmar que una colección está vacía: `Assert.Empty(coleccion)`.)* Comprueba que se pone rojo con el sabotaje de `Load` y verde sin él.
+
+<details>
+<summary>👉 Muéstrame una forma de hacerlo</summary>
+
+```csharp
+[Fact]
+public void Rehidratar_no_deja_hechos_sin_confirmar()
+{
+    var empresa = new Empresa();
+
+    empresa.Load(new object[] { new EmpresaRegistrada("Andes", "Básico"),
+                                new EmpresaSuspendida("falta de pago") });
+
+    Assert.Empty(empresa.SinConfirmar);   // rehidratar no es decidir: nada nuevo que guardar
+}
+```
+
+Este test no tiene "cuando": cargar **es** la acción. Y afirma la regla de [El agregado recuerda](el-agregado-recuerda.md) con una línea: reconstruir no acumula.
+</details>
+
 > 🌱 Fíjate en cómo preparaste cada test: `Load(new object[]{ … })`, una historia armada a mano, en memoria, que nace y muere con el test. Probaste que el agregado **decide** bien — pero nada de esto tocó un almacén ni un disco. **Nada de lo que escribiste prueba que el diario sobreviva a apagar y volver a prender.** Ese es el próximo dolor.
+
+> 📦 **¿Tu código no compila o no da lo mismo?** El estado completo al cierre de esta sección está en [`checkpoints/12-verde-y-roto`](../checkpoints/12-verde-y-roto/): el programa en `Empresas.Historia/Program.cs` y los tests en `Empresas.Tests/SuspensionTests.cs`. Compáralo con el tuyo o cópialo para seguir.
 
 ## ✅ Compruébalo
 
 - [ ] `dotnet test` corre los dos tests y los ves reportados, sin mirar ninguna consola del programa.
 - [ ] Con el sabotaje (`Aplicar` en vez de `Emitir`): el test de estado pasa **verde**, el de hechos se pone **rojo**.
 - [ ] Con `Emitir` restaurado: los dos pasan.
-- [ ] Borra el `if (Suspendida) return;` de `Suspender` y corre `dotnet test`: los dos siguen **verdes**, porque ninguno suspende dos veces. Esa es la lección — ese comportamiento no está cubierto, el verde es decorativo. (Escribir el test que lo cace —suspender dos veces, afirmar que hay un solo `EmpresaSuspendida`— es tu siguiente reto.)
+- [ ] Sin el `if (Suspendida) return;`, tu test de idempotencia se pone **rojo**; con la guarda, verde.
+- [ ] Con `Load` usando `Emitir`, tu test de rehidratación se pone **rojo**; con `Aplicar`, verde.
+- [ ] **Predice antes de correr:** comenta el `case EmpresaReactivada:` de `Aplicar` (el huérfano de [El agregado recuerda](el-agregado-recuerda.md)). ¿Cuál de tus cuatro tests se pone rojo? Escribe tu predicción, corre `dotnet test` y compara. Si ninguno cae, ¿qué test faltaría?
 
 ## 🆘 Si algo salió mal
 

@@ -192,6 +192,8 @@ No guardaste el estado: lo **reconstruiste** a partir de los hechos. Un `record`
 
 ---
 
+> 📦 **¿Tu código no compila o no da lo mismo?** El `Program.cs` completo al cierre de esta sección está en [`checkpoints/02-los-primeros-hechos/Program.cs`](../checkpoints/02-los-primeros-hechos/Program.cs). Compáralo con el tuyo o cópialo para seguir.
+
 ## ✅ Compruébalo
 
 - [ ] `dotnet run` imprime el estado reconstruido (`plan Premium`, `reactivada 1 vez/veces`).

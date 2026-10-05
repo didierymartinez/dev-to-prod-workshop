@@ -113,8 +113,9 @@ public class EventStream<T> where T : AggregateRoot, new()
     {
         foreach (var hecho in agg.SinConfirmar)
         {
-            _version++;
-            _store.AppendEvent(_aggregateId, new EventoAlmacenado(_version, hecho));
+            var siguiente = _version + 1;
+            _store.AppendEvent(_aggregateId, new EventoAlmacenado(siguiente, hecho));
+            _version = siguiente;                         // solo si el almacén lo aceptó
         }
         agg.MarcarConfirmados();
     }
@@ -162,17 +163,29 @@ public class PagarDeudaHandler(EventStore store) : ICommandHandler<PagarDeuda>
 
 > **¿Por qué `Load` aplica pero no acumula?** El replay **reconstruye**; solo las decisiones nuevas se **acumulan**. Por eso hay dos caminos: `Aplicar` a secas para leer, `Emitir` (aplicar + recordar) para decidir.
 >
-> 🔨 **Rómpelo tú.** Haz que `Load` use `Emitir` en vez de `Aplicar`, rehidrata una empresa con historia y llama `Append`: revienta con `ConcurrencyException` (versión ya ocupada), porque re-escribió toda la historia que acababa de cargar. Devuélvelo a `Aplicar`. Por la misma razón `Append` termina con `MarcarConfirmados()`: los hechos que ya guardó están en el almacén; si no los quitara de la lista, el siguiente `Append` los reescribiría.
+> 🔨 **Rómpelo tú (la historia duplicada).** Primero corre el demo de abajo ([Un acto, dos hechos, juntos](#un-acto-dos-hechos-juntos)) tal cual. Después haz que `Load` use `Emitir` en vez de `Aplicar` y, **antes de correrlo, predice**: ¿lanza `ConcurrencyException`? ¿Cuántos hechos quedan en `emp-7`? Para verlo, agrega al final del código suelto:
+> ```csharp
+> Console.WriteLine(string.Join(", ", store.GetEvents("emp-7").Select(x => $"v{x.Version} {x.EventData.GetType().Name}")));
+> ```
+>
+> <details><summary>👉 Lo que pasa</summary>
+>
+> **No lanza nada.** Al rehidratar, `Load` acumuló la historia entera como si fueran decisiones nuevas, y el `Append` del handler la volvió a escribir **a continuación**, en posiciones libres (v3, v4…): el almacén no tiene por qué rechazarlas. El diario queda con `EmpresaRegistrada` **dos veces**, y aun así el estado impreso sale bien: solo el diario lo delata.
+> </details>
+>
+> Devuélvelo a `Aplicar`. Por la misma razón `Append` termina con `MarcarConfirmados()`: los hechos que ya guardó están en el almacén; si no los quitara de la lista, el siguiente `Append` los reescribiría.
 
-> 🔨 **Rómpelo tú (el hecho huérfano).** Comenta la línea `case EmpresaReactivada:` en tu `Aplicar` y corre el arnés de pagar-y-reactivar. **Nada explota.** Pero recarga la empresa: `Suspendida` sigue en `true`. El hecho `EmpresaReactivada` **está** en el diario —cuéntalo si dudas—, y aun así el estado lo ignora. Un hecho sin su rama en `Aplicar` es un **huérfano**: no revienta, **miente** — y en silencio, que es peor. Restaura la línea.
+> 🔨 **Rómpelo tú (el hecho huérfano).** Comenta la línea `case EmpresaReactivada:` en tu `Aplicar` y corre el demo de pagar-y-reactivar de abajo. **Nada explota.** Pero recarga la empresa: `Suspendida` sigue en `true`. El hecho `EmpresaReactivada` **está** en el diario —cuéntalo si dudas—, y aun así el estado lo ignora. Un hecho sin su rama en `Aplicar` es un **huérfano**: no revienta, **miente** — y en silencio, que es peor. Restaura la línea.
 
 > Y la idempotencia sigue viva, pero cambió de mecanismo: ahora que `Emitir` **muta** el agregado, la guarda `if (Suspendida) return;` corta el no-op sin recargar. Recargar (`Get()` en cada handler) es lo que la garantiza **entre comandos** distintos.
 
 ## Un acto, dos hechos, juntos
 
-Corre el `PagarDeudaHandler` sobre una empresa morosa recién sembrada. Fíjate que **sembrar también usa el modelo nuevo**: sobre una empresa vacía, `Registrar` y `Suspender` emiten, y un solo `Append` los guarda.
+Corre el `PagarDeudaHandler` sobre una empresa morosa recién sembrada. Fíjate que **sembrar también usa el modelo nuevo**: sobre una empresa vacía, `Registrar` y `Suspender` emiten, y un solo `Append` los guarda. **Reemplaza** tu código suelto por este:
 
 ```csharp
+var store = new EventStore();
+
 var s = store.AbrirStream<Empresa>("emp-7");
 var e = s.Get();                 // empresa vacía (el diario aún no tiene eventos)
 e.Registrar("Constructora Andes", "Básico");
@@ -201,12 +214,14 @@ El agregado dejó de ser una función que **devuelve** hechos y pasó a ser algo
 
 ---
 
+> 📦 **¿Tu código no compila o no da lo mismo?** El `Program.cs` completo al cierre de esta sección está en [`checkpoints/11-el-agregado-recuerda/Program.cs`](../checkpoints/11-el-agregado-recuerda/Program.cs). Compáralo con el tuyo o cópialo para seguir.
+
 ## ✅ Compruébalo
 
 - [ ] El `PagarDeudaHandler` corre sin excepción; al recargar, la empresa queda `Suspendida=False`, `DeudaPendiente=False`.
 - [ ] Al recargar la empresa desde el almacén, tiene los dos hechos aplicados — el pago y la reactivación entraron por un solo `Append`.
-- [ ] Suspender dos veces la misma empresa deja **un** solo `empresa-suspendida` en el diario (la idempotencia sigue viva, ahora dentro de `Suspender`).
-- [ ] Explica, con tus palabras, por qué `Load` usa `Aplicar` y no `Emitir` — y qué pasaría si usara `Emitir`.
+- [ ] Suspender dos veces la misma empresa deja **un** solo `EmpresaSuspendida` en el diario (la idempotencia sigue viva, ahora dentro de `Suspender`).
+- [ ] Explica, con tus palabras, por qué `Load` usa `Aplicar` y no `Emitir` — y por qué, si usara `Emitir`, **nada** lanzaría un error.
 
 ---
 

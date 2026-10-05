@@ -218,6 +218,8 @@ Pero ese ciclo **cargar → actuar → guardar** está suelto en el `Program.cs`
 
 ---
 
+> 📦 **¿Tu código no compila o no da lo mismo?** El `Program.cs` completo al cierre de esta sección está en [`checkpoints/05-decidir-el-futuro/Program.cs`](../checkpoints/05-decidir-el-futuro/Program.cs). Compáralo con el tuyo o cópialo para seguir.
+
 ## ✅ Compruébalo
 
 - [ ] `dotnet run` muestra el plan cambiado tras `CambiarPlan` + `Append` + recargar (sobre un solo `EventStream`).

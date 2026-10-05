@@ -216,12 +216,20 @@ En tres saltos —separar, subir a una base, y rutear por tipo— pasaste de un 
 
 ---
 
+> 📦 **¿Tu código no compila o no da lo mismo?** El `Program.cs` completo al cierre de esta sección está en [`checkpoints/03-refactorizando-el-motor/Program.cs`](../checkpoints/03-refactorizando-el-motor/Program.cs). Compáralo con el tuyo o cópialo para seguir.
+
 ## ✅ Compruébalo
 
 - [ ] `dotnet run` imprime **lo mismo** que en la sección anterior (`plan Premium`, `reactivada 1 vez/veces`): refactorizaste sin cambiar el comportamiento.
 - [ ] Agrega un hecho nuevo, p. ej. `public record NombreCorregido(string Nuevo);`, y manéjalo con **un solo `case`** en el `switch` (`case NombreCorregido n: Nombre = n.Nuevo; break;`).
 - [ ] **Predice antes de correr:** comenta la rama `case EmpresaReactivada` del `switch`. ¿Compila? ¿Qué imprime? Escribe tu predicción, córrelo, compara, y restaura la línea.
-- [ ] **Dale un segundo hijo a la base:** crea `public record FacturaEmitida(decimal Total);`, `public record FacturaPagada();` y una clase `Factura : AggregateRoot` con `Total` y `Pagada`. Su `Aplicar` maneja sus dos hechos; `AggregateRoot` **no se toca**. Rehidrata una factura con `Load` e imprime su estado. Ese es el motivo de la base: el motor se escribió una vez y ya sirve a dos agregados.
+- [ ] **Dale un segundo hijo a la base.** Haz que esto funcione **sin tocar `AggregateRoot`**:
+  ```csharp
+  var f = new Factura();
+  f.Load(new object[] { new FacturaEmitida(1200m), new FacturaPagada() });
+  Console.WriteLine($"Total {f.Total}, pagada={f.Pagada}");   // Total 1200, pagada=True
+  ```
+  Necesitas dos `record` (`FacturaEmitida(decimal Total)`, `FacturaPagada()`) y una clase `Factura : AggregateRoot` con su `Aplicar`. Ese es el motivo de la base: el motor se escribió una vez y ya sirve a dos agregados.
 - [ ] Intenta `new AggregateRoot()` y observa que **no compila**: una clase abstracta no se instancia sola (por eso sirve para compartir el motor, no para usarse directa).
 - [ ] Explica, con la consecuencia concreta, por qué el motor va en una **clase abstracta** y no en una interfaz.
 
