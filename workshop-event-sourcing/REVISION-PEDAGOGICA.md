@@ -168,3 +168,55 @@ Entrega: el repo + un 📓 que justifique cada decisión + la rúbrica de sabota
 6. **Capstone `Contrato`** sin solución. → evaluación final.
 7. Fusiones/particiones de §3.4 y núcleo + ramas de §3.5.
 8. Regenerar `MAPA.md`, alinear `README.md`, archivar documentos superados.
+
+---
+
+## 8. Realineado a los tres objetivos del autor
+
+> Objetivos declarados: **(1)** entender event sourcing con fundamentos; **(2)** manejar `Cosmos.BuildingBlocks` y ser **crítico y mantenedor** de la plantilla; **(3)** construir una app que **visualice el flujo de mensajes** como CritterWatch.
+
+| Objetivo | ¿Lo sirve hoy el taller? | Brecha principal |
+|---|---|---|
+| 1 · Fundamentos | **Sí**, §1-19 + §26-31 (con las erratas de §4 arregladas). | Ninguna de fondo; es el tramo fuerte. |
+| 2 · Mantenedor crítico | **Poco.** La plantilla real se nombra en 2 secciones y **nunca se abre**. §38 construye una miniatura; §39 concluye "usa `FetchForWriting` visible". | El criterio de mantenedor se enseña **sin la evidencia real** que ya existe en este repo. |
+| 3 · Observador tipo CritterWatch | **No.** Ninguna sección enseña **correlación/causación** ni **trazas OpenTelemetry**, que son lo que convierte filas sueltas en un *flujo*. | Leer la BD da **estado** (streams, rezago, DLQ, outbox pendiente), no **flujo** (qué mensaje causó qué hecho, qué handler lo procesó). |
+
+### 8.1 Objetivo 2 — de "plantilla en miniatura" a "mantenedor de la real"
+
+La evidencia para formar ese criterio **ya está escrita**, pero vive en documentos de trabajo, no en las secciones:
+- `AUDITORIA-APPLICATION-PLANE.md`: `FetchForWriting` tiene **0 usos** porque *"la abstracción no acepta versión esperada, así que nadie puede usarlo sin cambiar la librería"*; *"el wrapper es la frontera de capacidad real: lo que no expone, no existe"*; ~48 read models sin camino de reconstrucción.
+- `AMPLIACION-MARTEN.md`: ControlPlane **elige no usar** `FetchForWriting` porque serializa las escrituras por sesión del bus (`GroupId=TenantId`); el read-side debe **replicar la config de eventos** del write-side o no deserializa.
+- `conceptos.md`: la postura técnica sobre el PR #21 (eventos privados en una cola `local://` no durable) — **es exactamente el tipo de crítica que un mantenedor debe poder escribir**.
+
+**Hallazgo:** el capstone actual (§39) da una regla única ("usa `FetchForWriting` visible") donde la realidad tiene **dos respuestas con evidencia**. Un mantenedor no aplica la regla: sopesa el trade-off.
+
+**Propuesta — un módulo "La plantilla real" tras el núcleo:**
+1. **Mapa pieza a pieza:** tabla *lo que construiste → archivo real de `Cosmos.BuildingBlocks` → qué decidió distinto y por qué*. El alumno la llena leyendo el código real.
+2. **Tres decisiones reales como ejercicios de criterio** (cada una: evidencia → postura escrita):
+   - ¿Adoptar `FetchForWriting` en la librería? (11 repos expuestos a la carrera vs. ControlPlane que serializa por sesión).
+   - ¿Eventos privados por cola `local://`? (PR #21, `conceptos.md`; enlaza con `UseDurableLocalQueues` de §30 y §37).
+   - ¿El wrapper debe exponer más de Marten? (el Orquestador reimplementó una saga a mano porque no se expone).
+3. **Mantenimiento concreto:** subir 9.2.1 → 9.12 con los tests como red; leer un pin de versión con síntoma e issue upstream.
+4. **Capstone de mantenedor (la evaluación del objetivo 2):** escribir una propuesta de cambio a la librería —ADR o PR— con evidencia, al nivel de `conceptos.md`. Si el alumno la escribe bien, es mantenedor; si no, no.
+
+### 8.2 Objetivo 3 — qué falta para *visualizar el flujo*
+
+**Contradicción a resolver primero:** `SECUENCIA.md` dice que el alumno **no** construye CosmosLens (se le da); `APP-MONITOR-PLAN.md` dice que **se construye a lo largo de las secciones**, y su fila 9 matiza: el alumno escribe **las consultas que alimentan cada panel**, no la interfaz. Hay que elegir una, y el taller debe reflejarla.
+
+**El ingrediente que falta en el taller: la traza.** Para dibujar *comando → hecho → anuncio → handler → hecho* hace falta que cada pieza lleve un **id de correlación** (el mismo para todo el flujo) y un **id de causación** (quién la provocó). Fiel al método, se construye a mano primero:
+- §26 (outbox a mano): añadir `correlacion` y `causa` a `eventos` y `bandeja_salida`; el alumno escribe la consulta que reconstruye un flujo completo. **Ese es el primer panel de flujo**, hecho con sus manos.
+- §29-30 (swap): reconocerlo en la herramienta — metadatos de correlación/causación de Marten y la propagación de Wolverine (a verificar contra la doc de la versión que se fije).
+- §36: añadir **trazas OpenTelemetry** (Wolverine y Marten emiten trazas) para lo que la BD no conserva: un mensaje ya procesado no siempre queda en las tablas de Wolverine, así que el flujo histórico **no** sale solo de leer la BD.
+
+**Paneles mínimos tipo CritterWatch y de dónde sale cada uno:**
+
+| Panel | Fuente | ¿Sección que lo siembra? |
+|---|---|---|
+| Explorador de streams | `mt_events` / `mt_streams` | §29 (hoy, solo SQL en §36) |
+| Rezago de proyecciones | `mt_event_progression` | §19 → §32 |
+| Fallos / dead letters | `proyeccion_fallos` → tablas de dead letters de Wolverine | §20 → §36 (falta un 🔨 que produzca uno real) |
+| Outbox pendiente | `bandeja_salida` → tablas de envelopes de Wolverine | §26 → §30 |
+| **Flujo de un mensaje** | correlación/causación + trazas OTel | **no existe — falta** |
+| Mapa estático mensaje → handler | descripción de rutas de Wolverine | **no existe — falta** |
+
+**Evaluación del objetivo 3:** apuntar el observador a un sistema real del Application Plane y explicar un flujo concreto de punta a punta con lo que muestra.
