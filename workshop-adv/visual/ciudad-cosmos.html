@@ -1,0 +1,704 @@
+<title>Ciudad Cosmos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap">
+<style>
+/* Layout: un mundo isométrico a pantalla completa; barra arriba, inspector a la derecha,
+   lección abajo a la izquierda (como el "engine room" de Kubiverse). Un solo look oscuro, a propósito. */
+:root {
+  color-scheme: dark;
+  --noche: #141b33;      /* fondo del mundo */
+  --panel: #0f1426ee;    /* paneles */
+  --linea: #2c3866;
+  --texto: #e8ecff;
+  --tenue: #8e9ac4;
+  --azure: #29adff;      /* Application Plane / red */
+  --control: #c58bff;    /* Control Plane */
+  --ok: #4be08a;
+  --alerta: #ffcc33;
+  --peligro: #ff5577;
+  --pixel: "Press Start 2P", ui-monospace, monospace;
+  --mono: "VT323", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+html, body { height: 100%; }
+body { background: var(--noche); color: var(--texto); font-family: var(--mono); font-size: 20px; overflow: hidden; }
+#app { position: fixed; inset: 0; display: grid; grid-template-rows: auto 1fr auto; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--alerta); outline-offset: 2px; }
+
+/* barra superior */
+.barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px; background: #0b1022; border-bottom: 2px solid var(--linea); }
+.logo { font-family: var(--pixel); font-size: 15px; color: var(--alerta); letter-spacing: 1px; white-space: nowrap; }
+.logo small { color: var(--ok); font-size: 9px; margin-left: 6px; }
+.chip { font-family: var(--pixel); font-size: 9px; padding: 7px 9px; background: #1a2347; border: 2px solid var(--linea); white-space: nowrap; }
+.chip.on { background: #1f5a3c; border-color: var(--ok); }
+.chip.cp { border-color: var(--control); }
+.lab { display: flex; align-items: center; gap: 8px; font-family: var(--pixel); font-size: 9px; color: var(--tenue); }
+.lab input { width: 150px; accent-color: var(--alerta); }
+.lab output { color: var(--alerta); min-width: 9ch; }
+.empuje { flex: 1; }
+
+/* el mundo */
+.mundo { position: relative; overflow: hidden; touch-action: none; cursor: grab; }
+.mundo.arrastrando { cursor: grabbing; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+.etiquetas { position: absolute; inset: 0; pointer-events: none; }
+.tag { position: absolute; transform: translate(-50%, -100%); background: #0b1022e6; border-left: 3px solid var(--azure); padding: 3px 6px; font-size: 16px; line-height: 1; white-space: nowrap; }
+.tag b { display: block; font-family: var(--pixel); font-size: 7px; font-weight: 400; color: var(--texto); }
+.tag span { display: none; margin-top: 3px; }
+.tag.sel span, .tag.zona span { display: block; }
+.tag span { color: var(--tenue); }
+.tag.cp { border-color: var(--control); }
+.tag.zona { border-color: var(--ok); background: transparent; }
+.tag.zona b { color: var(--ok); }
+.tag.sel { border-color: var(--alerta); background: #2a2410e6; }
+.tag.nuevo { animation: aparece 0.6s steps(4); }
+@keyframes aparece { from { opacity: 0; transform: translate(-50%, -60%); } }
+
+/* paneles */
+.panel { position: absolute; background: var(--panel); border: 2px solid var(--linea); display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; max-height: calc(100% - 24px); overflow: auto; }
+.panel h2 { font-family: var(--pixel); font-size: 11px; font-weight: 400; color: var(--alerta); line-height: 1.5; text-wrap: balance; }
+.panel h3 { font-family: var(--pixel); font-size: 9px; font-weight: 400; color: var(--tenue); letter-spacing: 1px; margin-top: 4px; }
+.panel p { line-height: 1.15; }
+.panel code { color: var(--azure); }
+.cerrar { position: absolute; top: 8px; right: 10px; background: none; border: 0; color: var(--tenue); font-family: var(--pixel); font-size: 10px; }
+#inspector { top: 12px; right: 12px; width: min(380px, calc(100% - 32px)); }
+#inspector .meta { display: flex; flex-wrap: wrap; gap: 6px; }
+#inspector pre { background: #070b18; border: 1px solid var(--linea); padding: 8px; font-family: var(--mono); font-size: 17px; color: var(--ok); white-space: pre-wrap; overflow-wrap: anywhere; }
+#leccion { left: 12px; bottom: 12px; max-height: min(60%, 520px); width: min(520px, calc(100% - 32px)); border-color: var(--alerta); }
+.paso { color: var(--alerta); font-family: var(--pixel); font-size: 9px; }
+.texto-paso { font-size: 22px; line-height: 1.12; min-height: 3.4em; }
+.controles { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn { font-family: var(--pixel); font-size: 9px; padding: 8px 10px; background: #1a2347; border: 2px solid var(--linea); }
+.btn:hover { border-color: var(--azure); }
+.btn.prim { background: #1f5a3c; border-color: var(--ok); }
+.btn[disabled] { opacity: 0.4; cursor: default; }
+.opciones { display: grid; gap: 6px; }
+.opciones button { text-align: left; background: #151d3d; border: 2px solid var(--linea); padding: 8px 10px; font-size: 20px; line-height: 1.05; }
+.opciones button.bien { border-color: var(--ok); background: #143524; }
+.opciones button.mal { border-color: var(--peligro); background: #3a1424; }
+.feedback { font-size: 20px; line-height: 1.1; }
+#misiones { top: 12px; left: 12px; width: min(460px, calc(100% - 32px)); }
+.mision { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; padding: 8px 0; border-top: 1px solid var(--linea); align-items: start; }
+.mision .num { font-family: var(--pixel); font-size: 10px; color: var(--tenue); padding-top: 3px; }
+.mision.hecha .num { color: var(--ok); }
+.mision .q { font-size: 21px; line-height: 1.05; }
+.mision .q small { display: block; color: var(--tenue); font-size: 17px; margin-top: 2px; }
+.mision button { grid-column: 2; justify-self: start; }
+.lista-lecciones { display: grid; gap: 6px; }
+.pie { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 6px 16px calc(6px + env(safe-area-inset-bottom, 0px)); background: #0b1022; border-top: 2px solid var(--linea); font-size: 17px; color: var(--tenue); }
+.pie kbd { font-family: var(--pixel); font-size: 8px; color: var(--alerta); margin-right: 4px; }
+.aviso { font-size: 17px; color: var(--tenue); border-top: 1px dashed var(--linea); padding-top: 8px; }
+
+@media (max-width: 640px) {
+  .lab input { width: 110px; }
+  #inspector { top: auto; bottom: 12px; right: 12px; max-height: 55%; }
+  #leccion { max-height: 48%; }
+  .texto-paso { font-size: 20px; min-height: 0; }
+  .pie { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .tag.nuevo { animation: none; } }
+</style>
+
+<div id="app">
+  <header class="barra">
+    <div class="logo">CIUDAD COSMOS<small>■ demo</small></div>
+    <span class="chip on" id="chip-estado">AZURE · SIMULADO</span>
+    <span class="chip" id="chip-recursos">0 recursos</span>
+    <label class="lab" for="lab">CONSTRUIDO HASTA <input id="lab" type="range" min="1" max="10" value="10"><output id="lab-out">LAB 10</output></label>
+    <span class="empuje"></span>
+    <button class="chip" id="b-lecciones">L LECCIONES</button>
+    <button class="chip cp" id="b-misiones">J MISIONES <span id="m-cuenta">0/9</span></button>
+  </header>
+
+  <main class="mundo" id="mundo">
+    <canvas id="lienzo" aria-label="Mapa isométrico de la infraestructura de Cosmos en Azure"></canvas>
+    <div class="etiquetas" id="etiquetas"></div>
+
+    <section class="panel" id="inspector" hidden aria-live="polite"></section>
+
+    <section class="panel" id="leccion" hidden>
+      <button class="cerrar" id="l-cerrar" aria-label="Cerrar lección">X</button>
+      <h2 id="l-titulo"></h2>
+      <div class="paso" id="l-paso"></div>
+      <div class="texto-paso" id="l-texto"></div>
+      <div class="opciones" id="l-opciones"></div>
+      <div class="feedback" id="l-feedback"></div>
+      <div class="controles">
+        <button class="btn" id="l-prev">&lt; ANTERIOR</button>
+        <button class="btn prim" id="l-next">SIGUIENTE &gt;</button>
+        <button class="btn" id="l-replay">REPETIR PASO</button>
+      </div>
+    </section>
+
+    <section class="panel" id="misiones" hidden>
+      <button class="cerrar" id="m-cerrar" aria-label="Cerrar misiones">X</button>
+      <h2>LAS 9 PREGUNTAS DEL INGENIERO DE PLATAFORMA</h2>
+      <p class="aviso">Al terminar el taller debes poder responderlas. Cada una se gana completando su lección: primero predices, después ves pasar los paquetes.</p>
+      <div id="m-lista"></div>
+    </section>
+
+    <section class="panel" id="p-lecciones" hidden style="top:12px; left:12px; width:min(420px, calc(100% - 32px));">
+      <button class="cerrar" id="pl-cerrar" aria-label="Cerrar lecciones">X</button>
+      <h2>LECCIONES</h2>
+      <p class="aviso">Cada lección hace viajar paquetes reales del sistema por la ciudad, paso a paso.</p>
+      <div class="lista-lecciones" id="pl-lista"></div>
+    </section>
+  </main>
+
+  <footer class="pie">
+    <span><kbd>CLIC</kbd>inspeccionar</span><span><kbd>ARRASTRA</kbd>mover la cámara</span><span><kbd>RUEDA</kbd>zoom</span><span><kbd>L</kbd>lecciones</span><span><kbd>J</kbd>misiones</span><span><kbd>1-0</kbd>construir hasta el lab</span><span><kbd>F</kbd>encuadrar</span>
+  </footer>
+</div>
+
+<script>
+// ─────────────────────────── El mundo: recursos de workshop-adv ───────────────────────────
+// gx, gy: celda isométrica · w, d: tamaño · h: altura · lab: en qué laboratorio nace
+const C = { azure: '#29adff', azureO: '#1b6fb3', cp: '#c58bff', cpO: '#7b4fb8', ok: '#4be08a', alerta: '#ffcc33',
+  peligro: '#ff5577', piedra: '#5f6a9e', piedraO: '#3b4475', blanco: '#e8ecff', cafe: '#c98a54', verde: '#2f8f5b' };
+
+const ZONAS = [
+  { id: 'internet', nombre: 'INTERNET', sub: 'los usuarios de los tenants', gx: 1, gy: -10, w: 11, d: 4, color: '#22284a', lab: 1 },
+  { id: 'vnet', nombre: 'VNET vnet-cosmos', sub: 'tu espacio privado en Azure · Lab 1', gx: -1, gy: -3, w: 15, d: 13, color: '#1d3a5c', lab: 1 },
+  { id: 'snet-app', nombre: 'snet-app', sub: 'subred del cómputo', gx: 0, gy: -2, w: 8, d: 7, color: '#244b73', lab: 1 },
+  { id: 'snet-data', nombre: 'snet-data', sub: 'subred de los datos', gx: 9, gy: -2, w: 4, d: 7, color: '#244b73', lab: 1 },
+  { id: 'cp', nombre: 'CONTROL PLANE', sub: 'el ciclo de vida de los tenants · Lab 9', gx: 16, gy: -3, w: 7, d: 10, color: '#33264f', lab: 9, cp: true },
+  { id: 'casa', nombre: 'TU CASA', sub: 'tu laptop, fuera de Azure', gx: -7, gy: 6, w: 3, d: 3, color: '#2b2a3a', lab: 1 },
+];
+
+const RECURSOS = [
+  { id: 'frontdoor', nombre: 'Azure Front Door', sub: 'la puerta global', gx: 5, gy: -6, w: 3, d: 1, h: 3.2, color: C.alerta, tipo: 'arco', lab: 8, plano: 'Perímetro',
+    que: 'La única entrada desde internet. Recibe al usuario cerca de donde está y reenvía la petición al origen (YARP en la VM).',
+    analogia: 'La portería del edificio: nadie entra por otra puerta.',
+    porque: 'ADR-003: ruteo inteligente con Front Door delante y YARP dentro. La VM no tiene que exponerse al mundo.',
+    tf: 'azurerm_cdn_frontdoor_profile\nazurerm_cdn_frontdoor_endpoint\nazurerm_cdn_frontdoor_origin   # → IP de la VM',
+    check: 'az afd endpoint list -g rg-cosmos-dev-eus-001 --profile-name <perfil> -o table' },
+  { id: 'nsg', nombre: 'NSG', sub: 'el sello: solo Front Door', gx: 5, gy: -3.6, w: 3, d: 0.6, h: 0.9, color: C.peligro, tipo: 'reja', lab: 8, plano: 'Perímetro',
+    que: 'Las reglas de firewall de la subred. Solo admite tráfico al puerto 80 cuyo origen sea la etiqueta de servicio AzureFrontDoor.Backend.',
+    analogia: 'El guardia que solo deja pasar a quien viene de la portería.',
+    porque: 'Si alguien descubre la IP de la VM y llama directo, el NSG lo descarta: Front Door no se puede saltar.',
+    tf: 'azurerm_network_security_rule {\n  source_address_prefix = "AzureFrontDoor.Backend"\n  destination_port_range = "80"\n}',
+    check: 'az network nsg rule list -g rg-cosmos-dev-eus-001 --nsg-name <nsg> -o table' },
+  { id: 'vm', nombre: 'VM + Docker Swarm', sub: 'la fábrica del Application Plane', gx: 1, gy: -1, w: 6, d: 5, h: 0.7, color: C.piedra, tipo: 'losa', lab: 2, plano: 'Application Plane',
+    que: 'Una VM Linux con Docker. Desde el Lab 3, Docker Swarm orquesta varios servicios (uno por repo) sobre redes overlay.',
+    analogia: 'La nave industrial donde trabajan los robots (contenedores).',
+    porque: 'Swarm reinicia un contenedor caído, reparte réplicas y da service discovery por nombre: con contenedores sueltos lo harías a mano.',
+    tf: 'azurerm_linux_virtual_machine {\n  identity { type = "SystemAssigned" }\n  custom_data = cloud-init\n}',
+    check: 'ssh azureuser@<ip> docker service ls' },
+  { id: 'yarp', nombre: 'YARP', sub: 'reverse proxy', gx: 1.6, gy: -0.4, w: 1.4, d: 1.4, h: 1.9, color: C.alerta, tipo: 'torre', lab: 8, plano: 'Application Plane', base: 0.7,
+    que: 'Recibe lo que manda Front Door y lo enruta al servicio correcto del Swarm según la ruta (/oxp, /contabilidad, /radicacion).',
+    analogia: 'El recepcionista que sabe a qué oficina va cada visitante.',
+    porque: 'ADR-003: YARP y no Azure Application Gateway. Corre dentro de la red overlay, en .NET, y el equipo lo configura como código.',
+    tf: '# servicio del stack de Swarm\nyarp:\n  networks: [oxp-public, oxp-internal]',
+    check: 'docker service logs yarp' },
+  { id: 'oxp', nombre: 'oxp', sub: 'contenedor', gx: 3.6, gy: -0.4, w: 1.1, d: 1.1, h: 1.3, color: C.azure, tipo: 'robot', lab: 3, plano: 'Application Plane', base: 0.7,
+    que: 'Un servicio del ERP, en su propio contenedor, con su imagen en el ACR.', analogia: 'Un robot en la línea de montaje.',
+    porque: 'Un contenedor por repo: cada equipo despliega lo suyo sin tocar a los demás.', tf: 'oxp:\n  image: <acr>.azurecr.io/oxp:<sha>\n  deploy: { replicas: 2 }', check: 'docker service ps oxp' },
+  { id: 'conta', nombre: 'contabilidad', sub: 'contenedor', gx: 5.1, gy: -0.4, w: 1.1, d: 1.1, h: 1.3, color: C.azure, tipo: 'robot', lab: 3, plano: 'Application Plane', base: 0.7,
+    que: 'El bounded context de Contabilidad, como servicio del Swarm.', analogia: 'Otro robot, otra estación.',
+    porque: 'ADR-001: bounded contexts aislados. Contabilidad no comparte proceso ni base con Radicación.', tf: 'contabilidad:\n  image: <acr>.azurecr.io/contabilidad:<sha>', check: 'docker service ps contabilidad' },
+  { id: 'radic', nombre: 'radicación', sub: 'contenedor', gx: 3.6, gy: 1.6, w: 1.1, d: 1.1, h: 1.3, color: C.azure, tipo: 'robot', lab: 3, plano: 'Application Plane', base: 0.7,
+    que: 'El bounded context de Radicación. Consume eventos de Reconocimiento por Service Bus.', analogia: 'Un robot que espera piezas de otra línea.',
+    porque: 'Recibe por mensaje, no por HTTP: si Reconocimiento cae, Radicación sigue.', tf: 'radicacion:\n  image: <acr>.azurecr.io/radicacion:<sha>', check: 'docker service ps radicacion' },
+  { id: 'runner', nombre: 'GitHub Runner', sub: 'construye y despliega', gx: 5.1, gy: 1.6, w: 1.1, d: 1.1, h: 2.2, color: C.ok, tipo: 'grua', lab: 5, plano: 'Application Plane', base: 0.7,
+    que: 'Un runner self-hosted dentro de la VM: compila, construye la imagen, la sube al ACR y actualiza el stack.',
+    analogia: 'La grúa de la fábrica: arma y coloca los robots.',
+    porque: 'GitHub no entra a tu red privada; el runner sale hacia GitHub. Se registra solo en el día 0 con cloud-init.',
+    tf: '# cloud-init (día 0)\naz login --identity\nPAT=$(az keyvault secret show ...)\n./config.sh --token $PAT',
+    check: 'GitHub → Settings → Actions → Runners' },
+  { id: 'identity', nombre: 'Managed Identity', sub: 'el gafete de la VM', gx: 0.2, gy: 2.6, w: 0.8, d: 0.8, h: 1.2, color: C.alerta, tipo: 'gafete', lab: 4, plano: 'Control (gobernanza)', base: 0.7,
+    que: 'Una identidad de Azure atada a la VM (SystemAssigned). Con ella la VM pide tokens sin guardar contraseñas.',
+    analogia: 'El gafete con foto: la puerta te reconoce, no necesitas recordar una clave.',
+    porque: 'ADR-004: zero secrets. Se le asignan roles: AcrPull en el ACR, lectura de secretos en el Key Vault, Sender/Receiver en Service Bus.',
+    tf: 'azurerm_role_assignment {\n  role_definition_name = "AcrPull"\n  principal_id = azurerm_linux_virtual_machine.vm.identity[0].principal_id\n}',
+    check: 'az vm identity show -g rg-cosmos-dev-eus-001 -n <vm>' },
+  { id: 'acr', nombre: 'Container Registry', sub: 'el almacén de imágenes', gx: 1, gy: 5.5, w: 2.4, d: 2, h: 1.6, color: C.cafe, tipo: 'bodega', lab: 4, plano: 'Application Plane',
+    que: 'Registro privado de imágenes Docker. Cada servicio tiene la suya.', analogia: 'La bodega donde esperan los robots empacados.',
+    porque: 'Nada de imágenes públicas en Docker Hub. La VM las descarga con su identidad (AcrPull), sin usuario ni clave.',
+    tf: 'azurerm_container_registry {\n  sku = "Basic"\n  admin_enabled = false\n}', check: 'az acr repository list -n <acr> -o table' },
+  { id: 'kv', nombre: 'Key Vault', sub: 'el banco de secretos', gx: 10, gy: 3.2, w: 2.2, d: 2, h: 2.1, color: C.blanco, tipo: 'banco', lab: 4, plano: 'Control (gobernanza)',
+    que: 'Guarda el PAT del runner, la cadena de conexión de Postgres y lo que el frontend necesita en env.js.',
+    analogia: 'El banco: el dinero no se guarda en el bolsillo, se retira con identificación.',
+    porque: 'Ningún secreto en el código de Terraform ni en el repo. Quien tiene el rol lo lee en tiempo de despliegue.',
+    tf: 'azurerm_key_vault_secret { name = "github-pat" }\nazurerm_key_vault_secret { name = "pg-connection" }', check: 'az keyvault secret list --vault-name <kv> -o table' },
+  { id: 'postgres', nombre: 'PostgreSQL Flexible', sub: 'la biblioteca de datos', gx: 9.6, gy: -1.4, w: 2.6, d: 2.4, h: 2, color: '#7ec8ff', tipo: 'biblioteca', lab: 6, plano: 'Application Plane (datos)',
+    que: 'Base de datos PaaS. El estado vive fuera del contenedor, que es efímero.', analogia: 'La biblioteca: los robots consultan, pero los libros no viven en ellos.',
+    porque: 'Si el contenedor muere, los datos siguen. Azure se encarga de backups y parches.',
+    tf: 'azurerm_postgresql_flexible_server {\n  public_network_access_enabled = false  # desde el Lab 10\n}', check: 'az postgres flexible-server show -g rg-cosmos-dev-eus-001 -n <pg>' },
+  { id: 'storage', nombre: 'Storage · sitio estático', sub: 'el frontend + env.js', gx: 10.5, gy: -8.6, w: 2, d: 1.6, h: 1.3, color: C.ok, tipo: 'kiosco', lab: 7, plano: 'Application Plane (front)',
+    que: 'El frontend compilado, servido como archivos estáticos. Un env.js generado en el despliegue le dice a qué API llamar.',
+    analogia: 'Un kiosco de folletos impresos: el folleto no cambia, pero la hoja de direcciones sí.',
+    porque: 'Una sola compilación para todos los ambientes: la URL de la API llega en env.js, leída del Key Vault, sin recompilar.',
+    tf: 'azurerm_storage_account { static_website { index_document = "index.html" } }\n# env.js: window.ENV = { API_URL: "https://..." }',
+    check: 'curl https://<cuenta>.z13.web.core.windows.net/env.js' },
+  { id: 'sbap', nombre: 'Service Bus · App Plane', sub: 'el correo entre bounded contexts', gx: 4, gy: 6.3, w: 2.6, d: 2, h: 1.8, color: C.azure, tipo: 'correo', lab: 9, plano: 'Application Plane',
+    que: 'Topics y subscriptions para eventos entre bounded contexts (p. ej. reconocimiento.documento.procesado).',
+    analogia: 'La oficina de correos: dejas la carta y sigues; el otro la recoge cuando puede.',
+    porque: 'Desacopla productor y consumidor. Autenticación solo con Managed Identity (disableLocalAuth).',
+    tf: 'azurerm_servicebus_namespace { local_auth_enabled = false }\nazurerm_servicebus_topic { name = "reconocimiento" }', check: 'az servicebus topic list -g rg-cosmos-dev-eus-001 --namespace-name <sb-ap> -o table' },
+  { id: 'onboarding', nombre: 'Function: onboarding', sub: 'nace un tenant', gx: 17, gy: -2, w: 1.6, d: 1.6, h: 2.4, color: C.cp, tipo: 'torre', lab: 9, plano: 'Control Plane', cp: true,
+    que: 'Recibe el registro de un tenant nuevo y publica el evento en el Service Bus del Control Plane.', analogia: 'La ventanilla de inscripción del castillo.',
+    porque: 'ADR-009: el ciclo de vida de los tenants vive aparte del runtime del ERP.', tf: 'azurerm_linux_function_app { name = "func-onboarding" }', check: 'az functionapp list -g rg-cosmos-dev-eus-001 -o table' },
+  { id: 'billing', nombre: 'Function: billing', sub: 'planes y límites', gx: 20, gy: -2, w: 1.6, d: 1.6, h: 2, color: C.cp, tipo: 'torre', lab: 9, plano: 'Control Plane', cp: true,
+    que: 'Reacciona a los eventos de tenants: plan, límites, facturación.', analogia: 'La tesorería del castillo.',
+    porque: 'Si billing falla, el ERP de los clientes sigue funcionando: no hay llamada síncrona entre planos.', tf: 'azurerm_linux_function_app { name = "func-billing" }', check: 'az functionapp show -n func-billing ...' },
+  { id: 'usermgmt', nombre: 'Function: user-mgmt', sub: 'usuarios del tenant', gx: 17, gy: 1.4, w: 1.6, d: 1.6, h: 2, color: C.cp, tipo: 'torre', lab: 9, plano: 'Control Plane', cp: true,
+    que: 'Crea y administra los usuarios del tenant; sus claims terminan en el token JWT.', analogia: 'La oficina que emite los pasaportes.',
+    porque: 'El ERP no le pregunta al Control Plane quién eres: lo lee del JWT.', tf: 'azurerm_linux_function_app { name = "func-user-mgmt" }', check: 'az functionapp show -n func-user-mgmt ...' },
+  { id: 'sbcp', nombre: 'Service Bus · Control Plane', sub: 'eventos de tenants', gx: 19.6, gy: 1.4, w: 2.4, d: 2, h: 1.6, color: C.cp, tipo: 'correo', lab: 9, plano: 'Control Plane', cp: true,
+    que: 'Un Service Bus propio para los eventos del ciclo de vida: tenant creado, plan cambiado, tenant suspendido.',
+    analogia: 'El correo interno del castillo, separado del correo de la ciudad.',
+    porque: 'Pregunta 1: dos Service Buses porque son dos planos. Un pico de eventos del ERP no puede frenar el alta de un tenant, ni al revés.',
+    tf: 'azurerm_servicebus_namespace { name = "sb-cosmos-cp" }', check: 'az servicebus namespace list -g rg-cosmos-dev-eus-001 -o table' },
+  { id: 'pe', nombre: 'Private Endpoints', sub: 'túneles privados', gx: 8.1, gy: 0.2, w: 0.8, d: 0.8, h: 0.8, color: C.ok, tipo: 'tunel', lab: 10, plano: 'Hardening',
+    que: 'Una IP privada dentro de tu VNet para Postgres y el Key Vault, con su zona de DNS privada.',
+    analogia: 'Un pasillo interno entre edificios: ya no hay que salir a la calle.',
+    porque: 'ADR-007: zero public IP. Con el acceso público apagado, nadie fuera de la VNet llega a los datos, ni siquiera tú desde tu casa.',
+    tf: 'azurerm_private_endpoint { subresource_names = ["postgresqlServer"] }\nazurerm_private_dns_zone { name = "privatelink.postgres.database.azure.com" }',
+    check: 'nslookup <pg>.postgres.database.azure.com   # desde la VM: 10.x.x.x' },
+  { id: 'laptop', nombre: 'Tu laptop', sub: 'psql desde tu casa', gx: -6.2, gy: 6.8, w: 1.2, d: 1.2, h: 1, color: C.blanco, tipo: 'casa', lab: 1, plano: 'Fuera de Azure',
+    que: 'Tú, intentando conectarte a la base desde tu casa.', analogia: 'Un vecino tocando la puerta trasera de la biblioteca.',
+    porque: 'Hasta el Lab 9 funciona (con firewall). Desde el Lab 10, la base no tiene puerta pública.', tf: 'psql "host=<pg>.postgres.database.azure.com ..."', check: 'psql ... → timeout desde el Lab 10' },
+];
+const porId = Object.fromEntries(RECURSOS.map(r => [r.id, r]));
+const NOMBRE_LAB = { 1: 'Cimentación', 2: 'Cómputo básico', 3: 'Orquestación', 4: 'Automatización e identidad', 5: 'CI/CD', 6: 'Persistencia', 7: 'Frontend inmutable', 8: 'Perímetro', 9: 'Los dos planos', 10: 'Hardening' };
+
+// ─────────────────────────── Lecciones: paquetes que viajan ───────────────────────────
+// Cada paso mueve un paquete por una ruta de recursos. Algunos pasos preguntan antes (predecir → ver).
+const LECCIONES = [
+  { id: 'request', titulo: 'EL VIAJE DE UN REQUEST', lab: 8, preguntas: [2, 5],
+    pasos: [
+      { pregunta: 'Un usuario abre /contabilidad. ¿Por dónde entra primero su petición?',
+        opciones: [['Directo a la IP de la VM', false, 'La VM no acepta tráfico de internet: su NSG lo descarta.'], ['Por Azure Front Door', true, 'Sí: Front Door es la única puerta. Míralo.'], ['Por el Key Vault', false, 'El Key Vault guarda secretos, no recibe peticiones.']] },
+      { ruta: ['internet', 'frontdoor'], color: C.alerta, texto: 'La petición llega a Front Door, la puerta global. Está cerca del usuario y reenvía al origen configurado: la VM.' },
+      { ruta: ['frontdoor', 'nsg'], color: C.alerta, texto: 'El NSG mira el origen: es la etiqueta AzureFrontDoor.Backend, puerto 80. Pasa. Cualquier otro origen se descarta aquí (pregunta 5).' },
+      { ruta: ['nsg', 'yarp'], color: C.alerta, texto: 'YARP recibe la petición dentro de la VM y lee la ruta: /contabilidad.' },
+      { ruta: ['yarp', 'conta'], color: C.alerta, texto: 'YARP la enruta al servicio contabilidad por la red overlay del Swarm. Un proxy en .NET, configurado como código (pregunta 2).' },
+      { ruta: ['conta', 'postgres'], color: '#7ec8ff', texto: 'Contabilidad lee y escribe su estado en PostgreSQL. El contenedor es efímero; los datos no.' },
+      { ruta: ['postgres', 'conta', 'yarp', 'frontdoor', 'internet'], color: C.ok, texto: 'La respuesta vuelve por el mismo camino. El usuario nunca supo que existía una VM.' },
+    ] },
+  { id: 'tenant', titulo: 'NACE UN TENANT', lab: 9, preguntas: [1, 8],
+    pasos: [
+      { pregunta: 'Una empresa nueva se registra. ¿Quién se entera primero?',
+        opciones: [['El ERP (Application Plane)', false, 'El ERP sirve a los clientes que ya existen; no gestiona altas.'], ['El Control Plane (onboarding)', true, 'Sí: el ciclo de vida de los tenants vive en el Control Plane.'], ['YARP', false, 'YARP enruta peticiones del ERP; no sabe de altas.']] },
+      { ruta: ['internet', 'onboarding'], color: C.cp, texto: 'El registro llega a la Function de onboarding, en el Control Plane. El Application Plane ni se entera.' },
+      { ruta: ['onboarding', 'sbcp'], color: C.cp, texto: 'Onboarding publica "tenant creado" en el Service Bus del Control Plane. No el del ERP: este es otro correo (pregunta 1).' },
+      { ruta: ['sbcp', 'billing'], color: C.cp, texto: 'Billing reacciona: asigna el plan y sus límites.' },
+      { ruta: ['sbcp', 'usermgmt'], color: C.cp, texto: 'User-mgmt crea el usuario administrador del tenant.' },
+      { pregunta: 'Mañana, el ERP necesita saber el plan de este tenant. ¿Cómo lo averigua?',
+        opciones: [['Llama por HTTP al Control Plane', false, 'Eso acopla los planos: si el Control Plane cae, el ERP cae con él.'], ['Lo lee del token JWT del usuario', true, 'Sí: los claims del tenant viajan en el JWT. Sin llamadas entre planos.'], ['Lo consulta en Postgres del Control Plane', false, 'Tampoco: el ERP no toca la base del otro plano.']] },
+      { ruta: ['usermgmt', 'internet', 'frontdoor', 'yarp', 'oxp'], color: C.alerta, token: true, texto: 'El usuario inicia sesión y su JWT trae los claims del tenant (plan, permisos). El ERP los lee del token: no hay acoplamiento síncrono entre planos (pregunta 8).' },
+    ] },
+  { id: 'secretos', titulo: 'CERO SECRETOS', lab: 5, preguntas: [3, 4],
+    pasos: [
+      { pregunta: 'El runner necesita el PAT de GitHub para registrarse. ¿Dónde está?',
+        opciones: [['En terraform.tfvars', false, 'Entonces quedaría en el repo y en el state. Justo lo que se evita.'], ['En el Key Vault, leído con la identidad de la VM', true, 'Sí: la VM se identifica con su Managed Identity y lo lee.'], ['Escrito en cloud-init', false, 'cloud-init lo pide al Key Vault; no lo lleva escrito.']] },
+      { ruta: ['identity', 'kv'], color: C.alerta, token: true, texto: 'En el día 0, cloud-init hace az login --identity: la VM muestra su gafete (Managed Identity SystemAssigned, pregunta 3).' },
+      { ruta: ['kv', 'runner'], color: C.alerta, texto: 'El Key Vault reconoce el gafete, ve el rol de lectura de secretos y entrega el PAT. El runner se registra en GitHub (pregunta 4).' },
+      { ruta: ['runner', 'acr'], color: C.ok, texto: 'Llega un push: el runner construye la imagen y la sube al ACR.' },
+      { ruta: ['acr', 'identity', 'conta'], color: C.azure, texto: 'Swarm descarga la imagen del ACR con el rol AcrPull de la misma identidad. En ningún paso hubo una contraseña.' },
+    ] },
+  { id: 'frontend', titulo: 'EL FRONTEND SIN RECOMPILAR', lab: 7, preguntas: [6],
+    pasos: [
+      { ruta: ['runner', 'kv'], color: C.alerta, texto: 'En el despliegue, el runner lee del Key Vault la URL de la API de este ambiente.' },
+      { ruta: ['kv', 'storage'], color: C.ok, texto: 'Con ella genera env.js y lo sube al Storage, junto al frontend ya compilado.' },
+      { pregunta: 'Pasas de dev a prod. ¿Hay que recompilar el frontend?',
+        opciones: [['Sí, la URL está dentro del bundle', false, 'Eso pasaría si la URL se compilara adentro. Aquí no.'], ['No: solo cambia env.js', true, 'Sí: el mismo build sirve para todos los ambientes (pregunta 6).']] },
+      { ruta: ['internet', 'storage'], color: C.ok, texto: 'El navegador descarga index.html y env.js: window.ENV.API_URL dice a dónde llamar.' },
+      { ruta: ['storage', 'internet', 'frontdoor', 'yarp'], color: C.alerta, texto: 'Y llama a la API a través de Front Door, como cualquier otra petición.' },
+    ] },
+  { id: 'casa', titulo: '¿POR QUÉ NO ENTRO A LA BASE DESDE MI CASA?', lab: 10, preguntas: [9],
+    pasos: [
+      { pregunta: 'Ya estás en el Lab 10. Abres psql desde tu laptop contra la base. ¿Qué pasa?',
+        opciones: [['Conecta, porque tengo la contraseña', false, 'La contraseña no sirve si no hay puerta: el acceso público está apagado.'], ['Timeout: la base no tiene puerta pública', true, 'Sí. Míralo.']] },
+      { ruta: ['laptop', 'postgres'], color: C.peligro, bloqueado: true, texto: 'Tu conexión sale de tu casa y choca: public_network_access_enabled = false. No hay IP pública que contestar.' },
+      { ruta: ['conta', 'pe', 'postgres'], color: C.ok, texto: 'Contabilidad, en cambio, llega por el Private Endpoint: una IP 10.x dentro de la VNet. El DNS privado resuelve el nombre a esa IP (pregunta 9).' },
+      { ruta: ['runner', 'pe', 'kv'], color: C.ok, texto: 'El Key Vault también se cerró al público: el runner lo alcanza por su propio túnel privado.' },
+    ] },
+  { id: 'swarm', titulo: 'UN CONTENEDOR SE CAE', lab: 3, preguntas: [7],
+    pasos: [
+      { pregunta: 'El contenedor de radicación muere a las 3 a. m. ¿Qué pasa?',
+        opciones: [['Queda caído hasta que alguien entre a la VM', false, 'Eso pasaba con contenedores sueltos (Lab 2).'], ['Swarm lo vuelve a levantar', true, 'Sí: Swarm compara lo que pediste (réplicas) con lo que hay, y corrige.']] },
+      { caida: 'radic', ruta: ['radic', 'vm'], color: C.peligro, texto: 'radicación se cae. Swarm nota que hay 0 réplicas de 1 pedida.' },
+      { ruta: ['acr', 'radic'], color: C.ok, revive: 'radic', texto: 'Swarm agenda una réplica nueva, descarga la imagen del ACR y la arranca. Por eso Swarm y no contenedores directos (pregunta 7).' },
+    ] },
+];
+const MISIONES = [
+  [1, '¿Por qué hay dos Service Buses?', 'tenant'], [2, '¿Por qué YARP y no Azure Application Gateway?', 'request'],
+  [3, '¿Por qué la VM tiene SystemAssigned Identity?', 'secretos'], [4, '¿Cómo sabe el runner el PAT sin tenerlo en el código?', 'secretos'],
+  [5, '¿Por qué el NSG solo permite AzureFrontDoor.Backend:80?', 'request'], [6, '¿Cómo recibe el frontend la URL de la API sin recompilarse?', 'frontend'],
+  [7, '¿Qué hace Docker Swarm y por qué no contenedores directos?', 'swarm'], [8, '¿Qué pasa cuando se registra un tenant nuevo?', 'tenant'],
+  [9, '¿Por qué no me puedo conectar a la base desde mi casa?', 'casa'],
+];
+
+// ─────────────────────────── Estado ───────────────────────────
+const est = { lab: 10, cam: { x: 0, y: 0, z: 1 }, sel: null, leccion: null, paso: 0, anim: null, caidos: new Set(), hechas: new Set(), recienNacidos: new Set(), t: 0 };
+try { JSON.parse(localStorage.getItem('cc-hechas') || '[]').forEach(id => est.hechas.add(id)); } catch {}
+const guardar = () => { try { localStorage.setItem('cc-hechas', JSON.stringify([...est.hechas])); } catch {} };
+
+// ─────────────────────────── Proyección isométrica ───────────────────────────
+const TW = 34, TH = 17, HZ = 17;          // ancho/alto de una celda, altura de una unidad
+const ESCALA_PIXEL = 2;                   // se dibuja a la mitad y se agranda: el look pixel
+const lienzo = document.getElementById('lienzo'), ctx = lienzo.getContext('2d');
+const mundo = document.getElementById('mundo'), capa = document.getElementById('etiquetas');
+let W = 0, H = 0;
+function iso(gx, gy, z = 0) { return [(gx - gy) * TW / 2, (gx + gy) * TH / 2 - z * HZ]; }
+function aPantalla([x, y]) { return [(x * est.cam.z + est.cam.x) + W / 2, (y * est.cam.z + est.cam.y) + H / 2]; }
+function visible(o) { return o.lab <= est.lab; }
+// Encuadra toda la ciudad en la pantalla (deja sitio abajo a la izquierda para la lección).
+function encuadrar() {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const z of ZONAS) for (const [a, b] of [[z.gx, z.gy], [z.gx + z.w, z.gy], [z.gx, z.gy + z.d], [z.gx + z.w, z.gy + z.d]]) {
+    const [x, y] = iso(a, b, 0); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y - 70); y1 = Math.max(y1, y);
+  }
+  est.cam.z = Math.max(0.5, Math.min(1.6, Math.min((W - 20) / (x1 - x0), (H - 20) / (y1 - y0))));
+  est.cam.x = -((x0 + x1) / 2) * est.cam.z;
+  est.cam.y = -((y0 + y1) / 2) * est.cam.z;
+}
+
+function redimensionar() {
+  const r = mundo.getBoundingClientRect();
+  W = Math.floor(r.width / ESCALA_PIXEL); H = Math.floor(r.height / ESCALA_PIXEL);
+  lienzo.width = W; lienzo.height = H;
+}
+
+function sombra(hex, f) {
+  const n = parseInt(hex.slice(1), 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const k = v => Math.max(0, Math.min(255, Math.round(v * f)));
+  return `rgb(${k(r)},${k(g)},${k(b)})`;
+}
+function poligono(pts, fill, linea) {
+  ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath();
+  ctx.fillStyle = fill; ctx.fill();
+  if (linea) { ctx.strokeStyle = linea; ctx.lineWidth = 1; ctx.stroke(); }
+}
+// Una caja isométrica: tapa, cara izquierda (+gy) y cara derecha (+gx)
+function caja(gx, gy, w, d, z0, h, color, opts = {}) {
+  const P = (a, b, z) => aPantalla(iso(a, b, z));
+  const z1 = z0 + h;
+  const tapa = [P(gx, gy, z1), P(gx + w, gy, z1), P(gx + w, gy + d, z1), P(gx, gy + d, z1)];
+  const izq = [P(gx, gy + d, z1), P(gx + w, gy + d, z1), P(gx + w, gy + d, z0), P(gx, gy + d, z0)];
+  const der = [P(gx + w, gy, z1), P(gx + w, gy + d, z1), P(gx + w, gy + d, z0), P(gx + w, gy, z0)];
+  const borde = opts.sel ? C.alerta : '#0b1022';
+  poligono(izq, sombra(color, 0.62), borde);
+  poligono(der, sombra(color, 0.8), borde);
+  poligono(tapa, color, borde);
+  return [tapa[0], tapa[1], der[1], der[2], izq[2], izq[3], tapa[3]];
+}
+
+// ─────────────────────────── Dibujo ───────────────────────────
+function dibujarZona(z) {
+  const P = (a, b) => aPantalla(iso(a, b, 0));
+  poligono([P(z.gx, z.gy), P(z.gx + z.w, z.gy), P(z.gx + z.w, z.gy + z.d), P(z.gx, z.gy + z.d)], z.color, sombra(z.color, 1.5));
+  if (z.id === 'internet') {   // rascacielos de fondo
+    for (let i = 0; i < 9; i++) {
+      const gx = z.gx + 0.6 + (i % 5) * 2.1, gy = z.gy + 0.4 + Math.floor(i / 5) * 2;
+      const h = 2 + ((i * 7) % 5) * 0.8;
+      caja(gx, gy, 1, 1, 0, h, i % 3 ? '#3a4278' : '#4d3a78');
+      const [wx, wy] = aPantalla(iso(gx + 0.5, gy + 1, h * 0.5));
+      ctx.fillStyle = (Math.floor(est.t / 30) + i) % 4 ? C.alerta : '#6b5a20'; ctx.fillRect(wx - 1, wy, 2, 2);
+    }
+  }
+  if (z.id === 'cp') {         // muralla del castillo
+    for (let i = 0; i <= z.w; i += 1) caja(z.gx + i - 0.2, z.gy - 0.2, 0.4, 0.4, 0, 1.1 + (i % 2) * 0.4, C.cpO);
+  }
+}
+
+function dibujarRecurso(r) {
+  const sel = est.sel === r.id;
+  const z0 = r.base || 0, caido = est.caidos.has(r.id);
+  const nacer = est.recienNacidos.has(r.id) ? Math.min(1, (est.t - est.nacimiento) / 24) : 1;
+  const h = r.h * nacer;
+  let color = caido ? '#55304a' : r.color;
+  if (r.id === 'postgres' && est.lab >= 10) color = '#5fa8e0';
+  let sil;
+  switch (r.tipo) {
+    case 'arco': {
+      caja(r.gx, r.gy, 0.6, r.d, z0, h, color, { sel });
+      caja(r.gx + r.w - 0.6, r.gy, 0.6, r.d, z0, h, color, { sel });
+      sil = caja(r.gx, r.gy, r.w, r.d, z0 + h - 0.6, 0.6 * nacer, sombra(color, 1.1), { sel });
+      break;
+    }
+    case 'reja': {
+      for (let i = 0; i < 6; i++) caja(r.gx + i * 0.55, r.gy, 0.2, r.d, z0, h, color, { sel });
+      sil = caja(r.gx, r.gy, r.w, r.d, z0 + h - 0.15, 0.15, color, { sel });
+      break;
+    }
+    case 'banco': {
+      sil = caja(r.gx, r.gy, r.w, r.d, z0, h * 0.25, sombra(color, 0.85), { sel });
+      for (let i = 0; i < 4; i++) caja(r.gx + 0.15 + i * 0.55, r.gy + r.d - 0.35, 0.25, 0.25, z0 + h * 0.25, h * 0.55, color, { sel });
+      caja(r.gx, r.gy, r.w, r.d, z0 + h * 0.8, h * 0.2, sombra(color, 0.9), { sel });
+      break;
+    }
+    case 'grua': {
+      sil = caja(r.gx, r.gy, r.w, r.d, z0, h * 0.45, color, { sel });
+      caja(r.gx + r.w * 0.4, r.gy + r.d * 0.4, 0.2, 0.2, z0 + h * 0.45, h * 0.55, C.alerta, { sel });
+      caja(r.gx - 0.3, r.gy + r.d * 0.4, r.w + 0.4, 0.2, z0 + h * 0.95, 0.12, C.alerta, { sel });
+      break;
+    }
+    case 'tunel': {
+      if (est.lab >= 10) {   // los túneles brillan hacia Postgres y el Key Vault
+        ctx.strokeStyle = C.ok; ctx.lineWidth = 2; ctx.setLineDash([3, 3]); ctx.lineDashOffset = -est.t / 4;
+        for (const dest of ['postgres', 'kv', 'conta']) {
+          const [ax, ay] = centro(r), [bx, by] = centro(porId[dest]);
+          ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+        }
+        ctx.setLineDash([]);
+      }
+      sil = caja(r.gx, r.gy, r.w, r.d, z0, h, color, { sel });
+      break;
+    }
+    default:
+      sil = caja(r.gx, r.gy, r.w, r.d, z0, h, color, { sel });
+  }
+  // detalles
+  if (r.tipo === 'robot' || r.tipo === 'torre') {
+    const [x, y] = aPantalla(iso(r.gx + r.w / 2, r.gy + r.d, z0 + h * 0.55));
+    ctx.fillStyle = caido ? C.peligro : (r.cp ? '#f2dcff' : C.ok);
+    ctx.fillRect(x - 2, y - 2, 4, 3);
+  }
+  if (r.tipo === 'gafete') { const [x, y] = aPantalla(iso(r.gx + r.w / 2, r.gy + r.d / 2, z0 + h + 0.3)); ctx.fillStyle = C.alerta; ctx.fillRect(x - 3, y - 3 + Math.sin(est.t / 12) * 2, 6, 6); }
+  if (r.id === 'postgres' && est.lab < 10) { const [x, y] = aPantalla(iso(r.gx, r.gy + r.d / 2, z0 + 0.6)); ctx.fillStyle = C.peligro; ctx.fillRect(x - 3, y - 3, 4, 6); }
+  r._sil = sil;
+}
+
+function centro(r) {
+  const z = (r.base || 0) + (r.h || 0) + 0.2;
+  return aPantalla(iso(r.gx + (r.w || 1) / 2, r.gy + (r.d || 1) / 2, z));
+}
+function centroDe(id) {
+  if (porId[id]) return centro(porId[id]);
+  const z = ZONAS.find(z => z.id === id);
+  return aPantalla(iso(z.gx + z.w / 2, z.gy + z.d / 2, 1));
+}
+
+function dibujarAnimacion() {
+  const a = est.anim; if (!a) return;
+  const pts = a.ruta.map(centroDe);
+  ctx.strokeStyle = a.color; ctx.globalAlpha = 0.35; ctx.lineWidth = 2;
+  ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); ctx.globalAlpha = 1;
+  const tramos = pts.length - 1, prog = Math.min(1, a.t / (tramos * 40));
+  const pos = prog * tramos, i = Math.min(tramos - 1, Math.floor(pos)), f = pos - i;
+  let [x, y] = [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * f, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * f];
+  if (a.bloqueado && prog > 0.55) { // choca y rebota
+    const fr = 0.55 * tramos, j = Math.floor(fr), g = fr - j;
+    x = pts[j][0] + (pts[j + 1][0] - pts[j][0]) * g; y = pts[j][1] + (pts[j + 1][1] - pts[j][1]) * g;
+    ctx.fillStyle = C.peligro; ctx.font = '8px "Press Start 2P", monospace'; ctx.fillText('X TIMEOUT', x + 6, y - 6);
+  }
+  ctx.fillStyle = '#0b1022'; ctx.fillRect(x - 4, y - 4, 8, 8);
+  ctx.fillStyle = a.color; ctx.fillRect(x - 3, y - 3, 6, 6);
+  if (a.token) { ctx.fillStyle = '#0b1022'; ctx.font = '6px "Press Start 2P", monospace'; ctx.fillText('JWT', x - 8, y - 6); ctx.fillStyle = C.alerta; ctx.fillText('JWT', x - 9, y - 7); }
+  a.t++;
+  if (prog >= 1 && !a.fin) { a.fin = true; if (a.revive) est.caidos.delete(a.revive); }
+}
+
+function dibujar() {
+  est.t++;
+  ctx.fillStyle = '#141b33'; ctx.fillRect(0, 0, W, H);
+  // estrellas
+  ctx.fillStyle = '#2c3866';
+  for (let i = 0; i < 60; i++) ctx.fillRect((i * 97) % W, (i * 53) % H, 1, 1);
+  ZONAS.filter(visible).forEach(dibujarZona);
+  // orden de pintado: de atrás (gx+gy pequeño) hacia adelante
+  RECURSOS.filter(visible).sort((a, b) => (a.gx + a.gy + (a.base ? 0.01 : 0)) - (b.gx + b.gy + (b.base ? 0.01 : 0)) || (a.base || 0) - (b.base || 0))
+    .forEach(dibujarRecurso);
+  dibujarAnimacion();
+  actualizarEtiquetas();
+  requestAnimationFrame(dibujar);
+}
+
+// ─────────────────────────── Etiquetas (HTML nítido sobre el pixel art) ───────────────────────────
+const tags = new Map();
+function tag(id, html, clase) {
+  let el = tags.get(id);
+  if (!el) { el = document.createElement('div'); el.className = 'tag ' + clase; capa.appendChild(el); tags.set(id, el); el.dataset.html = ''; }
+  if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
+  return el;
+}
+function actualizarEtiquetas() {
+  const vivos = new Set();
+  for (const z of ZONAS) {
+    if (!visible(z) || z.id === 'snet-app' || z.id === 'snet-data') continue;
+    const [x, y] = aPantalla(iso(z.gx + 0.5, z.gy + 0.2, 0));
+    const el = tag('z-' + z.id, `<b>${z.nombre}</b><span>${z.sub}</span>`, 'zona' + (z.cp ? ' cp' : ''));
+    el.style.left = x * ESCALA_PIXEL + 'px'; el.style.top = y * ESCALA_PIXEL + 'px'; el.style.transform = 'translate(0,-100%)'; vivos.add('z-' + z.id);
+  }
+  const mostrar = est.cam.z > 1.15;
+  for (const r of RECURSOS) {
+    if (!visible(r)) continue;
+    const pequeño = ['oxp', 'conta', 'radic', 'identity', 'pe', 'nsg'].includes(r.id);
+    if (!mostrar && pequeño && est.sel !== r.id && est.hover !== r.id) continue;
+    const [x, y] = centro(r);
+    const estado = est.caidos.has(r.id) ? ' · <span style="color:var(--peligro)">CAÍDO</span>' : '';
+    const el = tag(r.id, `<b>${r.nombre}</b><span>${r.sub}${estado}</span>`, (r.cp ? 'cp' : '') + (est.sel === r.id ? ' sel' : '') + (est.recienNacidos.has(r.id) ? ' nuevo' : ''));
+    el.style.left = x * ESCALA_PIXEL + 'px'; el.style.top = (y - 4) * ESCALA_PIXEL + 'px';
+    el.classList.toggle('sel', est.sel === r.id || est.hover === r.id);
+    vivos.add(r.id);
+  }
+  for (const [id, el] of tags) if (!vivos.has(id)) { el.remove(); tags.delete(id); }
+  const n = RECURSOS.filter(r => visible(r) && r.id !== 'laptop').length;
+  document.getElementById('chip-recursos').textContent = `${n} recursos · ${est.caidos.size ? est.caidos.size + ' caído' : 'todo sano'}`;
+}
+
+// ─────────────────────────── Inspector ───────────────────────────
+const insp = document.getElementById('inspector');
+function inspeccionar(id) {
+  est.sel = id;
+  if (!id) { insp.hidden = true; return; }
+  const r = porId[id];
+  const lecciones = LECCIONES.filter(l => l.pasos.some(p => p.ruta && p.ruta.includes(id)));
+  insp.innerHTML = `
+    <button class="cerrar" id="i-cerrar" aria-label="Cerrar inspector">X</button>
+    <h2>${r.nombre}</h2>
+    <div class="meta"><span class="chip">LAB ${r.lab} · ${NOMBRE_LAB[r.lab].toUpperCase()}</span><span class="chip ${r.cp ? 'cp' : ''}">${r.plano.toUpperCase()}</span></div>
+    <h3>QUÉ ES</h3><p>${r.que}</p>
+    <h3>COMO SI FUERA…</h3><p>${r.analogia}</p>
+    <h3>POR QUÉ ASÍ</h3><p>${r.porque}</p>
+    <h3>EN TERRAFORM</h3><pre>${r.tf.replace(/</g, '&lt;')}</pre>
+    <h3>COMPRUÉBALO</h3><pre>${r.check.replace(/</g, '&lt;')}</pre>
+    ${lecciones.length ? `<h3>APARECE EN</h3><div class="controles">${lecciones.map(l => `<button class="btn" data-leccion="${l.id}">${l.titulo}</button>`).join('')}</div>` : ''}
+    ${r.cp ? '<p class="aviso">En la plataforma real, el Control Plane ya son varias Function Apps por contexto sobre Azure Service Bus. Este prototipo sigue al taller tal como está.</p>' : ''}`;
+  insp.hidden = false;
+  insp.querySelector('#i-cerrar').onclick = () => inspeccionar(null);
+  insp.querySelectorAll('[data-leccion]').forEach(b => b.onclick = () => abrirLeccion(b.dataset.leccion));
+}
+
+// ─────────────────────────── Lecciones ───────────────────────────
+const L = id => document.getElementById(id);
+function abrirLeccion(id) {
+  const lec = LECCIONES.find(l => l.id === id);
+  if (est.lab < lec.lab) cambiarLab(Math.max(lec.lab, 10));
+  est.leccion = lec; est.paso = 0; est.caidos.clear();
+  ['p-lecciones', 'misiones'].forEach(p => L(p).hidden = true);
+  L('leccion').hidden = false;
+  mostrarPaso();
+}
+function mostrarPaso() {
+  const lec = est.leccion, p = lec.pasos[est.paso];
+  L('l-titulo').textContent = lec.titulo;
+  L('l-paso').textContent = `PASO ${est.paso + 1} / ${lec.pasos.length}`;
+  L('l-feedback').textContent = '';
+  L('l-opciones').innerHTML = '';
+  L('l-prev').disabled = est.paso === 0;
+  if (p.pregunta) {
+    L('l-texto').textContent = '🔮 PREDICE: ' + p.pregunta;
+    est.anim = null;
+    L('l-next').disabled = true;
+    p.opciones.forEach(([txt, ok, fb]) => {
+      const b = document.createElement('button'); b.textContent = txt;
+      b.onclick = () => {
+        L('l-opciones').querySelectorAll('button').forEach(x => x.disabled = true);
+        b.classList.add(ok ? 'bien' : 'mal');
+        L('l-feedback').innerHTML = `<span style="color:${ok ? 'var(--ok)' : 'var(--peligro)'}">${ok ? 'Bien.' : 'No.'}</span> ${fb}`;
+        if (!ok) L('l-opciones').querySelectorAll('button').forEach((x, i) => { if (p.opciones[i][1]) x.classList.add('bien'); });
+        L('l-next').disabled = false;
+      };
+      L('l-opciones').appendChild(b);
+    });
+  } else {
+    L('l-texto').textContent = p.texto;
+    L('l-next').disabled = false;
+    if (p.caida) est.caidos.add(p.caida);
+    est.anim = { ruta: p.ruta, color: p.color, t: 0, token: p.token, bloqueado: p.bloqueado, revive: p.revive };
+    if (p.ruta) inspeccionarSuave(p.ruta[p.ruta.length - 1]);
+  }
+  L('l-next').textContent = est.paso === lec.pasos.length - 1 ? 'TERMINAR ✓' : 'SIGUIENTE >';
+}
+function inspeccionarSuave(id) { if (porId[id] && !insp.hidden) inspeccionar(id); }
+L('l-next').onclick = () => {
+  const lec = est.leccion;
+  if (est.paso < lec.pasos.length - 1) { est.paso++; mostrarPaso(); return; }
+  est.hechas.add(lec.id); guardar(); pintarMisiones();
+  L('l-texto').textContent = `Lección completa. Ganaste: ${lec.preguntas.map(n => 'pregunta ' + n).join(' y ')}. Ábrela en MISIONES y respóndela con tus palabras.`;
+  L('l-opciones').innerHTML = ''; L('l-feedback').textContent = ''; L('l-next').disabled = true; est.anim = null; est.caidos.clear();
+};
+L('l-prev').onclick = () => { if (est.paso > 0) { est.paso--; mostrarPaso(); } };
+L('l-replay').onclick = () => { if (est.anim) { est.anim.t = 0; est.anim.fin = false; } const p = est.leccion?.pasos[est.paso]; if (p?.caida) est.caidos.add(p.caida); };
+L('l-cerrar').onclick = () => { L('leccion').hidden = true; est.leccion = null; est.anim = null; est.caidos.clear(); };
+
+function pintarLecciones() {
+  L('pl-lista').innerHTML = LECCIONES.map(l => `<button class="btn ${est.hechas.has(l.id) ? 'prim' : ''}" data-l="${l.id}">${est.hechas.has(l.id) ? '✓ ' : ''}${l.titulo} · LAB ${l.lab}</button>`).join('');
+  L('pl-lista').querySelectorAll('[data-l]').forEach(b => b.onclick = () => abrirLeccion(b.dataset.l));
+}
+function pintarMisiones() {
+  const hecha = m => est.hechas.has(m[2]);
+  L('m-cuenta').textContent = `${MISIONES.filter(hecha).length}/9`;
+  L('m-lista').innerHTML = MISIONES.map(m => `<div class="mision ${hecha(m) ? 'hecha' : ''}">
+      <span class="num">${hecha(m) ? '✓' : m[0]}</span>
+      <div class="q">${m[1]}<small>${hecha(m) ? 'Lección hecha. ¿Sabrías explicarla sin mirar?' : 'Se gana en: ' + LECCIONES.find(l => l.id === m[2]).titulo.toLowerCase()}</small></div>
+      <button class="btn" data-l="${m[2]}">${hecha(m) ? 'REPASAR' : 'IR'}</button></div>`).join('');
+  L('m-lista').querySelectorAll('[data-l]').forEach(b => b.onclick = () => abrirLeccion(b.dataset.l));
+  pintarLecciones();
+}
+function alternar(id) { const p = L(id); const abrir = p.hidden; ['p-lecciones', 'misiones'].forEach(x => L(x).hidden = true); p.hidden = !abrir; }
+L('b-lecciones').onclick = () => alternar('p-lecciones');
+L('b-misiones').onclick = () => alternar('misiones');
+L('m-cerrar').onclick = () => L('misiones').hidden = true;
+L('pl-cerrar').onclick = () => L('p-lecciones').hidden = true;
+
+// ─────────────────────────── Construir hasta el lab N ───────────────────────────
+function cambiarLab(n) {
+  const antes = est.lab; est.lab = n;
+  L('lab').value = n; L('lab-out').textContent = 'LAB ' + n;
+  L('lab').title = NOMBRE_LAB[n];
+  est.recienNacidos = new Set(RECURSOS.filter(r => r.lab > antes && r.lab <= n).map(r => r.id));
+  est.nacimiento = est.t;
+  if (est.sel && !visible(porId[est.sel])) inspeccionar(null);
+}
+L('lab').oninput = e => cambiarLab(+e.target.value);
+
+// ─────────────────────────── Cámara y clic ───────────────────────────
+let arrastre = null;
+mundo.addEventListener('pointerdown', e => { if (e.target !== lienzo) return; arrastre = { x: e.clientX, y: e.clientY, cx: est.cam.x, cy: est.cam.y, movio: false }; mundo.setPointerCapture(e.pointerId); });
+mundo.addEventListener('pointermove', e => {
+  if (!arrastre) return;
+  const dx = (e.clientX - arrastre.x) / ESCALA_PIXEL, dy = (e.clientY - arrastre.y) / ESCALA_PIXEL;
+  if (Math.abs(dx) + Math.abs(dy) > 3) { arrastre.movio = true; mundo.classList.add('arrastrando'); }
+  est.cam.x = arrastre.cx + dx; est.cam.y = arrastre.cy + dy;
+});
+mundo.addEventListener('pointerup', e => {
+  if (arrastre && !arrastre.movio) clicEn(e);
+  arrastre = null; mundo.classList.remove('arrastrando');
+});
+mundo.addEventListener('wheel', e => { e.preventDefault(); est.cam.z = Math.min(2.2, Math.max(0.5, est.cam.z * (e.deltaY < 0 ? 1.1 : 0.9))); }, { passive: false });
+function dentro(pt, pol) {
+  let c = false;
+  for (let i = 0, j = pol.length - 1; i < pol.length; j = i++) {
+    const [xi, yi] = pol[i], [xj, yj] = pol[j];
+    if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi) c = !c;
+  }
+  return c;
+}
+mundo.addEventListener('mousemove', e => {
+  if (arrastre) return;
+  const r = lienzo.getBoundingClientRect();
+  const pt = [(e.clientX - r.left) / ESCALA_PIXEL, (e.clientY - r.top) / ESCALA_PIXEL];
+  const hit = RECURSOS.filter(visible).find(x => x._sil && dentro(pt, x._sil));
+  est.hover = hit ? hit.id : null;
+  lienzo.style.cursor = hit ? 'pointer' : '';
+});
+function clicEn(e) {
+  const r = lienzo.getBoundingClientRect();
+  const pt = [(e.clientX - r.left) / ESCALA_PIXEL, (e.clientY - r.top) / ESCALA_PIXEL];
+  const orden = RECURSOS.filter(visible).sort((a, b) => (b.gx + b.gy + (b.base ? 0.01 : 0)) - (a.gx + a.gy + (a.base ? 0.01 : 0)) || (b.base || 0) - (a.base || 0));
+  const hit = orden.find(x => x._sil && dentro(pt, x._sil));
+  inspeccionar(hit ? hit.id : null);
+}
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'l' || e.key === 'L') alternar('p-lecciones');
+  else if (e.key === 'j' || e.key === 'J') alternar('misiones');
+  else if (e.key === 'Escape') { inspeccionar(null); L('leccion').hidden = true; est.anim = null; }
+  else if (/^[0-9]$/.test(e.key)) cambiarLab(e.key === '0' ? 10 : +e.key);
+  else if (e.key === 'f' || e.key === 'F') encuadrar();
+});
+
+// ─────────────────────────── Arranque ───────────────────────────
+window.addEventListener('resize', () => { redimensionar(); encuadrar(); });
+redimensionar();
+encuadrar();
+cambiarLab(10); est.recienNacidos.clear();
+pintarMisiones();
+requestAnimationFrame(dibujar);
+// Abre en un estado de trabajo: la primera lección, lista para predecir.
+abrirLeccion('request');
+</script>
