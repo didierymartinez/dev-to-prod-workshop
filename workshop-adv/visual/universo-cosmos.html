@@ -1,0 +1,714 @@
+<title>Universo Cosmos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+/* Layout: un sistema estelar a pantalla completa. La Estación de Control arriba, los planetas del
+   Application Plane abajo, el portal (Front Door) a la izquierda. Paneles flotantes: inspector a la
+   derecha, lección abajo a la izquierda. Un solo look oscuro, a propósito: es el espacio. */
+:root {
+  color-scheme: dark;
+  --vacio: #060818;
+  --panel: #0b1030f0;
+  --borde: #2a3470;
+  --texto: #eef0ff;
+  --tenue: #98a0cf;
+  --control: #ffb547;   /* el Control Plane: la estrella dorada */
+  --app: #4fd1ff;       /* el Application Plane: planetas azules */
+  --bus: #b48cff;       /* Azure Service Bus: el hiperespacio */
+  --ok: #43e6a0;
+  --peligro: #ff4d6d;
+  --display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --cuerpo: "Atkinson Hyperlegible", system-ui, sans-serif;
+  --codigo: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+html, body { height: 100%; }
+body { background: var(--vacio); color: var(--texto); font-family: var(--cuerpo); font-size: 15px; overflow: hidden; }
+#app { position: fixed; inset: 0; display: grid; grid-template-rows: auto 1fr; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--control); outline-offset: 2px; }
+
+.barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px; background: linear-gradient(#070a20, #060818); border-bottom: 1px solid var(--borde); }
+.marca { font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: 3px; text-transform: uppercase; white-space: nowrap; }
+.marca span { color: var(--control); }
+.marca small { font-family: var(--cuerpo); font-weight: 400; font-size: 11px; letter-spacing: 1px; color: var(--ok); margin-left: 8px; text-transform: none; }
+.tenants { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tenants > span { font-size: 11px; color: var(--tenue); letter-spacing: 1px; text-transform: uppercase; margin-right: 2px; }
+.tchip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px 5px 8px; border: 1px solid var(--borde); border-radius: 999px; background: #0d1336; font-size: 13px; white-space: nowrap; }
+.tchip i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.tchip em { font-style: normal; font-size: 11px; color: var(--tenue); }
+.tchip.sel { border-color: var(--texto); background: #19205a; }
+.empuje { flex: 1; }
+.accion { font-family: var(--display); font-weight: 500; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; padding: 7px 12px; border: 1px solid var(--borde); background: #0d1336; border-radius: 4px; white-space: nowrap; }
+.accion:hover { border-color: var(--app); }
+.accion.cp { border-color: #6b5321; }
+.accion.on { background: #123d34; border-color: var(--ok); }
+
+.espacio { position: relative; overflow: hidden; touch-action: none; cursor: grab; }
+.espacio.arrastrando { cursor: grabbing; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.capa { position: absolute; inset: 0; pointer-events: none; }
+.rotulo { position: absolute; transform: translate(-50%, 0); text-align: center; white-space: nowrap; text-shadow: 0 1px 6px #000; }
+.rotulo b { display: block; font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; }
+.rotulo span { display: block; font-size: 11px; color: var(--tenue); }
+.rotulo.cp b { color: var(--control); }
+.rotulo.bus b { color: var(--bus); }
+.rotulo.peq b { font-size: 10px; letter-spacing: 1px; }
+.rotulo.peq span { display: none; }
+.rotulo.sel b { color: var(--texto); text-decoration: underline; text-underline-offset: 3px; }
+.rotulo.sel span { display: block; }
+.rotulo.lado { transform: translate(0, -50%); text-align: left; }
+
+.panel { position: absolute; background: var(--panel); border: 1px solid var(--borde); border-radius: 8px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; max-height: calc(100% - 24px); overflow: auto; backdrop-filter: blur(6px); }
+.panel h2 { font-family: var(--display); font-weight: 700; font-size: 17px; letter-spacing: 1px; text-transform: uppercase; text-wrap: balance; padding-right: 20px; }
+.panel h3 { font-family: var(--display); font-weight: 500; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--tenue); margin-top: 4px; }
+.panel p { line-height: 1.45; max-width: 62ch; }
+.panel pre { font-family: var(--codigo); font-size: 12px; background: #050716; border: 1px solid var(--borde); border-radius: 4px; padding: 8px 10px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ok); }
+.cerrar { position: absolute; top: 10px; right: 12px; background: none; border: 0; color: var(--tenue); font-size: 18px; line-height: 1; }
+.insignias { display: flex; flex-wrap: wrap; gap: 6px; }
+.ins { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; padding: 3px 8px; border-radius: 3px; border: 1px solid var(--borde); color: var(--tenue); }
+.ins.cp { border-color: #6b5321; color: var(--control); }
+.ins.app { border-color: #1f5874; color: var(--app); }
+.ins.bus { border-color: #4b3a7a; color: var(--bus); }
+.ins.codigo { border-color: #1f6b4f; color: var(--ok); }
+.ins.diseno { border-color: #6b5321; color: var(--control); }
+.ins.riesgo { border-color: #7a2335; color: var(--peligro); }
+.fuente { font-size: 12px; color: var(--tenue); border-top: 1px dashed var(--borde); padding-top: 8px; }
+#inspector { top: 12px; right: 12px; width: min(400px, calc(100% - 32px)); }
+#leccion { left: 12px; bottom: 12px; width: min(540px, calc(100% - 32px)); border-color: #6b5321; max-height: min(62%, 560px); }
+.paso { font-family: var(--display); font-size: 12px; letter-spacing: 2px; color: var(--control); text-transform: uppercase; }
+.barra-paso { height: 3px; background: var(--borde); border-radius: 2px; overflow: hidden; }
+.barra-paso i { display: block; height: 100%; background: var(--control); transition: width 0.3s; }
+.texto-paso { font-size: 17px; line-height: 1.45; }
+.opciones { display: grid; gap: 6px; }
+.opciones button { text-align: left; background: #0f1640; border: 1px solid var(--borde); border-radius: 4px; padding: 9px 12px; font-size: 15px; line-height: 1.3; }
+.opciones button:hover:not([disabled]) { border-color: var(--app); }
+.opciones button.bien { border-color: var(--ok); background: #0e3329; }
+.opciones button.mal { border-color: var(--peligro); background: #3a1022; }
+.feedback { line-height: 1.4; }
+.controles { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn { font-family: var(--display); font-weight: 500; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; padding: 8px 12px; border: 1px solid var(--borde); border-radius: 4px; background: #0f1640; }
+.btn.prim { background: #4a3510; border-color: var(--control); color: #ffe2a8; }
+.btn[disabled] { opacity: 0.35; cursor: default; }
+#misiones, #p-lecciones { top: 12px; left: 12px; width: min(460px, calc(100% - 32px)); }
+.mision { display: grid; grid-template-columns: 26px 1fr; gap: 6px 10px; padding: 10px 0; border-top: 1px solid var(--borde); }
+.mision .n { font-family: var(--display); font-weight: 700; color: var(--tenue); font-size: 15px; }
+.mision.hecha .n { color: var(--ok); }
+.mision .q { line-height: 1.35; }
+.mision .q small { display: block; color: var(--tenue); font-size: 12px; margin-top: 3px; }
+.mision button { grid-column: 2; justify-self: start; }
+.lista { display: grid; gap: 6px; }
+.lista .btn { text-align: left; }
+
+@media (max-width: 640px) {
+  .tenants > span { display: none; }
+  #inspector { top: auto; bottom: 12px; max-height: 55%; }
+  #leccion { max-height: 50%; }
+  .texto-paso { font-size: 15px; }
+}
+</style>
+
+<div id="app">
+  <header class="barra">
+    <div class="marca">Universo <span>Cosmos</span><small>● simulación</small></div>
+    <div class="tenants" id="tenants"><span>Tenants</span></div>
+    <span class="empuje"></span>
+    <button class="accion on" id="b-trafico" aria-pressed="true">Tráfico en vivo</button>
+    <button class="accion" id="b-lecciones">Lecciones</button>
+    <button class="accion cp" id="b-misiones">Misiones <span id="m-cuenta">0/8</span></button>
+  </header>
+
+  <main class="espacio" id="espacio">
+    <canvas id="lienzo" aria-label="Mapa del universo de Cosmos: Control Plane, Application Plane y sus rutas de mensajes"></canvas>
+    <div class="capa" id="capa"></div>
+
+    <section class="panel" id="inspector" hidden aria-live="polite"></section>
+
+    <section class="panel" id="leccion" hidden>
+      <button class="cerrar" id="l-cerrar" aria-label="Cerrar lección">×</button>
+      <h2 id="l-titulo"></h2>
+      <div class="paso" id="l-paso"></div>
+      <div class="barra-paso"><i id="l-progreso"></i></div>
+      <div class="texto-paso" id="l-texto"></div>
+      <div class="opciones" id="l-opciones"></div>
+      <div class="feedback" id="l-feedback"></div>
+      <div class="controles">
+        <button class="btn" id="l-prev">‹ Anterior</button>
+        <button class="btn prim" id="l-next">Siguiente ›</button>
+        <button class="btn" id="l-replay">Repetir paso</button>
+      </div>
+    </section>
+
+    <section class="panel" id="misiones" hidden>
+      <button class="cerrar" id="m-cerrar" aria-label="Cerrar misiones">×</button>
+      <h2>Lo que debes poder explicar</h2>
+      <p class="fuente">Cada misión se gana completando su lección: primero predices, después ves viajar las naves. Después, explícala sin mirar.</p>
+      <div id="m-lista"></div>
+    </section>
+
+    <section class="panel" id="p-lecciones" hidden>
+      <button class="cerrar" id="pl-cerrar" aria-label="Cerrar lecciones">×</button>
+      <h2>Lecciones</h2>
+      <p class="fuente">Cada lección pone naves a viajar por las rutas reales de la plataforma, paso a paso.</p>
+      <div class="lista" id="pl-lista"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+// ═══════════════ Fuentes de lo que se dibuja (nada inventado; lo no verificado se marca) ═══════════════
+const F = {
+  blog: 'Blog de ingeniería · «La forma de la plataforma» (feb 2026)',
+  adr1: 'Blog de ingeniería · ADR-0001 multitenancy (estado: propuesto, decisión pendiente)',
+  audit: 'Auditoría del Application Plane (AUDITORIA / ACCIONABLES, código real)',
+  marten: 'AMPLIACION-MARTEN.md (inventario de Cosmos.ControlPlane)',
+  confirmar: 'Por confirmar: no hay repo de infraestructura accesible',
+};
+
+// Colores en el canvas (mismos valores que los tokens del CSS)
+const K = { control: '#ffb547', app: '#4fd1ff', bus: '#b48cff', ok: '#43e6a0', peligro: '#ff4d6d', texto: '#eef0ff', tenue: '#98a0cf' };
+
+// ═══════════════ Los cuerpos del universo ═══════════════
+// x, y en un mundo de 1600×1000 · r: radio · tipo: cómo se dibuja · plano: cp | app | bus | borde
+const CUERPOS = [
+  // ── El borde: por donde llega la gente
+  { id: 'usuarios', nombre: 'Usuarios', sub: 'de todos los tenants', x: 70, y: 610, r: 26, tipo: 'cumulo', plano: 'borde',
+    que: 'Las personas de cada empresa cliente, desde su navegador.', metafora: 'Viajeros que llegan desde fuera de la galaxia.',
+    real: 'Inician sesión con WorkOS y traen un token JWT con su tenant y sus permisos.', fuente: F.audit },
+  { id: 'frontdoor', nombre: 'Azure Front Door', sub: 'el portal', x: 230, y: 610, r: 34, tipo: 'portal', plano: 'borde',
+    que: 'La entrada global. Recibe a cada usuario cerca de donde está y reenvía al Gateway, marcando la petición con su id de Front Door.',
+    metafora: 'El portal estelar: la única forma de entrar al sistema.',
+    real: 'El Gateway exige el header con el id de Front Door para aceptar tráfico. Sin él, la petición no viene del portal.',
+    riesgo: 'La auditoría encontró que la validación es fail-open: si el secreto con el id esperado falta, el Gateway deja de validarlo sin avisar.',
+    fuente: F.audit },
+  { id: 'gateway', nombre: 'Gateway', sub: 'YARP · aduana', x: 410, y: 610, r: 30, tipo: 'estacion', plano: 'app',
+    que: 'Un reverse proxy YARP de unas 170 líneas. Valida el JWT de WorkOS y el header de Front Door, y enruta por el slug del bounded context.',
+    metafora: 'La aduana del puerto espacial: revisa el pasaporte (JWT) y el sello del portal (Front Door) antes de dejarte pasar.',
+    real: 'Quita cualquier header de tenant que traiga el cliente y lo vuelve a poner desde el claim del token (anti-spoofing, con test que lo fija). Decidió no usar event sourcing: es stateless.',
+    tf: 'ApplicationPlane.Gateway · Yarp.ReverseProxy 2.3.0 · JwtBearer\npropagatedClaims: tenant, usuario',
+    fuente: F.audit },
+
+  // ── El Control Plane: la estación que da la experiencia SaaS
+  { id: 'cp', nombre: 'Estación de Control', sub: 'Control Plane', x: 860, y: 230, r: 62, tipo: 'estrella', plano: 'cp',
+    que: 'La capa sobre la que se construyen todas las aplicaciones. Da la experiencia SaaS: registrarse, entrar, administrar accesos, cambiar de plan, pagar.',
+    metafora: 'La estación central: no fabrica los productos, pero sin ella nadie llega, nadie se identifica y nadie paga.',
+    real: 'En código: 5 Function Apps de escritura (Onboarding, TenantManagement, TenantProvisioning, UserManagement, Billing) y 1 host de lectura (Query), sobre Cosmos.BuildingBlocks 2.3.0 y Marten 9.12.',
+    fuente: F.blog + ' · ' + F.marten },
+  { id: 'onboarding', nombre: 'Onboarding', sub: 'la puerta del cliente', orbita: ['cp', 168, -2.35], r: 15, tipo: 'modulo', plano: 'cp', estado: 'codigo',
+    que: 'Recibe a un tenant nuevo. Al inicio lo administra el equipo de Sinco; el autoservicio llega después.',
+    metafora: 'El muelle de llegada de la estación.', real: 'Function App de Onboarding.', fuente: F.blog },
+  { id: 'tenantmgr', nombre: 'Tenant Manager', sub: 'ciclo de vida', orbita: ['cp', 168, -1.55], r: 15, tipo: 'modulo', plano: 'cp', estado: 'codigo',
+    que: 'Administra el estado del tenant: Registrado → Activado → Suspendido → Inactivo → Destruido. Cada cambio implica acciones en todo el Application Plane.',
+    metafora: 'El registro civil de la galaxia: sabe en qué etapa de su vida está cada colonia.', real: 'Function App de TenantManagement.', fuente: F.blog },
+  { id: 'provisioning', nombre: 'Tenant Provisioning', sub: 'el puente', orbita: ['cp', 168, -0.75], r: 15, tipo: 'modulo', plano: 'cp', estado: 'codigo',
+    que: 'El puente entre los dos planos: pide a cada aplicación que active, inactive o destruya al tenant. Puede ser una fila en una tabla o infraestructura propia.',
+    metafora: 'El astillero que funda las colonias en cada planeta.', real: 'Function App de TenantProvisioning.', fuente: F.blog },
+  { id: 'billing', nombre: 'Facturación', sub: 'planes y cartera', orbita: ['cp', 168, 0.05], r: 15, tipo: 'modulo', plano: 'cp', estado: 'codigo',
+    que: 'Sincroniza el plan contratado con lo que se cobra y vigila la cartera: puede suspender a quien no paga y reactivarlo cuando paga. No es el sistema contable: le entrega los valores.',
+    metafora: 'La tesorería de la estación.', real: 'Function App de Billing.', fuente: F.blog },
+  { id: 'usuariosadm', nombre: 'Admin users', sub: 'los más poderosos', orbita: ['cp', 168, 0.85], r: 14, tipo: 'modulo', plano: 'cp', estado: 'codigo',
+    que: 'Administra a los usuarios administradores de cada tenant, que tienen los mayores poderes sobre la aplicación.',
+    metafora: 'La oficina que entrega las llaves maestras.', real: 'Function App de UserManagement.', fuente: F.blog },
+  { id: 'identity', nombre: 'Identity', sub: 'WorkOS', orbita: ['cp', 168, 1.65], r: 14, tipo: 'modulo', plano: 'cp', estado: 'codigo',
+    que: 'Dice quién hace cada petición, a qué tenant pertenece y qué puede hacer. Es el servicio más delicado: de él depende el aislamiento entre clientes.',
+    metafora: 'La oficina de pasaportes.', real: 'El proveedor es WorkOS: el Gateway valida su JWT. Cómo se integra con el Control Plane: por confirmar.', fuente: F.blog + ' · ' + F.audit },
+  { id: 'metrics', nombre: 'Metrics', sub: 'salud y uso', orbita: ['cp', 168, 2.45], r: 13, tipo: 'modulo', plano: 'cp', estado: 'diseno',
+    que: 'Logs, trazas y métricas por tenant: errores, patrones de uso, salud general. Alimenta decisiones de planes y de infraestructura.',
+    metafora: 'El observatorio de la estación.', real: 'Está en el diseño. La auditoría encontró que hoy nadie mide el rezago de las proyecciones (hueco L6): es lo que CosmosLens viene a cubrir.', fuente: F.blog + ' · ' + F.audit },
+  { id: 'query', nombre: 'Query', sub: 'lectura', orbita: ['cp', 112, 3.14], r: 12, tipo: 'modulo', plano: 'cp', estado: 'codigo',
+    que: 'El host de lectura del Control Plane: proyecciones de Marten con su daemon, sobre el mismo event store.',
+    metafora: 'La biblioteca de la estación: lee lo que los demás escribieron.', real: 'Debe replicar la configuración de eventos de la escritura, o los eventos no deserializan.', fuente: F.marten },
+
+  // ── El hiperespacio: Azure Service Bus entre los planos
+  { id: 'asb', nombre: 'Azure Service Bus', sub: 'el hiperespacio entre planos', x: 860, y: 470, r: 22, tipo: 'nexo', plano: 'bus',
+    que: 'Topics y subscriptions. Los módulos reaccionan a eventos de otros módulos por aquí, nunca por una llamada HTTP directa.',
+    metafora: 'Los corredores de hiperespacio: dejas el mensaje en el corredor y la nave llega cuando el destino puede recibirla.',
+    real: 'En el Control Plane, 34 handlers «AcciónWhenEvento» son Functions con ServiceBusTrigger. Los mensajes de un tenant viajan en sesión (GroupId = TenantId): uno detrás de otro, en orden.',
+    fuente: F.marten },
+
+  // ── El Application Plane: los planetas
+  { id: 'opp', nombre: 'Obligaciones por Pagar', sub: 'un producto, varios bounded contexts', x: 700, y: 760, r: 54, tipo: 'planeta', plano: 'app', color: '#3fb6e8',
+    que: 'Un producto del Application Plane: recibe documentos de proveedores, los reconoce, los radica y los integra con el ERP.',
+    metafora: 'Un planeta con sus lunas: cada luna es un bounded context con su propio repositorio.',
+    real: 'Repos: Front, Gateway, Entradas, Reconocimiento, Radicación, Integraciones.', fuente: F.audit },
+  { id: 'entradas', nombre: 'Entradas', sub: 'recibe documentos', orbita: ['opp', 96, -2.6], r: 11, tipo: 'luna', plano: 'app', estado: 'codigo',
+    que: 'Hace polling a Sinco y publica cada documento recibido para que Radicación lo procese.', metafora: 'La luna de aduanas del planeta.',
+    real: 'Publica por un exchange de RabbitMQ.', riesgo: 'La auditoría encontró que republica el mismo documento en cada vuelta del polling (falta idempotencia por clave de negocio).', fuente: F.audit },
+  { id: 'reconocimiento', nombre: 'Reconocimiento', sub: 'lee documentos', orbita: ['opp', 96, -1.6], r: 11, tipo: 'luna', plano: 'app', estado: 'codigo',
+    que: 'Extrae los datos de cada documento (Document Intelligence) y publica lo que reconoció.', metafora: 'La luna laboratorio.', real: 'Event sourcing con Marten.', fuente: F.audit },
+  { id: 'radicacion', nombre: 'Radicación', sub: 'radica obligaciones', orbita: ['opp', 96, -0.55], r: 12, tipo: 'luna', plano: 'app', estado: 'codigo',
+    que: 'Radica la obligación por pagar a partir de lo recibido y reconocido.', metafora: 'La luna notaría.',
+    real: 'Event sourcing con Marten.', riesgo: 'Riesgo de doble pago: decide efectos con dinero leyendo una vista async que puede ir atrasada.', fuente: F.audit },
+  { id: 'integraciones', nombre: 'Integraciones', sub: 'habla con el ERP', orbita: ['opp', 96, 0.5], r: 11, tipo: 'luna', plano: 'app', estado: 'codigo',
+    que: 'Lleva los resultados al ERP del cliente.', metafora: 'La luna embajada.', real: 'Riesgo de doble asiento al reintentar el POST (sin clave de idempotencia).', fuente: F.audit },
+  { id: 'contabilidad', nombre: 'Contabilidad', sub: 'otro producto', x: 1040, y: 790, r: 40, tipo: 'planeta', plano: 'app', color: '#5c8cff',
+    que: 'Otro producto del Application Plane, con su propio event store.', metafora: 'Un planeta vecino.', real: 'Uno de los 11 repos con event sourcing completo.', fuente: F.audit },
+  { id: 'impuestos', nombre: 'Impuestos', sub: 'otro producto', x: 1250, y: 680, r: 32, tipo: 'planeta', plano: 'app', color: '#4bc4b0',
+    que: 'Otro producto del Application Plane.', metafora: 'Otro planeta del sistema.', real: 'Event sourcing con Marten.', fuente: F.audit },
+  { id: 'cinturon', nombre: 'Más bounded contexts', sub: 'Terceros, Direcciones, Datos de referencia…', x: 1380, y: 860, r: 30, tipo: 'cinturon', plano: 'app',
+    que: 'Servicios más pequeños. Algunos decidieron NO usar event sourcing, con ADR: un catálogo sin comportamiento no lo necesita.',
+    metafora: 'El cinturón de asteroides: muchos cuerpos pequeños.', real: '5 de 16 servicios dijeron no al event sourcing, con alternativas evaluadas.', fuente: F.audit },
+  { id: 'notificaciones', nombre: 'Notificaciones', sub: 'SignalR al navegador', x: 470, y: 820, r: 16, tipo: 'satelite', plano: 'app',
+    que: 'Recibe «EnviarNotificacion» y lo empuja al navegador en tiempo real.', metafora: 'El satélite de comunicaciones.',
+    real: 'Consume de RabbitMQ y de un topic de Service Bus; SignalR con backplane Redis.', riesgo: 'El hub no exige autenticación: un cliente puede unirse al grupo de otro usuario o tenant.', fuente: F.audit },
+  { id: 'rabbit', nombre: 'RabbitMQ', sub: 'órbita local del Application Plane', x: 880, y: 640, r: 14, tipo: 'nexo', plano: 'bus', color: '#ff8f5a',
+    que: 'El transporte de mensajes dentro del Application Plane, con Wolverine: exchanges y colas entre bounded contexts cercanos.',
+    metafora: 'Las rutas locales entre lunas y planetas vecinos, más cortas que el hiperespacio.', real: 'Usado por Entradas, Notificaciones y otros; Wolverine con outbox.', fuente: F.audit },
+  { id: 'archivo', nombre: 'El Archivo', sub: 'Postgres + Marten', x: 1040, y: 560, r: 26, tipo: 'archivo', plano: 'app',
+    que: 'Donde viven los hechos: tablas de eventos de Marten en Postgres. Cada servicio con event sourcing guarda ahí su diario.',
+    metafora: 'La caja negra del sistema: todo lo que pasó, en orden, sin borrar.',
+    real: 'Tenancy conjoined: todos los tenants en las mismas tablas, separados por tenant_id. La decisión formal (ADR-0001) sigue pendiente.',
+    riesgo: 'Si el tenant viene de un header que el cliente elige, es lectura y escritura cruzada entre clientes. Debe salir del claim.', fuente: F.audit + ' · ' + F.adr1 },
+  { id: 'astillero', nombre: 'Astillero', sub: 'Docker Swarm + ACR', x: 410, y: 860, r: 20, tipo: 'astillero', plano: 'app',
+    que: 'Donde corren los servicios del Application Plane: contenedores en Docker Swarm, con imágenes en un Azure Container Registry.',
+    metafora: 'El astillero orbital donde se arman y relanzan las naves.',
+    real: 'Los secretos se montan como Swarm secrets (AddKeyPerFile).', riesgo: 'Hay credenciales de producción versionadas en appsettings de dos repos: hay que rotarlas.', fuente: F.audit },
+];
+const C = Object.fromEntries(CUERPOS.map(c => [c.id, c]));
+
+// Tenants de ejemplo (simulación) y su estado de vida (Tenant Manager)
+const TENANTS = [
+  { id: 'andes', nombre: 'Constructora Andes', color: '#ffd166', estado: 'Activado' },
+  { id: 'sur', nombre: 'Ferretería Sur', color: '#5ee6d0', estado: 'Activado' },
+  { id: 'norte', nombre: 'Textiles Norte', color: '#ff7ab6', estado: 'Registrado', oculto: true },
+];
+const T = Object.fromEntries(TENANTS.map(t => [t.id, t]));
+
+// ═══════════════ Lecciones ═══════════════
+const LECCIONES = [
+  { id: 'tenant', titulo: 'Nace un tenant', misiones: [1, 2],
+    pasos: [
+      { pregunta: 'Textiles Norte firma con Sinco. ¿Qué parte del sistema se entera primero?',
+        opciones: [['El producto que compró (Obligaciones por Pagar)', false, 'Los productos no reciben altas: atienden a tenants que ya existen.'], ['El Control Plane, por Onboarding', true, 'Sí. La experiencia SaaS empieza en la estación.'], ['El Gateway', false, 'El Gateway atiende peticiones de usuarios que ya tienen tenant.']] },
+      { ruta: ['usuarios', 'onboarding'], color: K.control, texto: 'El equipo de Sinco registra a Textiles Norte en Onboarding. Por ahora el onboarding es administrado; el autoservicio llega después.' },
+      { ruta: ['onboarding', 'tenantmgr'], color: K.control, tenant: ['norte', 'Registrado'], texto: 'Tenant Manager anota su primer estado: Registrado. A partir de aquí, cada cambio de estado tendrá consecuencias en todo el Application Plane.' },
+      { ruta: ['tenantmgr', 'provisioning'], color: K.control, texto: 'Tenant Provisioning recibe la tarea de activarlo en los productos que contrató.' },
+      { pregunta: '¿Cómo le pide Provisioning a Obligaciones por Pagar que active al tenant?',
+        opciones: [['Llamando a su API por HTTP', false, 'Eso ataría los dos planos: si el producto está caído, el alta se cae con él.'], ['Publicando un evento en Service Bus', true, 'Sí. El producto lo recibe cuando puede, y Service Bus lo guarda mientras tanto.']] },
+      { ruta: ['provisioning', 'asb', 'opp'], color: K.bus, texto: 'El pedido viaja por el hiperespacio (Azure Service Bus). Los mensajes de un mismo tenant van en sesión: llegan en orden, uno detrás de otro.' },
+      { ruta: ['opp', 'asb', 'tenantmgr'], color: K.bus, tenant: ['norte', 'Activado'], aparece: 'norte', texto: 'El producto crea la colonia de Textiles Norte (sus datos llevarán su tenant_id) y avisa de vuelta. Tenant Manager lo pasa a Activado.' },
+      { ruta: ['tenantmgr', 'usuariosadm', 'identity'], color: K.control, texto: 'Se crea su usuario administrador y su identidad en WorkOS. Desde ahora, su JWT dirá a qué tenant pertenece.' },
+      { ruta: ['tenantmgr', 'billing'], color: K.control, texto: 'Facturación registra su plan. Lo que se cobra queda sincronizado con lo que se habilitó.' },
+    ] },
+  { id: 'request', titulo: 'El viaje de una petición', misiones: [3, 4],
+    pasos: [
+      { pregunta: 'Una contadora de Constructora Andes abre Radicación. ¿Cómo sabe Radicación de qué tenant es la petición?',
+        opciones: [['Por un header X-Tenant-Id que manda el navegador', false, 'El navegador lo podría cambiar: sería leer y escribir datos de otro cliente.'], ['Por el claim del JWT, que el Gateway propaga', true, 'Sí. El tenant sale del token firmado, nunca de lo que el cliente elige.'], ['Llamando al Control Plane', false, 'No hay llamadas síncronas entre planos.']] },
+      { ruta: ['usuarios', 'frontdoor'], color: K.app, texto: 'La petición entra por el portal: Azure Front Door, cerca de la usuaria. Front Door la marca con su id antes de reenviarla.' },
+      { ruta: ['frontdoor', 'gateway'], color: K.app, texto: 'La aduana (Gateway YARP) revisa dos cosas: que traiga el id de Front Door (vino por el portal) y que el JWT de WorkOS sea válido.' },
+      { ruta: ['gateway', 'gateway'], color: K.control, texto: 'Si el navegador mandó su propio header de tenant, el Gateway lo borra y pone el que dice el claim del token. Es la línea que impide hacerse pasar por otro cliente.' },
+      { ruta: ['gateway', 'radicacion'], color: K.app, texto: 'El Gateway enruta por el slug del bounded context hacia Radicación, con el tenant y el usuario ya propagados.' },
+      { ruta: ['radicacion', 'archivo'], color: K.ok, texto: 'Radicación guarda sus hechos en el Archivo. Cada fila lleva el tenant_id de Constructora Andes: así se separan los clientes en las mismas tablas.' },
+      { ruta: ['archivo', 'radicacion', 'gateway', 'frontdoor', 'usuarios'], color: K.ok, texto: 'La respuesta vuelve por el mismo camino.' },
+    ] },
+  { id: 'cartera', titulo: 'Suspendido por cartera', misiones: [2, 5],
+    pasos: [
+      { pregunta: 'Ferretería Sur lleva tres meses sin pagar. ¿Quién decide suspenderla?',
+        opciones: [['Cada producto, por su cuenta', false, 'Entonces cada producto aplicaría una regla distinta.'], ['Facturación, en el Control Plane', true, 'Sí: vigilar la cartera y suspender es responsabilidad del Control Plane.']] },
+      { ruta: ['billing', 'tenantmgr'], color: K.control, tenant: ['sur', 'Suspendido'], texto: 'Facturación detecta la mora y Tenant Manager cambia el estado de Ferretería Sur a Suspendido.' },
+      { ruta: ['tenantmgr', 'asb', 'opp'], color: K.bus, texto: 'El cambio viaja por Service Bus, en la sesión de Ferretería Sur: si mañana llega «reactivada», no se adelantará a «suspendida».' },
+      { ruta: ['asb', 'contabilidad'], color: K.bus, texto: 'Cada producto que lo tenga activo recibe el mismo evento y aplica la suspensión a su colonia. Cómo lo aplica cada uno (bloquear escrituras, solo lectura): por confirmar en cada repo.' },
+      { pregunta: 'Ferretería Sur paga. ¿Qué tiene que pasar para que vuelva a funcionar?',
+        opciones: [['Que alguien entre a cada producto y la reactive', false, 'Eso es justo lo que el Control Plane evita.'], ['Facturación lo detecta y Tenant Manager la pasa a Activado; el evento hace el resto', true, 'Sí: el mismo camino, de vuelta.']] },
+      { ruta: ['billing', 'tenantmgr', 'asb', 'opp'], color: K.ok, tenant: ['sur', 'Activado'], texto: 'Paga, Facturación lo ve, Tenant Manager la reactiva y el evento llega a los productos. Nadie tocó un producto a mano.' },
+    ] },
+  { id: 'cruce', titulo: 'Un documento cruza de luna', misiones: [6],
+    pasos: [
+      { ruta: ['entradas', 'rabbit'], color: '#ff8f5a', texto: 'Entradas recibe un documento de Sinco y lo publica en RabbitMQ, la órbita local del Application Plane.' },
+      { ruta: ['rabbit', 'radicacion'], color: '#ff8f5a', texto: 'Radicación lo consume y radica la obligación.' },
+      { pregunta: 'En la siguiente vuelta del polling, Entradas vuelve a publicar el mismo documento. ¿Qué debería pasar?',
+        opciones: [['Radicación lo radica otra vez', false, 'Eso es una obligación duplicada: pagar dos veces la misma factura.'], ['Radicación lo reconoce por su clave de negocio y lo ignora', true, 'Sí: idempotencia. Un mensaje puede llegar dos veces; el efecto debe ocurrir una.']] },
+      { ruta: ['entradas', 'rabbit', 'radicacion'], color: K.peligro, duplicado: true, texto: 'Llega el duplicado. Con idempotencia por clave de negocio (documento de Sinco + tipo de fuente), Radicación lo descarta. La auditoría encontró que hoy no está: es el accionable T2.' },
+    ] },
+  { id: 'portal', titulo: '¿Y si alguien se salta el portal?', misiones: [4],
+    pasos: [
+      { pregunta: 'Alguien descubre la dirección del Gateway y le habla directo, sin pasar por Front Door. ¿Qué debería pasar?',
+        opciones: [['Pasa, si trae un JWT válido', false, 'El JWT no basta: la petición también debe venir del portal.'], ['El Gateway lo rechaza: falta el id de Front Door', true, 'Sí. Front Door no se puede saltar.']] },
+      { ruta: ['usuarios', 'gateway'], color: K.peligro, bloqueado: true, texto: 'La petición llega sin el id de Front Door y el Gateway la rechaza.' },
+      { ruta: ['astillero', 'gateway'], color: K.peligro, texto: 'El riesgo encontrado: el id esperado viene de un Swarm secret. Si ese secreto falta o se renombra, la validación se apaga sin ruido y el Gateway acepta tráfico directo. La corrección: exigirlo en producción y fallar al arrancar si no está.' },
+    ] },
+];
+const MISIONES = [
+  [1, '¿Por qué el Control Plane y el Application Plane no se llaman por HTTP?', 'tenant'],
+  [2, '¿Qué estados vive un tenant y quién los cambia?', 'tenant'],
+  [3, '¿Cómo sabe un producto a qué tenant pertenece una petición?', 'request'],
+  [4, '¿Por qué el Gateway exige el id de Front Door, y qué pasa si falta?', 'portal'],
+  [5, '¿Por qué los mensajes de un tenant viajan en sesión?', 'cartera'],
+  [6, '¿Qué pasa si un mensaje llega dos veces?', 'cruce'],
+  [7, '¿Dónde viven los datos de cada tenant?', 'request'],
+  [8, '¿Qué servicios tiene el Control Plane y cuáles ya existen en código?', 'tenant'],
+];
+
+// ═══════════════ Estado ═══════════════
+const est = { cam: { x: 0, y: 0, z: 1 }, sel: null, hover: null, tenant: null, leccion: null, paso: 0, anim: null, naves: [], trafico: true, t: 0, hechas: new Set() };
+try { JSON.parse(localStorage.getItem('uc-hechas') || '[]').forEach(x => est.hechas.add(x)); } catch {}
+const guardar = () => { try { localStorage.setItem('uc-hechas', JSON.stringify([...est.hechas])); } catch {} };
+
+// ═══════════════ Geometría ═══════════════
+const lienzo = document.getElementById('lienzo'), ctx = lienzo.getContext('2d');
+const espacio = document.getElementById('espacio'), capa = document.getElementById('capa');
+let W = 0, H = 0, DPR = 1;
+function pos(c) {
+  if (c.orbita) {
+    const [padre, radio, ang] = c.orbita, p = pos(C[padre]);
+    const a = ang + (c.plano === 'app' ? est.t * 0.0012 : 0);
+    return [p[0] + Math.cos(a) * radio, p[1] + Math.sin(a) * radio * 0.62];
+  }
+  return [c.x, c.y];
+}
+const aPantalla = ([x, y]) => [(x - 800) * est.cam.z + W / 2 + est.cam.x, (y - 520) * est.cam.z + H / 2 + est.cam.y];
+const deMundo = id => aPantalla(pos(C[id]));
+function redimensionar() {
+  const r = espacio.getBoundingClientRect(); DPR = Math.min(2, window.devicePixelRatio || 1);
+  W = r.width; H = r.height; lienzo.width = W * DPR; lienzo.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+function encuadrar() {
+  est.cam.z = Math.max(0.35, Math.min(1.3, Math.min(W / 1560, H / 1000)));
+  // con la lección abierta abajo a la izquierda, el mundo se corre a la derecha y hacia arriba
+  est.cam.x = W > 900 ? W * 0.08 : 0; est.cam.y = W > 900 ? -H * 0.04 : 0;
+}
+
+// Estrellas de fondo (tres capas con paralaje) y nebulosas
+const estrellas = Array.from({ length: 360 }, (_, i) => ({ x: (i * 7919) % 2400 - 400, y: (i * 104729) % 1600 - 300, p: [0.25, 0.5, 0.85][i % 3], b: (i * 31) % 100 / 100 }));
+function fondo() {
+  ctx.fillStyle = '#060818'; ctx.fillRect(0, 0, W, H);
+  const neb = [[860, 230, 520, 'rgba(255,181,71,0.07)'], [900, 760, 640, 'rgba(79,209,255,0.06)'], [300, 600, 380, 'rgba(180,140,255,0.06)']];
+  for (const [x, y, r, col] of neb) {
+    const [sx, sy] = aPantalla([x, y]); const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * est.cam.z);
+    g.addColorStop(0, col); g.addColorStop(1, 'rgba(6,8,24,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+  for (const s of estrellas) {
+    const x = (s.x - 800) * est.cam.z * s.p + W / 2 + est.cam.x * s.p, y = (s.y - 520) * est.cam.z * s.p + H / 2 + est.cam.y * s.p;
+    if (x < 0 || y < 0 || x > W || y > H) continue;
+    ctx.globalAlpha = 0.35 + 0.65 * Math.abs(Math.sin(est.t * 0.01 + s.b * 6));
+    ctx.fillStyle = s.b > 0.85 ? '#ffd9a0' : '#cfd6ff'; ctx.fillRect(x, y, s.p > 0.6 ? 1.6 : 1, s.p > 0.6 ? 1.6 : 1);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ═══════════════ Rutas fijas (siempre visibles) ═══════════════
+const RUTAS = [
+  ['usuarios', 'frontdoor', K.app, 1], ['frontdoor', 'gateway', K.app, 1], ['gateway', 'opp', K.app, 0.6], ['gateway', 'contabilidad', K.app, 0.5], ['gateway', 'impuestos', K.app, 0.4],
+  ['cp', 'asb', K.bus, 1.6], ['asb', 'opp', K.bus, 1.2], ['asb', 'contabilidad', K.bus, 1.2], ['asb', 'impuestos', K.bus, 1], ['asb', 'notificaciones', K.bus, 0.6],
+  ['rabbit', 'opp', '#ff8f5a', 0.8], ['rabbit', 'notificaciones', '#ff8f5a', 0.6], ['rabbit', 'contabilidad', '#ff8f5a', 0.5],
+  ['opp', 'archivo', K.ok, 0.4], ['contabilidad', 'archivo', K.ok, 0.4], ['impuestos', 'archivo', K.ok, 0.4], ['cp', 'archivo', K.ok, 0.3],
+  ['usuarios', 'onboarding', K.control, 0.3],
+];
+function curva(a, b, f) {   // punto en una curva suave entre a y b (se arquea hacia arriba)
+  const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2 - Math.hypot(b[0] - a[0], b[1] - a[1]) * 0.12;
+  const u = 1 - f; return [u * u * a[0] + 2 * u * f * mx + f * f * b[0], u * u * a[1] + 2 * u * f * my + f * f * b[1]];
+}
+function dibujarRutas() {
+  for (const [a, b, col, w] of RUTAS) {
+    const pa = deMundo(a), pb = deMundo(b);
+    ctx.strokeStyle = col; ctx.globalAlpha = 0.16; ctx.lineWidth = w * 1.6 * est.cam.z + 0.6;
+    ctx.beginPath(); for (let i = 0; i <= 24; i++) { const [x, y] = curva(pa, pb, i / 24); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ═══════════════ Cuerpos ═══════════════
+function brillo(x, y, r, col, a = 0.5) {
+  const g = ctx.createRadialGradient(x, y, r * 0.2, x, y, r * 2.4);
+  g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.globalAlpha = a; ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, r * 2.4, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+}
+function dibujarCuerpo(c) {
+  const [x, y] = deMundo(c.id), r = c.r * est.cam.z, sel = est.sel === c.id || est.hover === c.id;
+  const col = c.color || (c.plano === 'cp' ? K.control : c.plano === 'bus' ? K.bus : K.app);
+  switch (c.tipo) {
+    case 'estrella': {
+      brillo(x, y, r, 'rgba(255,181,71,0.9)', 0.55);
+      const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
+      g.addColorStop(0, '#fff3d6'); g.addColorStop(0.5, '#ffb547'); g.addColorStop(1, '#a8541a');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,181,71,0.35)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(x, y, 168 * est.cam.z, 168 * 0.62 * est.cam.z, 0, 0, 7); ctx.stroke();
+      break;
+    }
+    case 'planeta': {
+      brillo(x, y, r, col, 0.25);
+      const g = ctx.createRadialGradient(x - r * 0.4, y - r * 0.4, r * 0.1, x, y, r);
+      g.addColorStop(0, '#ffffff'); g.addColorStop(0.25, col); g.addColorStop(1, '#0a1a3a');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+      ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.clip(); ctx.globalAlpha = 0.18; ctx.fillStyle = '#ffffff';
+      for (let i = -2; i <= 2; i++) ctx.fillRect(x - r, y + i * r * 0.32 + Math.sin(est.t * 0.01 + i) * 2, r * 2, r * 0.07); ctx.restore(); ctx.globalAlpha = 1;
+      if (C[c.id] && c.id === 'opp') { ctx.strokeStyle = 'rgba(79,209,255,0.25)'; ctx.beginPath(); ctx.ellipse(x, y, 96 * est.cam.z, 96 * 0.62 * est.cam.z, 0, 0, 7); ctx.stroke(); }
+      colonias(c, x, y, r);
+      break;
+    }
+    case 'luna': case 'modulo': case 'satelite': {
+      const apagado = c.estado === 'diseno';
+      ctx.globalAlpha = apagado ? 0.55 : 1;
+      if (c.tipo === 'satelite') { ctx.fillStyle = '#9fb0e0'; ctx.fillRect(x - r * 1.8, y - r * 0.25, r * 3.6, r * 0.5); }
+      const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.35, 0, x, y, r);
+      g.addColorStop(0, '#ffffff'); g.addColorStop(0.4, col); g.addColorStop(1, '#14183a');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+      if (apagado) { ctx.setLineDash([3, 3]); ctx.strokeStyle = col; ctx.beginPath(); ctx.arc(x, y, r + 3, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+      ctx.globalAlpha = 1;
+      if (c.riesgo) { ctx.fillStyle = K.peligro; ctx.beginPath(); ctx.arc(x + r * 0.8, y - r * 0.8, 3.2, 0, 7); ctx.fill(); }
+      break;
+    }
+    case 'portal': {
+      brillo(x, y, r * 0.8, 'rgba(79,209,255,0.9)', 0.35);
+      for (let i = 0; i < 3; i++) {
+        ctx.strokeStyle = i ? 'rgba(79,209,255,0.45)' : K.app; ctx.lineWidth = i ? 1.5 : 3;
+        ctx.beginPath(); ctx.ellipse(x, y, r * (0.55 + i * 0.2), r * (1 + i * 0.25), 0, 0, 7); ctx.stroke();
+      }
+      ctx.save(); ctx.translate(x, y); ctx.rotate(est.t * 0.02); ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.setLineDash([2, 6]);
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.4, 0, 7); ctx.stroke(); ctx.restore(); ctx.setLineDash([]);
+      break;
+    }
+    case 'estacion': {
+      ctx.save(); ctx.translate(x, y); ctx.rotate(est.t * 0.004);
+      ctx.strokeStyle = K.app; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.stroke();
+      for (let i = 0; i < 6; i++) { ctx.rotate(Math.PI / 3); ctx.fillStyle = '#cfe9ff'; ctx.fillRect(r - 4, -3, 8, 6); }
+      ctx.restore();
+      ctx.fillStyle = '#1a3a66'; ctx.beginPath(); ctx.arc(x, y, r * 0.45, 0, 7); ctx.fill(); ctx.strokeStyle = K.app; ctx.stroke();
+      if (c.riesgo || C.frontdoor.riesgo) { ctx.fillStyle = K.peligro; ctx.beginPath(); ctx.arc(x + r * 0.75, y - r * 0.75, 3.5, 0, 7); ctx.fill(); }
+      break;
+    }
+    case 'nexo': {
+      brillo(x, y, r, col, 0.5);
+      ctx.save(); ctx.translate(x, y); ctx.rotate(est.t * 0.03);
+      ctx.strokeStyle = col; ctx.lineWidth = 2;
+      for (let i = 0; i < 4; i++) { ctx.rotate(Math.PI / 2); ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(r, -r * 0.3, r * 0.9, r * 0.6); ctx.stroke(); }
+      ctx.restore(); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x, y, r * 0.22, 0, 7); ctx.fill();
+      break;
+    }
+    case 'archivo': {
+      ctx.fillStyle = '#05060f'; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+      ctx.strokeStyle = K.ok; ctx.lineWidth = 1.2;
+      for (let i = 0; i < 3; i++) { ctx.globalAlpha = 0.6 - i * 0.15; ctx.beginPath(); ctx.ellipse(x, y, r * (1.3 + i * 0.25), r * (0.35 + i * 0.08), -0.25, 0, 7); ctx.stroke(); }
+      ctx.globalAlpha = 1;
+      if (c.riesgo) { ctx.fillStyle = K.peligro; ctx.beginPath(); ctx.arc(x + r * 0.8, y - r * 0.8, 3.2, 0, 7); ctx.fill(); }
+      break;
+    }
+    case 'cumulo': {
+      for (let i = 0; i < 14; i++) { const a = i * 2.4 + est.t * 0.004, d = (i % 5) * r * 0.22; ctx.fillStyle = TENANTS[i % 2].color; ctx.beginPath(); ctx.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, 2.2, 0, 7); ctx.fill(); }
+      break;
+    }
+    case 'cinturon': {
+      for (let i = 0; i < 26; i++) { const a = i * 0.9 + est.t * 0.002, d = r * (0.6 + (i % 4) * 0.25); ctx.fillStyle = '#8fa0c8'; ctx.globalAlpha = 0.7; ctx.beginPath(); ctx.arc(x + Math.cos(a) * d * 1.6, y + Math.sin(a) * d * 0.6, 1.2 + (i % 3) * 0.7, 0, 7); ctx.fill(); }
+      ctx.globalAlpha = 1; break;
+    }
+    case 'astillero': {
+      ctx.strokeStyle = '#9fb0e0'; ctx.lineWidth = 2; ctx.strokeRect(x - r, y - r * 0.5, r * 2, r);
+      for (let i = 0; i < 4; i++) { ctx.fillStyle = i === Math.floor(est.t / 40) % 4 ? K.ok : '#4fd1ff'; ctx.fillRect(x - r + 4 + i * r * 0.47, y - r * 0.25, r * 0.32, r * 0.5); }
+      if (c.riesgo) { ctx.fillStyle = K.peligro; ctx.beginPath(); ctx.arc(x + r, y - r * 0.7, 3.2, 0, 7); ctx.fill(); }
+      break;
+    }
+  }
+  if (sel) { ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.2; ctx.setLineDash([4, 4]); ctx.lineDashOffset = -est.t * 0.3; ctx.beginPath(); ctx.arc(x, y, r + 9, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+}
+// Las colonias: un punto por tenant activo en cada planeta (tenancy conjoined: mismas tablas, distinto tenant_id)
+function colonias(c, x, y, r) {
+  TENANTS.filter(t => !t.oculto).forEach((t, i) => {
+    const a = -0.6 + i * 0.9 + est.t * 0.003;
+    const cx = x + Math.cos(a) * r * 0.62, cy = y + Math.sin(a) * r * 0.4;
+    const suspendido = t.estado === 'Suspendido';
+    const foco = !est.tenant || est.tenant === t.id;
+    ctx.globalAlpha = foco ? 1 : 0.2;
+    ctx.fillStyle = suspendido ? '#5a5f7a' : t.color; ctx.beginPath(); ctx.arc(cx, cy, 4.2, 0, 7); ctx.fill();
+    if (suspendido) { ctx.strokeStyle = K.peligro; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(cx - 4, cy - 4); ctx.lineTo(cx + 4, cy + 4); ctx.stroke(); }
+    else if (est.tenant === t.id) { ctx.strokeStyle = t.color; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, 7 + Math.sin(est.t * 0.1) * 1.5, 0, 7); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  });
+}
+
+// ═══════════════ Naves ═══════════════
+function nave(ruta, color, opts = {}) { return { ruta, color, t: 0, vel: opts.vel || 1, ...opts }; }
+function moverNave(n) {
+  const pts = n.ruta.map(deMundo), tramos = Math.max(1, pts.length - 1);
+  const dur = 70 / n.vel, prog = Math.min(1, n.t / (tramos * dur));
+  let i = Math.min(tramos - 1, Math.floor(prog * tramos)), f = prog * tramos - i;
+  if (pts.length === 1) pts.push(pts[0]);
+  if (n.bloqueado && prog > 0.8) { i = tramos - 1; f = 0.8; }
+  const [x, y] = pts[i] === pts[i + 1] ? [pts[i][0] + Math.sin(f * 6.28) * 18, pts[i][1] - Math.abs(Math.sin(f * 3.14)) * 18] : curva(pts[i], pts[i + 1], f);
+  // estela
+  n.estela = n.estela || []; n.estela.push([x, y]); if (n.estela.length > 16) n.estela.shift();
+  n.estela.forEach(([ex, ey], k) => { ctx.globalAlpha = (k / 16) * 0.6; ctx.fillStyle = n.color; ctx.beginPath(); ctx.arc(ex, ey, 1 + k / 8, 0, 7); ctx.fill(); });
+  ctx.globalAlpha = 1; ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x, y, n.grande ? 4.5 : 2.6, 0, 7); ctx.fill();
+  if (n.grande) { ctx.strokeStyle = n.color; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 8, 0, 7); ctx.stroke(); }
+  if (n.bloqueado && prog > 0.8) { ctx.fillStyle = K.peligro; ctx.font = '700 12px "Chakra Petch", sans-serif'; ctx.fillText('RECHAZADA', x + 10, y - 8); }
+  if (n.duplicado && prog >= 1) { ctx.fillStyle = K.ok; ctx.font = '700 12px "Chakra Petch", sans-serif'; ctx.fillText('DUPLICADO · DESCARTADO', x + 12, y - 10); }
+  n.t++;
+  return prog >= 1;
+}
+const AMBIENTE = [
+  [['usuarios', 'frontdoor', 'gateway', 'radicacion'], K.app], [['usuarios', 'frontdoor', 'gateway', 'contabilidad'], K.app], [['usuarios', 'frontdoor', 'gateway', 'impuestos'], K.app],
+  [['tenantmgr', 'asb', 'opp'], K.bus], [['billing', 'asb', 'contabilidad'], K.bus], [['entradas', 'rabbit', 'radicacion'], '#ff8f5a'],
+  [['radicacion', 'archivo'], K.ok], [['contabilidad', 'archivo'], K.ok], [['rabbit', 'notificaciones'], '#ff8f5a'], [['asb', 'notificaciones'], K.bus],
+];
+
+// ═══════════════ Bucle ═══════════════
+function cuadro() {
+  est.t++;
+  fondo(); dibujarRutas();
+  const orden = [...CUERPOS].sort((a, b) => pos(a)[1] - pos(b)[1]);
+  orden.forEach(dibujarCuerpo);
+  if (est.trafico && !est.leccion && est.t % 28 === 0 && est.naves.length < 14) { const [r, c] = AMBIENTE[(est.t / 28) % AMBIENTE.length | 0]; est.naves.push(nave(r, c, { vel: 0.8 + Math.random() * 0.6 })); }
+  est.naves = est.naves.filter(n => !moverNave(n));
+  if (est.anim) { const fin = moverNave(est.anim); if (fin && !est.anim.fin) { est.anim.fin = true; alTerminarAnim(est.anim); } if (fin && est.anim.t > est.anim.ruta.length * 70 + 120) { est.anim.t = 0; est.anim.estela = []; est.anim.fin = false; } }
+  rotulos();
+  requestAnimationFrame(cuadro);
+}
+
+// ═══════════════ Rótulos HTML ═══════════════
+const rot = new Map();
+function rotulos() {
+  const vivos = new Set();
+  for (const c of CUERPOS) {
+    const [x, y] = deMundo(c.id); const r = c.r * est.cam.z;
+    const pequeño = ['luna', 'modulo', 'satelite'].includes(c.tipo);
+    if (pequeño && est.cam.z < 0.55 && est.sel !== c.id && est.hover !== c.id) continue;
+    let el = rot.get(c.id);
+    if (!el) { el = document.createElement('div'); capa.appendChild(el); rot.set(c.id, el); el.dataset.h = ''; }
+    const marca = c.estado === 'diseno' ? ' · en diseño' : '';
+    const h = `<b>${c.nombre}</b><span>${c.sub}${marca}</span>`;
+    if (el.dataset.h !== h) { el.innerHTML = h; el.dataset.h = h; }
+    el.className = 'rotulo ' + (c.plano === 'cp' ? 'cp ' : c.plano === 'bus' ? 'bus ' : '') + (pequeño ? 'peq ' : '') + (est.sel === c.id || est.hover === c.id ? 'sel' : '');
+    if (pequeño) { el.classList.add('lado'); el.style.left = (x + r + 6) + 'px'; el.style.top = y + 'px'; }
+    else if (c.tipo === 'estrella') { el.style.left = x + 'px'; el.style.top = (y - r - 40) + 'px'; }
+    else { el.style.left = x + 'px'; el.style.top = (y + r + (c.tipo === 'portal' ? r * 0.4 : 6)) + 'px'; }
+    vivos.add(c.id);
+  }
+  for (const [id, el] of rot) if (!vivos.has(id)) { el.remove(); rot.delete(id); }
+}
+
+// ═══════════════ Tenants (barra) ═══════════════
+function pintarTenants() {
+  const cont = document.getElementById('tenants');
+  cont.querySelectorAll('.tchip').forEach(x => x.remove());
+  TENANTS.filter(t => !t.oculto).forEach(t => {
+    const b = document.createElement('button'); b.className = 'tchip' + (est.tenant === t.id ? ' sel' : '');
+    b.innerHTML = `<i style="background:${t.estado === 'Suspendido' ? '#5a5f7a' : t.color}"></i>${t.nombre} <em>${t.estado}</em>`;
+    b.title = 'Resaltar sus colonias en todos los planetas';
+    b.onclick = () => { est.tenant = est.tenant === t.id ? null : t.id; pintarTenants(); };
+    cont.appendChild(b);
+  });
+}
+
+// ═══════════════ Inspector ═══════════════
+const insp = document.getElementById('inspector');
+function inspeccionar(id) {
+  est.sel = id; if (!id) { insp.hidden = true; return; }
+  const c = C[id];
+  const plano = c.plano === 'cp' ? '<span class="ins cp">Control Plane</span>' : c.plano === 'bus' ? '<span class="ins bus">Mensajería</span>' : c.plano === 'app' ? '<span class="ins app">Application Plane</span>' : '<span class="ins">Borde</span>';
+  const estado = c.estado === 'diseno' ? '<span class="ins diseno">En diseño</span>' : c.estado === 'codigo' ? '<span class="ins codigo">Existe en código</span>' : '';
+  const lec = LECCIONES.filter(l => l.pasos.some(p => p.ruta && p.ruta.includes(id)));
+  insp.innerHTML = `<button class="cerrar" aria-label="Cerrar">×</button>
+    <h2>${c.nombre}</h2>
+    <div class="insignias">${plano}${estado}${c.riesgo ? '<span class="ins riesgo">Riesgo abierto</span>' : ''}</div>
+    <h3>Qué es</h3><p>${c.que}</p>
+    <h3>En este universo</h3><p>${c.metafora}</p>
+    <h3>En la plataforma real</h3><p>${c.real}</p>
+    ${c.riesgo ? `<h3>Riesgo encontrado</h3><p style="color:var(--peligro)">${c.riesgo}</p>` : ''}
+    ${c.tf ? `<h3>En el código</h3><pre>${c.tf}</pre>` : ''}
+    ${lec.length ? `<h3>Aparece en</h3><div class="controles">${lec.map(l => `<button class="btn" data-l="${l.id}">${l.titulo}</button>`).join('')}</div>` : ''}
+    <p class="fuente">Fuente: ${c.fuente}</p>`;
+  insp.hidden = false;
+  insp.querySelector('.cerrar').onclick = () => inspeccionar(null);
+  insp.querySelectorAll('[data-l]').forEach(b => b.onclick = () => abrirLeccion(b.dataset.l));
+}
+
+// ═══════════════ Lecciones ═══════════════
+const $ = id => document.getElementById(id);
+function abrirLeccion(id) {
+  est.leccion = LECCIONES.find(l => l.id === id); est.paso = 0; est.naves = [];
+  ['p-lecciones', 'misiones'].forEach(p => $(p).hidden = true);
+  if (id === 'tenant') { T.norte.oculto = true; T.norte.estado = 'Registrado'; }
+  if (id === 'cartera') { T.sur.estado = 'Activado'; }
+  pintarTenants();
+  $('leccion').hidden = false; mostrarPaso();
+}
+function alTerminarAnim(a) {
+  if (a.tenant) { const [tid, estado] = a.tenant; T[tid].estado = estado; if (a.aparece) T[tid].oculto = false; pintarTenants(); }
+}
+function mostrarPaso() {
+  const lec = est.leccion, p = lec.pasos[est.paso];
+  $('l-titulo').textContent = lec.titulo;
+  $('l-paso').textContent = `Paso ${est.paso + 1} de ${lec.pasos.length}`;
+  $('l-progreso').style.width = ((est.paso + 1) / lec.pasos.length * 100) + '%';
+  $('l-opciones').innerHTML = ''; $('l-feedback').innerHTML = '';
+  $('l-prev').disabled = est.paso === 0;
+  $('l-next').textContent = est.paso === lec.pasos.length - 1 ? 'Terminar ✓' : 'Siguiente ›';
+  if (p.pregunta) {
+    est.anim = null;
+    $('l-texto').innerHTML = `<strong style="color:var(--control)">Predice.</strong> ${p.pregunta}`;
+    $('l-next').disabled = true;
+    p.opciones.forEach(([txt, ok, fb], i) => {
+      const b = document.createElement('button'); b.textContent = txt;
+      b.onclick = () => {
+        $('l-opciones').querySelectorAll('button').forEach((x, j) => { x.disabled = true; if (p.opciones[j][1]) x.classList.add('bien'); });
+        if (!ok) b.classList.add('mal');
+        $('l-feedback').innerHTML = `<strong style="color:${ok ? 'var(--ok)' : 'var(--peligro)'}">${ok ? 'Bien.' : 'No exactamente.'}</strong> ${fb}`;
+        $('l-next').disabled = false;
+      };
+      $('l-opciones').appendChild(b);
+    });
+  } else {
+    $('l-texto').textContent = p.texto; $('l-next').disabled = false;
+    est.anim = nave(p.ruta, p.color, { grande: true, vel: 0.9, bloqueado: p.bloqueado, duplicado: p.duplicado, tenant: p.tenant, aparece: p.aparece });
+  }
+}
+$('l-next').onclick = () => {
+  const lec = est.leccion;
+  if (est.paso < lec.pasos.length - 1) { if (est.anim && !est.anim.fin) alTerminarAnim(est.anim); est.paso++; mostrarPaso(); return; }
+  if (est.anim && !est.anim.fin) alTerminarAnim(est.anim);
+  est.hechas.add(lec.id); guardar(); pintarMisiones();
+  const ms = MISIONES.filter(m => m[2] === lec.id).map(m => `«${m[1]}»`).join(' y ');
+  $('l-texto').innerHTML = `<strong style="color:var(--ok)">Lección completa.</strong> Ahora intenta responder, sin mirar: ${ms}`;
+  $('l-opciones').innerHTML = ''; $('l-feedback').innerHTML = ''; $('l-next').disabled = true; est.anim = null;
+};
+$('l-prev').onclick = () => { if (est.paso > 0) { est.paso--; mostrarPaso(); } };
+$('l-replay').onclick = () => { if (est.anim) { est.anim.t = 0; est.anim.estela = []; est.anim.fin = false; } };
+$('l-cerrar').onclick = () => { $('leccion').hidden = true; est.leccion = null; est.anim = null; };
+
+function pintarMisiones() {
+  const hecha = m => est.hechas.has(m[2]);
+  $('m-cuenta').textContent = `${MISIONES.filter(hecha).length}/${MISIONES.length}`;
+  $('m-lista').innerHTML = MISIONES.map(m => `<div class="mision ${hecha(m) ? 'hecha' : ''}"><span class="n">${hecha(m) ? '✓' : m[0]}</span>
+    <div class="q">${m[1]}<small>${hecha(m) ? 'Lección hecha. ¿La explicarías sin mirar?' : 'Se gana en: ' + LECCIONES.find(l => l.id === m[2]).titulo}</small></div>
+    <button class="btn" data-l="${m[2]}">${hecha(m) ? 'Repasar' : 'Ir'}</button></div>`).join('');
+  $('m-lista').querySelectorAll('[data-l]').forEach(b => b.onclick = () => abrirLeccion(b.dataset.l));
+  $('pl-lista').innerHTML = LECCIONES.map(l => `<button class="btn ${est.hechas.has(l.id) ? 'prim' : ''}" data-l="${l.id}">${est.hechas.has(l.id) ? '✓ ' : ''}${l.titulo}</button>`).join('');
+  $('pl-lista').querySelectorAll('[data-l]').forEach(b => b.onclick = () => abrirLeccion(b.dataset.l));
+}
+function alternar(id) { const abrir = $(id).hidden; ['p-lecciones', 'misiones'].forEach(x => $(x).hidden = true); $(id).hidden = !abrir; }
+$('b-lecciones').onclick = () => alternar('p-lecciones');
+$('b-misiones').onclick = () => alternar('misiones');
+$('m-cerrar').onclick = () => $('misiones').hidden = true;
+$('pl-cerrar').onclick = () => $('p-lecciones').hidden = true;
+$('b-trafico').onclick = () => { est.trafico = !est.trafico; $('b-trafico').classList.toggle('on', est.trafico); $('b-trafico').setAttribute('aria-pressed', est.trafico); };
+
+// ═══════════════ Cámara e interacción ═══════════════
+function cuerpoEn(px, py) {
+  let mejor = null, d = Infinity;
+  for (const c of CUERPOS) { const [x, y] = deMundo(c.id); const dd = Math.hypot(px - x, py - y); if (dd < Math.max(14, c.r * est.cam.z + 8) && dd < d) { d = dd; mejor = c.id; } }
+  return mejor;
+}
+let arr = null;
+espacio.addEventListener('pointerdown', e => { if (e.target !== lienzo) return; arr = { x: e.clientX, y: e.clientY, cx: est.cam.x, cy: est.cam.y, movio: false }; });
+window.addEventListener('pointermove', e => {
+  const r = lienzo.getBoundingClientRect();
+  if (arr) { const dx = e.clientX - arr.x, dy = e.clientY - arr.y; if (Math.abs(dx) + Math.abs(dy) > 4) { arr.movio = true; espacio.classList.add('arrastrando'); } est.cam.x = arr.cx + dx; est.cam.y = arr.cy + dy; return; }
+  if (e.target === lienzo) { est.hover = cuerpoEn(e.clientX - r.left, e.clientY - r.top); lienzo.style.cursor = est.hover ? 'pointer' : ''; }
+});
+window.addEventListener('pointerup', e => {
+  if (arr && !arr.movio) { const r = lienzo.getBoundingClientRect(); inspeccionar(cuerpoEn(e.clientX - r.left, e.clientY - r.top)); }
+  arr = null; espacio.classList.remove('arrastrando');
+});
+espacio.addEventListener('wheel', e => { e.preventDefault(); est.cam.z = Math.min(2, Math.max(0.3, est.cam.z * (e.deltaY < 0 ? 1.08 : 0.93))); }, { passive: false });
+document.addEventListener('keydown', e => {
+  if (e.key === 'l' || e.key === 'L') alternar('p-lecciones');
+  else if (e.key === 'j' || e.key === 'J') alternar('misiones');
+  else if (e.key === 'f' || e.key === 'F') encuadrar();
+  else if (e.key === 'Escape') { inspeccionar(null); }
+});
+window.addEventListener('resize', () => { redimensionar(); encuadrar(); });
+
+// ═══════════════ Arranque: en estado de trabajo (tráfico en vivo + la primera lección abierta) ═══════════════
+redimensionar(); encuadrar(); pintarTenants(); pintarMisiones();
+requestAnimationFrame(cuadro);
+abrirLeccion('tenant');
+</script>
