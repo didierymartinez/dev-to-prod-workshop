@@ -230,6 +230,8 @@ Pero todo esto sigue sobre **una sola** empresa, en un stream suelto. ¿Y cuando
 
 ---
 
+> 📦 **¿Tu código no compila o no da lo mismo?** El `Program.cs` completo al cierre de esta sección está en [`checkpoints/07-el-despachador/Program.cs`](../checkpoints/07-el-despachador/Program.cs). Compáralo con el tuyo o cópialo para seguir.
+
 ## ✅ Compruébalo
 
 - [ ] Cada comando es un **`record`** propio, y los handlers reciben su comando (`Handle(CambiarPlanDeEmpresa)`), no un `string`.

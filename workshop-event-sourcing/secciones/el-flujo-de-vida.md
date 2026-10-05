@@ -144,12 +144,14 @@ Pero hoy los hechos que anotas los **fabricas a mano**, sin que nadie vigile las
 
 ---
 
+> 📦 **¿Tu código no compila o no da lo mismo?** El `Program.cs` completo al cierre de esta sección está en [`checkpoints/04-el-flujo-de-vida/Program.cs`](../checkpoints/04-el-flujo-de-vida/Program.cs). Compáralo con el tuyo o cópialo para seguir.
+
 ## ✅ Compruébalo
 
 - [ ] `dotnet run` imprime `Constructora Andes: plan Premium`, con los hechos **anotados por `Append`** y la empresa obtenida vía `.Get()` (sin `new Empresa(historia)` ni `new List<object>{ … }` sueltos por ahí).
 - [ ] El consumidor escribe y lee sin tocar la lista cruda: solo `Append(...)` y `.Get()`.
 - [ ] Intenta `new EventStream<string>()` y observa que **no compila**: `string` no es un `AggregateRoot`, y la restricción `where` lo impide.
-- [ ] Cambia el constructor de `Empresa` por uno que **exija** un parámetro (`public Empresa(string nombre) { Nombre = nombre; }`) y mira el error: `CS0310 … must be a non-abstract type with a public parameterless constructor`. Sin constructor sin parámetros, `EventStream<T>` no puede hacer `new T()`: eso es lo que exige el `new()` del `where`. (Ojo: si solo **borras** `public Empresa() { }` sin poner otro, C# crea uno vacío por su cuenta y todo sigue compilando.) Restaura el constructor vacío.
+- [ ] Cambia `public Empresa() { }` por `public Empresa(string nombre) { Nombre = nombre; }`: falla con `CS0310`, porque el `new()` del `where` exige un constructor sin parámetros. (Si solo lo borras, C# crea uno vacío y compila.) Restaura el vacío.
 - [ ] Si hiciste la `Factura` de [Refactorizando el motor](refactorizando-el-motor.md): usa `new EventStream<Factura>()`, anota sus hechos con `Append` y pídela con `Get()`. **No toques `EventStream`**: es la prueba de que el genérico sirve para cualquier agregado.
 
 ---

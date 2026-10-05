@@ -229,6 +229,8 @@ Pero falta un peligro que aparece justo cuando hay **muchos escritores** sobre e
 
 ---
 
+> 📦 **¿Tu código no compila o no da lo mismo?** El `Program.cs` completo al cierre de esta sección está en [`checkpoints/08-el-almacen-por-id/Program.cs`](../checkpoints/08-el-almacen-por-id/Program.cs). Compáralo con el tuyo o cópialo para seguir.
+
 ## ✅ Compruébalo
 
 - [ ] `dotnet run` escribe y lee **dos** empresas distintas (`emp-7`, `emp-9`) **siempre a través del stream**, nunca tocando el `store` directo.

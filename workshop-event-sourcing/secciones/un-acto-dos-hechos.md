@@ -60,7 +60,7 @@ public class PagarDeudaHandler(EventStore store) : ICommandHandler<PagarDeuda>
 }
 ```
 
-Monta una empresa morosa —registrada y luego suspendida por mora— y dispara el handler:
+Monta una empresa morosa —registrada y luego suspendida por mora— y dispara el handler. **Reemplaza** tu código suelto por este:
 
 ```csharp
 var store = new EventStore();
@@ -87,11 +87,14 @@ El modelo de "decidir devuelve el hecho" —cada `decide` devuelve su hecho y al
 
 ---
 
+> 📦 **¿Tu código no compila o no da lo mismo?** El `Program.cs` completo al cierre de esta sección está en [`checkpoints/10-un-acto-dos-hechos/Program.cs`](../checkpoints/10-un-acto-dos-hechos/Program.cs). Compáralo con el tuyo o cópialo para seguir.
+
 ## ✅ Compruébalo
 
 - [ ] Montaste `PagoRegistrado`, `DeudaPendiente`, `RegistrarPago` y la regla en `Reactivar`.
 - [ ] Con una empresa suspendida por falta de pago, el `PagarDeudaHandler` lanza `ReglaDeNegocioException` — aunque el pago se decidió justo antes.
 - [ ] Explica, con tus palabras, por qué `Reactivar()` no "ve" el pago que la línea anterior acaba de registrar.
+- [ ] **Predice antes de mirar:** tras la excepción, ¿cuántos hechos quedaron en el cajón de `emp-7`: 2, 3 o 4? Compruébalo envolviendo la llamada al handler en un `try/catch` y leyendo después `store.GetEvents("emp-7").Count`. Si quedó algo que no esperabas, anótalo: es medio acto guardado, y volverá en [Todo o nada](todo-o-nada.md).
 
 ---
 

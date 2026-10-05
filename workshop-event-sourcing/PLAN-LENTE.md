@@ -38,8 +38,8 @@ Una app externa no puede ver la memoria del proceso del alumno. Aquí el alumno 
 
 | § | Cambio | Por qué |
 |---|---|---|
-| 10 ✏️ | **El sobre guarda `causa`**: el id del comando que produjo el hecho. **Dolor:** suspender-por-deuda deja dos hechos y no hay forma de saber que vinieron del mismo acto. | Es el dato que la Lente usará para agrupar hechos por acto y, en 28b, para dibujar el flujo. |
-| 11 ✏️ | El 🔨 de la historia duplicada (hoy promete una `ConcurrencyException` que no ocurre) se corrige: con `causa`, el alumno ve que un solo acto volvió a producir `EmpresaRegistrada`. | Corrige una errata de la revisión y siembra la invariante "nacimiento único". |
+| 10-11 ✏️ | **Sin `causa` todavía** (decisión al implementar, oct 2026): en §10-12 nadie la consumiría y la regla B3 prohíbe arrastrar piezas "para después". El 🔨 de §11 ya se corrigió sin ella: el alumno imprime el diario y ve `EmpresaRegistrada` dos veces. | — |
+| 13 ✏️ | **El sobre en disco gana `causa`**: el id del comando que produjo el hecho. Su primer consumidor es la Lente, que se instala en esta misma sección y agrupa los hechos por acto. | Es el dato que, en 28b, permite dibujar el flujo. |
 
 ### Era 1 · el esquema hecho a mano (§13-28)
 
@@ -126,7 +126,7 @@ Según `AMPLIACION-MARTEN.md`, en ControlPlane los mensajes entre módulos **no 
 |---|---|---|
 | **0 · Decisiones** | Confirmar las decisiones de §8. | — |
 | **1 · Spike técnico** | Verificar contra la versión que se fije, y contra un sistema real: metadatos de correlación y causación de Marten y su propagación desde Wolverine y Service Bus; nombres de tablas de progreso, dead letters y envelopes. Resultado en `SPIKE-LENTE.md`. Requiere .NET 10, Docker y acceso de solo lectura a un sistema real. | 0 |
-| **2a · Arreglar §1-12** | Erratas de la revisión, `causa` en §10, el 🔨 de §11, checkpoints de código. **No depende de la Lente**: puede empezar ya. | 0 |
+| **2a · Arreglar §1-12** | ✅ **Hecho** (oct 2026): erratas de la revisión, el 🔨 de §11, predicciones en los ✅, checkpoints compilados (`checkpoints/`). | 0 |
 | **2b · Lente para la era 1** | En `cosmos-trace`: lo que pide la fila §13-28b de la tabla de §6. | 1 |
 | **3 · Escribir §13-36 por bloques** | Cada bloque cuando su panel exista, y cada sección por `revisar-seccion`. Actualizar `SECUENCIA.md`, `MAPA.md` y `taller.md`. | 2b |
 | **4 · Piloto observado** | Una persona hace los hitos **sola**; el autor anota sección, minuto, `<details>` abierto, predicciones acertadas y resultado de `verificar`. | 3 |
@@ -138,7 +138,7 @@ Según `AMPLIACION-MARTEN.md`, en ControlPlane los mensajes entre módulos **no 
 | # | Decisión | Recomendación |
 |---|---|---|
 | 1 | ¿Desde dónde se usa la Lente: §13 (archivos) o §15 (Postgres)? | **§13.** Cuesta un adaptador de archivos pequeño, pero da el mejor momento de §14: la Lente como segundo lector que se rompe con un renombre. |
-| 2 | ¿Dónde nacen los metadatos? | `causa` en **§10**; `correlacion` en **§26**. |
+| 2 | ¿Dónde nacen los metadatos? | `causa` en **§13** (con la Lente, su primer consumidor); `correlacion` en **§26**. |
 | 3 | ¿Agregar el segundo salto al dominio (Facturación escribe su propio hecho)? | ✅ Sin él no hay flujo que observar. |
 | 4 | ¿Cómo se distribuye la Lente al alumno? | Un **`dotnet tool`** (lee archivos locales sin montar volúmenes) o un contenedor para la era 2. A decidir con el spike. |
 | 5 | ¿Dónde vive el adaptador modo taller? | En un **ensamblado aparte**, para que producción no lo cargue. |
