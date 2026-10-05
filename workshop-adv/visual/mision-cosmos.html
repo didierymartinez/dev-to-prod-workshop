@@ -1,0 +1,753 @@
+<title>Misión Cosmos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+/* Layout: un juego a pantalla completa. El espacio es el canvas; arriba el HUD de la misión,
+   abajo a la izquierda la radio con COSMO (el copiloto), abajo a la derecha el minimapa.
+   Al llegar a un sector se abre la consola de construcción. Un solo look oscuro: es el espacio. */
+:root {
+  color-scheme: dark;
+  --vacio: #050714;
+  --panel: #0a0f2cf2;
+  --borde: #283270;
+  --texto: #eef0ff;
+  --tenue: #98a0cf;
+  --oro: #ffb547;       /* Control Plane, recompensas */
+  --cian: #4fd1ff;      /* Application Plane, la nave */
+  --lila: #b48cff;      /* mensajería */
+  --ok: #43e6a0;
+  --mal: #ff4d6d;
+  --display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --cuerpo: "Atkinson Hyperlegible", system-ui, sans-serif;
+  --codigo: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+html, body { height: 100%; }
+body { background: var(--vacio); color: var(--texto); font-family: var(--cuerpo); font-size: 15px; overflow: hidden; }
+#juego { position: fixed; inset: 0; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--oro); outline-offset: 2px; }
+
+.hud { position: absolute; top: calc(10px + env(safe-area-inset-top, 0px)); left: 16px; right: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; pointer-events: none; }
+.hud > * { pointer-events: auto; }
+.titulo { font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: 3px; text-transform: uppercase; text-shadow: 0 2px 10px #000; }
+.titulo span { color: var(--oro); }
+.medidor { display: flex; align-items: center; gap: 8px; background: #0a0f2ccc; border: 1px solid var(--borde); border-radius: 999px; padding: 5px 12px; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.medidor b { font-family: var(--display); color: var(--oro); }
+.barra { width: 110px; height: 6px; background: #1a2150; border-radius: 3px; overflow: hidden; }
+.barra i { display: block; height: 100%; background: linear-gradient(90deg, var(--cian), var(--ok)); transition: width 0.6s; }
+.empuje { flex: 1; }
+.boton { font-family: var(--display); font-weight: 500; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; padding: 7px 12px; border: 1px solid var(--borde); border-radius: 4px; background: #0d1336e6; white-space: nowrap; }
+.boton:hover { border-color: var(--cian); }
+.boton.oro { background: #4a3510; border-color: var(--oro); color: #ffe2a8; }
+
+.radio { position: absolute; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: min(460px, calc(100% - 32px)); display: grid; grid-template-columns: 54px 1fr; gap: 12px; align-items: start; background: var(--panel); border: 1px solid var(--borde); border-radius: 10px; padding: 12px 14px; }
+.radio canvas { position: static; width: 54px; height: 54px; }
+.radio .quien { font-family: var(--display); font-size: 11px; letter-spacing: 2px; color: var(--cian); text-transform: uppercase; }
+.radio p { line-height: 1.4; margin-top: 3px; }
+.radio .tecla { font-size: 12px; color: var(--tenue); margin-top: 6px; }
+.mini { position: absolute; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: 180px; height: 130px; background: #070b22d9; border: 1px solid var(--borde); border-radius: 8px; }
+.mini canvas { position: static; width: 180px; height: 130px; }
+
+.consola { position: absolute; inset: 0; display: grid; place-items: center; background: #02030acc; padding: 16px; }
+.caja { width: min(720px, 100%); max-height: calc(100% - 16px); overflow: auto; background: var(--panel); border: 1px solid var(--borde); border-radius: 12px; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 20px 80px #000; }
+.caja header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.caja .sector { font-family: var(--display); font-size: 12px; letter-spacing: 2px; color: var(--tenue); text-transform: uppercase; }
+.caja h2 { font-family: var(--display); font-weight: 700; font-size: 24px; letter-spacing: 1px; text-wrap: balance; width: 100%; }
+.etapas { display: flex; gap: 6px; }
+.etapas i { flex: 1; height: 4px; border-radius: 2px; background: #1a2150; }
+.etapas i.hecha { background: var(--oro); }
+.etapas i.ahora { background: var(--cian); }
+.caja h3 { font-family: var(--display); font-weight: 500; font-size: 12px; letter-spacing: 2px; color: var(--oro); text-transform: uppercase; }
+.caja p { line-height: 1.5; max-width: 64ch; }
+.caja pre { font-family: var(--codigo); font-size: 12.5px; background: #050716; border: 1px solid var(--borde); border-radius: 6px; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ok); }
+.opciones { display: grid; gap: 8px; }
+.opciones button { text-align: left; background: #0f1640; border: 1px solid var(--borde); border-radius: 6px; padding: 10px 14px; line-height: 1.35; }
+.opciones button:hover:not([disabled]) { border-color: var(--cian); }
+.opciones button.bien { border-color: var(--ok); background: #0e3329; }
+.opciones button.mal { border-color: var(--mal); background: #3a1022; }
+.piezas { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
+.pieza { text-align: left; background: #0f1640; border: 1px solid var(--borde); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.pieza b { font-family: var(--display); font-size: 14px; letter-spacing: 0.5px; }
+.pieza span { font-size: 13px; color: var(--tenue); line-height: 1.35; }
+.pieza.elegida { border-color: var(--ok); background: #0e3329; }
+.pieza.rechazada { border-color: var(--mal); background: #3a1022; }
+.pieza.rechazada span { color: #ffb3c1; }
+.nota { font-size: 14px; line-height: 1.45; }
+.nota.bien b { color: var(--ok); }
+.nota.mal b { color: var(--mal); }
+.fuente { font-size: 12px; color: var(--tenue); border-top: 1px dashed var(--borde); padding-top: 10px; }
+.acciones { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.acciones .boton { padding: 10px 16px; font-size: 13px; }
+.acciones .boton[disabled] { opacity: 0.35; cursor: default; }
+.bitacora .fila { display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--borde); }
+.bitacora .num { font-family: var(--display); font-weight: 700; color: var(--tenue); }
+.bitacora .fila.hecho .num { color: var(--ok); }
+.bitacora small { display: block; color: var(--tenue); font-size: 12px; }
+
+@media (max-width: 640px) {
+  .mini { display: none; }
+  .radio { grid-template-columns: 40px 1fr; padding: 10px; }
+  .radio canvas { width: 40px; height: 40px; }
+  .caja { padding: 16px; }
+  .caja h2 { font-size: 20px; }
+  .barra { width: 70px; }
+}
+@media (prefers-reduced-motion: reduce) { .barra i { transition: none; } }
+</style>
+
+<div id="juego">
+  <canvas id="lienzo" aria-label="El espacio de Cosmos: pilota la nave hasta cada sector para construirlo"></canvas>
+
+  <div class="hud">
+    <div class="titulo">Misión <span>Cosmos</span></div>
+    <div class="medidor">Construido <b id="h-sectores">0/0</b><div class="barra"><i id="h-barra" style="width:0"></i></div></div>
+    <div class="medidor">★ <b id="h-estrellas">0</b> estrellas</div>
+    <span class="empuje"></span>
+    <button class="boton" id="b-bitacora">Bitácora</button>
+    <button class="boton" id="b-rumbo">Rumbo al siguiente</button>
+  </div>
+
+  <div class="radio" id="radio" aria-live="polite">
+    <canvas id="cara" width="108" height="108" aria-hidden="true"></canvas>
+    <div><div class="quien">COSMO · copiloto</div><p id="radio-texto"></p><div class="tecla" id="radio-tecla"></div></div>
+  </div>
+  <div class="mini"><canvas id="mapa" width="360" height="260" aria-label="Minimapa"></canvas></div>
+
+  <div class="consola" id="consola" hidden><div class="caja" id="caja" role="dialog" aria-modal="true"></div></div>
+</div>
+
+<script>
+// ══════════════════════ Contenido: los sectores del taller ══════════════════════
+// Cada sector es una sección del taller. Etapas: briefing → predicción → ensamblaje → construcción → prueba → bitácora.
+// `piezas`: el alumno elige las correctas; las incorrectas explican por qué no.
+// `estructura`: qué aparece en el espacio al construirlo · `prueba`: ruta de naves que la atraviesan.
+const SECTORES = [];   // se llena abajo (CONTENIDO)
+
+// ══════════════════════ Utilidades ══════════════════════
+const $ = id => document.getElementById(id);
+const K = { oro: '#ffb547', cian: '#4fd1ff', lila: '#b48cff', ok: '#43e6a0', mal: '#ff4d6d', texto: '#eef0ff', tenue: '#98a0cf', naranja: '#ff8f5a' };
+const lienzo = $('lienzo'), ctx = lienzo.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+function redimensionar() { DPR = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight; lienzo.width = W * DPR; lienzo.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
+addEventListener('resize', redimensionar); redimensionar();
+const azar = (s => () => (s = (s * 16807) % 2147483647) / 2147483647)(42);
+
+// ══════════════════════ Estado ══════════════════════
+const est = {
+  nave: { x: 0, y: 260, vx: 0, vy: 0, ang: -Math.PI / 2, motor: false },
+  destino: null, teclas: {}, cam: { x: 0, y: 0 }, t: 0,
+  hechos: new Set(), estrellas: 0, abierto: null, etapa: 0, naves: [], nacimientos: {}, chispas: [],
+};
+try { const g = JSON.parse(localStorage.getItem('mision-cosmos') || '{}'); (g.hechos || []).forEach(x => est.hechos.add(x)); est.estrellas = g.estrellas || 0; } catch {}
+function guardar() { try { localStorage.setItem('mision-cosmos', JSON.stringify({ hechos: [...est.hechos], estrellas: est.estrellas })); } catch {} }
+const siguiente = () => SECTORES.find(s => !est.hechos.has(s.id));
+const desbloqueado = s => SECTORES.indexOf(s) === 0 || est.hechos.has(SECTORES[SECTORES.indexOf(s) - 1].id);
+
+// ══════════════════════ Fondo: estrellas en capas y nebulosas ══════════════════════
+const estrellas = Array.from({ length: 700 }, () => ({ x: azar() * 6000 - 3000, y: azar() * 4400 - 2200, p: [0.15, 0.35, 0.7][Math.floor(azar() * 3)], b: azar() }));
+const nebulosas = [[-1500, -700, 900, '255,181,71'], [900, -900, 1000, '180,140,255'], [-300, 900, 1100, '79,209,255'], [1700, 700, 800, '67,230,160']];
+function fondo() {
+  ctx.fillStyle = '#050714'; ctx.fillRect(0, 0, W, H);
+  for (const [x, y, r, c] of nebulosas) {
+    const sx = (x - est.cam.x) * 0.3 + W / 2, sy = (y - est.cam.y) * 0.3 + H / 2;
+    const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * 0.6); g.addColorStop(0, `rgba(${c},0.09)`); g.addColorStop(1, 'rgba(5,7,20,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+  for (const s of estrellas) {
+    let x = ((s.x - est.cam.x * s.p) % 6000 + 9000) % 6000 - 3000 + W / 2, y = ((s.y - est.cam.y * s.p) % 4400 + 6600) % 4400 - 2200 + H / 2;
+    if (x < -2 || y < -2 || x > W + 2 || y > H + 2) continue;
+    ctx.globalAlpha = 0.3 + 0.7 * Math.abs(Math.sin(est.t * 0.008 + s.b * 9));
+    ctx.fillStyle = s.b > 0.9 ? '#ffd9a0' : '#cfd6ff'; const z = s.p > 0.5 ? 1.8 : 1; ctx.fillRect(x, y, z, z);
+  }
+  ctx.globalAlpha = 1;
+}
+const P = (x, y) => [x - est.cam.x + W / 2, y - est.cam.y + H / 2];
+
+// ══════════════════════ Estructuras ══════════════════════
+function halo(x, y, r, rgb, a) { const g = ctx.createRadialGradient(x, y, r * 0.2, x, y, r * 2.2); g.addColorStop(0, `rgba(${rgb},${a})`); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 2.2, 0, 7); ctx.fill(); }
+function esfera(x, y, r, color, sombra = '#0a1a3a') { const g = ctx.createRadialGradient(x - r * 0.4, y - r * 0.4, r * 0.1, x, y, r); g.addColorStop(0, '#ffffff'); g.addColorStop(0.3, color); g.addColorStop(1, sombra); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
+const DIBUJOS = {
+  anillo(x, y, f) {         // la base: red privada
+    ctx.strokeStyle = K.cian; ctx.lineWidth = 3; ctx.globalAlpha = f; ctx.beginPath(); ctx.ellipse(x, y, 120 * f, 46 * f, 0, 0, 7); ctx.stroke();
+    ctx.lineWidth = 1; ctx.setLineDash([6, 6]); for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse(x, y, (40 + i * 26) * f, (15 + i * 10) * f, 0, 0, 7); ctx.stroke(); } ctx.setLineDash([]);
+    for (let i = 0; i < 8; i++) { const a = i / 8 * 6.28 + est.t * 0.004; ctx.fillStyle = K.cian; ctx.fillRect(x + Math.cos(a) * 120 * f - 3, y + Math.sin(a) * 46 * f - 3, 6, 6); } ctx.globalAlpha = 1;
+  },
+  astillero(x, y, f) {      // donde corren los contenedores
+    ctx.globalAlpha = f; ctx.strokeStyle = '#9fb0e0'; ctx.lineWidth = 2; ctx.strokeRect(x - 90, y - 34, 180, 68);
+    for (let i = 0; i < 6; i++) { const on = (Math.floor(est.t / 30) + i) % 6 !== 0; ctx.fillStyle = on ? K.cian : K.ok; ctx.fillRect(x - 80 + i * 28, y - 20, 20 * f, 40 * f); }
+    ctx.fillStyle = '#9fb0e0'; ctx.fillRect(x - 100, y - 4, 200, 8); ctx.globalAlpha = 1;
+  },
+  bodega(x, y, f) {         // el registro de imágenes + la grúa del pipeline
+    ctx.globalAlpha = f; for (let i = 0; i < 9; i++) { ctx.fillStyle = ['#c98a54', '#a8703f', '#e0a36b'][i % 3]; ctx.fillRect(x - 60 + (i % 3) * 40, y - 10 - Math.floor(i / 3) * 26, 36, 22); }
+    ctx.strokeStyle = K.ok; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + 80, y + 20); ctx.lineTo(x + 80, y - 90); ctx.lineTo(x - 20, y - 90); ctx.stroke();
+    const g = (Math.sin(est.t * 0.03) + 1) / 2; ctx.beginPath(); ctx.moveTo(x - 20 + g * 60, y - 90); ctx.lineTo(x - 20 + g * 60, y - 60); ctx.stroke(); ctx.globalAlpha = 1;
+  },
+  boveda(x, y, f) {         // secretos
+    ctx.globalAlpha = f; ctx.fillStyle = '#1a2150'; ctx.beginPath(); ctx.arc(x, y, 52 * f, 0, 7); ctx.fill(); ctx.strokeStyle = K.oro; ctx.lineWidth = 3; ctx.stroke();
+    ctx.save(); ctx.translate(x, y); ctx.rotate(est.t * 0.01); for (let i = 0; i < 6; i++) { ctx.rotate(Math.PI / 3); ctx.fillStyle = K.oro; ctx.fillRect(18, -3, 22 * f, 6); } ctx.restore();
+    ctx.fillStyle = K.oro; ctx.beginPath(); ctx.arc(x, y, 9, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+  },
+  archivo(x, y, f) {        // el event store
+    ctx.globalAlpha = f; ctx.fillStyle = '#03040c'; ctx.beginPath(); ctx.arc(x, y, 44 * f, 0, 7); ctx.fill();
+    ctx.strokeStyle = K.ok; for (let i = 0; i < 4; i++) { ctx.globalAlpha = f * (0.8 - i * 0.15); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(x, y, (64 + i * 16) * f, (16 + i * 4) * f, -0.25 + Math.sin(est.t * 0.01) * 0.05, 0, 7); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  },
+  faro(x, y, f) {           // el frontend
+    ctx.globalAlpha = f; ctx.fillStyle = '#cfe9ff'; ctx.beginPath(); ctx.moveTo(x - 16, y + 50); ctx.lineTo(x + 16, y + 50); ctx.lineTo(x + 8, y - 40); ctx.lineTo(x - 8, y - 40); ctx.fill();
+    const a = est.t * 0.02; ctx.fillStyle = 'rgba(67,230,160,0.18)'; ctx.beginPath(); ctx.moveTo(x, y - 44); ctx.lineTo(x + Math.cos(a) * 260, y - 44 + Math.sin(a) * 80); ctx.lineTo(x + Math.cos(a + 0.25) * 260, y - 44 + Math.sin(a + 0.25) * 80); ctx.fill();
+    ctx.fillStyle = K.ok; ctx.beginPath(); ctx.arc(x, y - 46, 9, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+  },
+  portal(x, y, f) {         // Front Door
+    halo(x, y, 50 * f, '79,209,255', 0.35); ctx.globalAlpha = f;
+    for (let i = 0; i < 3; i++) { ctx.strokeStyle = i ? 'rgba(79,209,255,0.5)' : K.cian; ctx.lineWidth = i ? 2 : 4; ctx.beginPath(); ctx.ellipse(x, y, (34 + i * 14) * f, (70 + i * 18) * f, 0, 0, 7); ctx.stroke(); }
+    ctx.save(); ctx.translate(x, y); ctx.rotate(est.t * 0.03); ctx.setLineDash([3, 8]); ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.arc(0, 0, 22, 0, 7); ctx.stroke(); ctx.restore(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+  },
+  aduana(x, y, f) {         // el Gateway
+    ctx.save(); ctx.translate(x, y); ctx.rotate(est.t * 0.005); ctx.globalAlpha = f; ctx.strokeStyle = K.cian; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 0, 56 * f, 0, 7); ctx.stroke();
+    for (let i = 0; i < 8; i++) { ctx.rotate(Math.PI / 4); ctx.fillStyle = '#cfe9ff'; ctx.fillRect(50 * f, -5, 14, 10); } ctx.restore();
+    ctx.globalAlpha = f; ctx.fillStyle = '#163a66'; ctx.beginPath(); ctx.arc(x, y, 24 * f, 0, 7); ctx.fill(); ctx.strokeStyle = K.cian; ctx.stroke(); ctx.globalAlpha = 1;
+  },
+  estacion(x, y, f) {       // Control Plane
+    halo(x, y, 70 * f, '255,181,71', 0.45); ctx.globalAlpha = f; esfera(x, y, 46 * f, K.oro, '#8a3d10');
+    ctx.strokeStyle = 'rgba(255,181,71,0.45)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(x, y, 130 * f, 52 * f, 0, 0, 7); ctx.stroke();
+    for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28 + est.t * 0.006; esfera(x + Math.cos(a) * 130 * f, y + Math.sin(a) * 52 * f, 9 * f, K.oro, '#5a2a10'); } ctx.globalAlpha = 1;
+  },
+  hiperespacio(x, y, f) {   // la mensajería
+    halo(x, y, 40 * f, '180,140,255', 0.5); ctx.save(); ctx.translate(x, y); ctx.rotate(est.t * 0.03); ctx.globalAlpha = f; ctx.strokeStyle = K.lila; ctx.lineWidth = 3;
+    for (let i = 0; i < 4; i++) { ctx.rotate(Math.PI / 2); ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(46, -14, 40, 28); ctx.stroke(); } ctx.restore();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 7, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+  },
+  orbita(x, y, f) {         // RabbitMQ: rutas cortas dentro del producto
+    ctx.globalAlpha = f; ctx.strokeStyle = K.naranja; ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse(x, y, (30 + i * 22) * f, (12 + i * 9) * f, est.t * 0.004 * (i + 1), 0, 7); ctx.stroke(); }
+    for (let i = 0; i < 5; i++) { const a = est.t * 0.03 + i * 1.25; ctx.fillStyle = K.naranja; ctx.beginPath(); ctx.arc(x + Math.cos(a) * 52 * f, y + Math.sin(a) * 21 * f, 3, 0, 7); ctx.fill(); }
+    ctx.globalAlpha = 1;
+  },
+  pasaporte(x, y, f) {      // WorkOS: la identidad del usuario y de su tenant
+    ctx.globalAlpha = f; ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(est.t * 0.01) * 0.12);
+    ctx.fillStyle = '#1a2150'; ctx.strokeStyle = K.oro; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(-52 * f, -34 * f, 104 * f, 68 * f, 8); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = K.oro; ctx.beginPath(); ctx.arc(-26 * f, -2, 13 * f, 0, 7); ctx.fill();
+    ctx.fillStyle = '#98a0cf'; for (let i = 0; i < 3; i++) ctx.fillRect(-4, -14 + i * 12, 44 * f, 4);
+    ctx.restore(); ctx.globalAlpha = 1;
+  },
+  planetas(x, y, f) {       // los productos del Application Plane
+    const ps = [[-90, 10, 44, '#3fb6e8'], [70, -30, 34, '#5c8cff'], [120, 60, 26, '#4bc4b0']];
+    for (const [dx, dy, r, c] of ps) { halo(x + dx, y + dy, r * f, '79,209,255', 0.15); esfera(x + dx, y + dy, r * f, c); }
+    for (let i = 0; i < 4; i++) { const a = i * 1.6 + est.t * 0.008; esfera(x - 90 + Math.cos(a) * 70 * f, y + 10 + Math.sin(a) * 40 * f, 7 * f, '#8fdcff'); }
+  },
+  escudo(x, y, f) {         // hardening
+    ctx.globalAlpha = f * (0.5 + Math.sin(est.t * 0.05) * 0.15); ctx.strokeStyle = K.ok; ctx.lineWidth = 2; ctx.beginPath();
+    for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28; ctx.lineTo(x + Math.cos(a) * 70 * f, y + Math.sin(a) * 70 * f); } ctx.closePath(); ctx.stroke();
+    ctx.fillStyle = 'rgba(67,230,160,0.07)'; ctx.fill(); ctx.globalAlpha = 1;
+  },
+  observatorio(x, y, f) {   // métricas
+    ctx.globalAlpha = f; ctx.fillStyle = '#cfd6ff'; ctx.beginPath(); ctx.arc(x, y + 10, 34 * f, Math.PI, 0); ctx.fill();
+    ctx.save(); ctx.translate(x, y); ctx.rotate(-0.6 + Math.sin(est.t * 0.01) * 0.3); ctx.fillStyle = '#9fb0e0'; ctx.fillRect(-6, -40 * f, 12, 40 * f); ctx.restore();
+    ctx.strokeStyle = K.ok; ctx.lineWidth = 2; ctx.beginPath(); for (let i = 0; i < 12; i++) ctx.lineTo(x - 50 + i * 9, y + 50 - Math.abs(Math.sin(i * 0.9 + est.t * 0.02)) * 20); ctx.stroke(); ctx.globalAlpha = 1;
+  },
+};
+function dibujarSector(s) {
+  const [x, y] = P(s.x, s.y);
+  if (x < -400 || y < -400 || x > W + 400 || y > H + 400) return;
+  const hecho = est.hechos.has(s.id), libre = desbloqueado(s);
+  if (hecho) {
+    const n = est.nacimientos[s.id]; const f = n ? Math.min(1, (est.t - n) / 90) : 1;
+    DIBUJOS[s.estructura](x, y, f);
+    if (n && f < 1) for (let i = 0; i < 3; i++) est.chispas.push({ x: s.x + (azar() - 0.5) * 200, y: s.y + (azar() - 0.5) * 120, vx: (azar() - 0.5) * 2, vy: (azar() - 0.5) * 2, v: 40, c: K.oro });
+  } else {
+    // el plano (blueprint) del sector: punteado; brilla si está desbloqueado
+    ctx.strokeStyle = libre ? K.oro : '#2a3470'; ctx.globalAlpha = libre ? 0.5 + Math.sin(est.t * 0.06) * 0.3 : 0.6; ctx.setLineDash([5, 7]); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(x, y, 70, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+    if (libre) { ctx.beginPath(); ctx.arc(x, y, 70 + (est.t % 60), 0, 7); ctx.globalAlpha = 0.3 * (1 - (est.t % 60) / 60); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = libre ? K.oro : '#3a4480'; ctx.font = '700 26px "Chakra Petch", sans-serif'; ctx.textAlign = 'center'; ctx.fillText(libre ? '⬢' : '🔒', x, y + 9);
+  }
+  ctx.textAlign = 'center';
+  ctx.fillStyle = hecho ? K.texto : libre ? K.oro : '#5a64a0'; ctx.font = '700 13px "Chakra Petch", sans-serif';
+  ctx.fillText(`${SECTORES.indexOf(s) + 1} · ${s.nombre.toUpperCase()}`, x, y + 100);
+  ctx.fillStyle = K.tenue; ctx.font = '12px "Atkinson Hyperlegible", sans-serif';
+  ctx.fillText(hecho ? s.lema : libre ? 'acércate para construir' : 'bloqueado', x, y + 117);
+  ctx.textAlign = 'start';
+}
+// Las rutas entre sectores construidos (la plataforma conectándose)
+function rutas() {
+  for (const [a, b, c] of CONEXIONES) {
+    const A = SECTORES.find(s => s.id === a), B = SECTORES.find(s => s.id === b);
+    if (!A || !B || !est.hechos.has(a) || !est.hechos.has(b)) continue;
+    const [ax, ay] = P(A.x, A.y), [bx, by] = P(B.x, B.y);
+    ctx.strokeStyle = c; ctx.globalAlpha = 0.18; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.quadraticCurveTo((ax + bx) / 2, (ay + by) / 2 - 60, bx, by); ctx.stroke(); ctx.globalAlpha = 1;
+  }
+}
+
+// ══════════════════════ La nave y su astronauta ══════════════════════
+function dibujarNave() {
+  const n = est.nave, [x, y] = P(n.x, n.y);
+  ctx.save(); ctx.translate(x, y); ctx.rotate(n.ang + Math.PI / 2);
+  if (n.motor) { const l = 14 + Math.random() * 10; const g = ctx.createLinearGradient(0, 14, 0, 14 + l); g.addColorStop(0, '#fff'); g.addColorStop(0.4, K.oro); g.addColorStop(1, 'rgba(255,77,109,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(-6, 12); ctx.lineTo(6, 12); ctx.lineTo(0, 14 + l); ctx.fill(); }
+  ctx.fillStyle = '#dfe7ff'; ctx.beginPath(); ctx.moveTo(0, -22); ctx.quadraticCurveTo(12, -6, 11, 14); ctx.lineTo(-11, 14); ctx.quadraticCurveTo(-12, -6, 0, -22); ctx.fill();
+  ctx.fillStyle = K.cian; ctx.beginPath(); ctx.moveTo(-11, 4); ctx.lineTo(-20, 16); ctx.lineTo(-10, 14); ctx.fill(); ctx.beginPath(); ctx.moveTo(11, 4); ctx.lineTo(20, 16); ctx.lineTo(10, 14); ctx.fill();
+  // la cabina con el astronauta (casco blanco, visor dorado)
+  ctx.fillStyle = '#0c1a3a'; ctx.beginPath(); ctx.arc(0, -6, 6.5, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0, -6, 4.6, 0, 7); ctx.fill();
+  ctx.fillStyle = K.oro; ctx.beginPath(); ctx.ellipse(0, -5.4, 3, 2.1, 0, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function moverNave() {
+  const n = est.nave, k = est.teclas, empuje = 0.22, giro = 0.065;
+  let manual = false;
+  if (k.ArrowLeft || k.a) { n.ang -= giro; manual = true; }
+  if (k.ArrowRight || k.d) { n.ang += giro; manual = true; }
+  n.motor = !!(k.ArrowUp || k.w);
+  if (k.ArrowDown || k.s) { n.vx *= 0.93; n.vy *= 0.93; manual = true; }
+  if (n.motor || manual) est.destino = null;
+  if (est.destino) {        // piloto automático: gira hacia el destino y acelera
+    const dx = est.destino.x - n.x, dy = est.destino.y - n.y, d = Math.hypot(dx, dy);
+    const objetivo = Math.atan2(dy, dx); let dif = ((objetivo - n.ang + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+    n.ang += Math.max(-giro, Math.min(giro, dif));
+    n.motor = d > 60 && Math.abs(dif) < 0.9;
+    if (d < 60) { n.vx *= 0.9; n.vy *= 0.9; if (d < 20) est.destino = null; }
+  }
+  if (n.motor) { n.vx += Math.cos(n.ang) * empuje; n.vy += Math.sin(n.ang) * empuje; }
+  n.vx *= 0.985; n.vy *= 0.985; const v = Math.hypot(n.vx, n.vy); if (v > 7) { n.vx *= 7 / v; n.vy *= 7 / v; }
+  n.x += n.vx; n.y += n.vy;
+  n.x = Math.max(-2600, Math.min(2600, n.x)); n.y = Math.max(-1800, Math.min(1800, n.y));
+  est.cam.x += (n.x - est.cam.x) * 0.08; est.cam.y += (n.y - est.cam.y) * 0.08;
+  // ¿llegó a un sector desbloqueado y sin construir?
+  if (!est.abierto) for (const s of SECTORES) if (!est.hechos.has(s.id) && desbloqueado(s) && Math.hypot(s.x - n.x, s.y - n.y) < 70) { abrirConsola(s); break; }
+}
+
+// ══════════════════════ Naves de tráfico (la prueba de cada sector) ══════════════════════
+function lanzar(ruta, color) {
+  const pts = ruta.map(id => { const s = SECTORES.find(x => x.id === id); return [s.x + (azar() - 0.5) * 30, s.y + (azar() - 0.5) * 30]; });
+  if (pts.length > 1) est.naves.push({ pts, color, t: 0 });
+}
+function moverTrafico() {
+  est.naves = est.naves.filter(nv => {
+    const tramos = nv.pts.length - 1, prog = nv.t / (tramos * 110); if (prog >= 1) return false;
+    const i = Math.min(tramos - 1, Math.floor(prog * tramos)), f = prog * tramos - i;
+    const [ax, ay] = nv.pts[i], [bx, by] = nv.pts[i + 1];
+    const mx = (ax + bx) / 2, my = (ay + by) / 2 - 60, u = 1 - f;
+    const x = u * u * ax + 2 * u * f * mx + f * f * bx, y = u * u * ay + 2 * u * f * my + f * f * by;
+    nv.estela = nv.estela || []; nv.estela.push([x, y]); if (nv.estela.length > 14) nv.estela.shift();
+    nv.estela.forEach(([ex, ey], k) => { const [sx, sy] = P(ex, ey); ctx.globalAlpha = k / 14 * 0.6; ctx.fillStyle = nv.color; ctx.beginPath(); ctx.arc(sx, sy, 1 + k / 7, 0, 7); ctx.fill(); });
+    const [sx, sy] = P(x, y); ctx.globalAlpha = 1; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(sx, sy, 3, 0, 7); ctx.fill();
+    nv.t++; return true;
+  });
+}
+function chispas() {
+  est.chispas = est.chispas.filter(c => { c.x += c.vx; c.y += c.vy; c.v--; const [x, y] = P(c.x, c.y); ctx.globalAlpha = c.v / 40; ctx.fillStyle = c.c; ctx.fillRect(x, y, 2, 2); ctx.globalAlpha = 1; return c.v > 0; });
+}
+
+// ══════════════════════ Minimapa y COSMO ══════════════════════
+const mapa = $('mapa'), mctx = mapa.getContext('2d');
+function minimapa() {
+  mctx.clearRect(0, 0, 360, 260); const k = 360 / 5600;
+  const m = (x, y) => [(x + 2800) * k, (y + 1950) * (260 / 3900)];
+  for (const s of SECTORES) {
+    const [x, y] = m(s.x, s.y); const hecho = est.hechos.has(s.id);
+    mctx.fillStyle = hecho ? K.ok : desbloqueado(s) ? K.oro : '#3a4480'; mctx.beginPath(); mctx.arc(x, y, hecho ? 6 : 5, 0, 7); mctx.fill();
+  }
+  const [nx, ny] = m(est.nave.x, est.nave.y); mctx.fillStyle = '#fff'; mctx.beginPath(); mctx.arc(nx, ny, 5, 0, 7); mctx.fill();
+  mctx.strokeStyle = K.cian; mctx.lineWidth = 2; mctx.beginPath(); mctx.arc(nx, ny, 9 + Math.sin(est.t * 0.1) * 2, 0, 7); mctx.stroke();
+}
+const cara = $('cara'), cctx = cara.getContext('2d');
+function dibujarCosmo() {   // el copiloto: un robot redondo que parpadea
+  cctx.clearRect(0, 0, 108, 108); cctx.fillStyle = '#dfe7ff'; cctx.beginPath(); cctx.arc(54, 58, 38, 0, 7); cctx.fill();
+  cctx.fillStyle = '#0c1a3a'; cctx.beginPath(); cctx.roundRect(26, 40, 56, 32, 14); cctx.fill();
+  const ojo = Math.floor(est.t / 8) % 40 === 0 ? 1 : 7; cctx.fillStyle = K.cian;
+  cctx.beginPath(); cctx.ellipse(42, 56, 6, ojo, 0, 0, 7); cctx.fill(); cctx.beginPath(); cctx.ellipse(66, 56, 6, ojo, 0, 0, 7); cctx.fill();
+  cctx.strokeStyle = K.oro; cctx.lineWidth = 3; cctx.beginPath(); cctx.moveTo(54, 20); cctx.lineTo(54, 8); cctx.stroke(); cctx.fillStyle = K.oro; cctx.beginPath(); cctx.arc(54, 7, 5, 0, 7); cctx.fill();
+}
+function decir(texto, tecla = '') { $('radio-texto').textContent = texto; $('radio-tecla').textContent = tecla; }
+
+// ══════════════════════ La consola de construcción ══════════════════════
+const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const ETAPAS = ['Briefing', 'Predice', 'Ensambla', 'Construye', 'Prueba', 'Bitácora'];
+function abrirConsola(s) {
+  est.abierto = s; est.etapa = 0; est.nave.vx *= 0.2; est.nave.vy *= 0.2; est.destino = null; est.elegidas = new Set();
+  $('consola').hidden = false; pintarEtapa();
+}
+function cerrarConsola() {
+  $('consola').hidden = true; const s = est.abierto; est.abierto = null;
+  if (s && !est.hechos.has(s.id)) { est.nave.x = s.x; est.nave.y = s.y + 170; est.nave.vx = 0; est.nave.vy = 0; }
+}
+function cabecera(s) {
+  return `<header><span class="sector">Sector ${SECTORES.indexOf(s) + 1} de ${SECTORES.length} · ${s.taller}</span><h2>${s.nombre}</h2></header>
+    <div class="etapas">${ETAPAS.map((e, i) => `<i class="${i < est.etapa ? 'hecha' : i === est.etapa ? 'ahora' : ''}" title="${e}"></i>`).join('')}</div>
+    <h3>${ETAPAS[est.etapa]}</h3>`;
+}
+function pintarEtapa() {
+  const s = est.abierto, caja = $('caja');
+  let cuerpo = '', siguienteTxt = 'Siguiente ›', bloquear = false;
+  switch (est.etapa) {
+    case 0: cuerpo = `<p>${esc(s.briefing)}</p>`; siguienteTxt = 'A la consola ›'; break;
+    case 1: cuerpo = `<p><strong>${esc(s.prediccion.pregunta)}</strong></p><div class="opciones">${s.prediccion.opciones.map(([t], i) => `<button data-o="${i}">${esc(t)}</button>`).join('')}</div><div class="nota" id="nota"></div>`; bloquear = true; break;
+    case 2: cuerpo = `<p>${esc(s.ensamblaje.instruccion)}</p><div class="piezas">${s.ensamblaje.piezas.map((p, i) => `<button class="pieza" data-p="${i}"><b>${esc(p[0])}</b><span>${esc(p[1])}</span></button>`).join('')}</div><div class="nota" id="nota">Elige las ${s.ensamblaje.piezas.filter(p => p[2]).length} piezas que necesita este sector.</div>`; bloquear = true; break;
+    case 3: cuerpo = `<p>${esc(s.construye)}</p>`; siguienteTxt = 'Construir ⬢'; break;
+    case 4: cuerpo = `<p>${esc(s.prueba.texto)}</p><p class="nota">Las naves de prueba ya están volando por lo que construiste.</p>`; break;
+    case 5: cuerpo = `<p>${esc(s.aprendiste)}</p>${s.codigo ? `<pre>${s.codigo.replace(/</g, '&lt;')}</pre>` : ''}<p class="fuente">${esc(s.fuente)}</p>`; siguienteTxt = 'Volver a la nave ✓'; break;
+  }
+  caja.innerHTML = cabecera(s) + cuerpo + `<div class="acciones">${est.etapa === 0 ? '<button class="boton" id="c-salir">Ahora no</button>' : ''}<button class="boton oro" id="c-sig" ${bloquear ? 'disabled' : ''}>${siguienteTxt}</button></div>`;
+  $('c-sig').onclick = avanzar; if ($('c-salir')) $('c-salir').onclick = cerrarConsola;
+  if (est.etapa === 1) caja.querySelectorAll('[data-o]').forEach(b => b.onclick = () => {
+    const i = +b.dataset.o, [, ok, fb] = s.prediccion.opciones[i];
+    caja.querySelectorAll('[data-o]').forEach((x, j) => { x.disabled = true; if (s.prediccion.opciones[j][1]) x.classList.add('bien'); });
+    if (!ok) b.classList.add('mal'); else ganar(3);
+    $('nota').className = 'nota ' + (ok ? 'bien' : 'mal'); $('nota').innerHTML = `<b>${ok ? '+3 ★ Bien.' : 'No.'}</b> ${esc(fb)}`;
+    $('c-sig').disabled = false;
+  });
+  if (est.etapa === 2) {
+    const total = s.ensamblaje.piezas.filter(p => p[2]).length; let errores = 0;
+    caja.querySelectorAll('[data-p]').forEach(b => b.onclick = () => {
+      const [nombre, , ok, porque] = s.ensamblaje.piezas[+b.dataset.p];
+      b.disabled = true;
+      if (ok) { b.classList.add('elegida'); est.elegidas.add(nombre); }
+      else { b.classList.add('rechazada'); b.querySelector('span').textContent = porque; errores++; }
+      const listo = est.elegidas.size === total;
+      $('nota').className = 'nota ' + (ok ? 'bien' : 'mal');
+      $('nota').innerHTML = ok ? `<b>Encaja.</b> ${esc(porque)}` : `<b>No encaja.</b> ${esc(porque)}`;
+      if (listo) { const premio = Math.max(1, 3 - errores); ganar(premio); $('nota').innerHTML += ` <b>Ensamblaje completo: +${premio} ★</b>`; $('c-sig').disabled = false; caja.querySelectorAll('[data-p]').forEach(x => x.disabled = true); }
+    });
+  }
+}
+function ganar(n) { est.estrellas += n; hud(); guardar(); }
+function avanzar() {
+  const s = est.abierto;
+  if (est.etapa === 3) {   // construir: la estructura nace en el espacio
+    est.hechos.add(s.id); est.nacimientos[s.id] = est.t; guardar(); hud();
+    $('consola').hidden = true; est.etapa = 4;
+    decir(s.radioConstruido, '');
+    setTimeout(() => { for (let i = 0; i < 4; i++) setTimeout(() => lanzar(s.prueba.ruta, s.prueba.color), i * 500); $('consola').hidden = false; pintarEtapa(); }, 1700);
+    return;
+  }
+  if (est.etapa === 5) { cerrarConsola(); const sig = siguiente(); decir(sig ? `Listo. El siguiente sector es «${sig.nombre}». Pulsa «Rumbo al siguiente» o vuela tú.` : '¡Construiste toda la plataforma! Vuela por ella y mira el tráfico de verdad.', sig ? 'Flechas o WASD para pilotar · clic en el espacio para ir ahí' : ''); return; }
+  est.etapa++; pintarEtapa();
+}
+
+// ══════════════════════ HUD y bitácora ══════════════════════
+function hud() {
+  $('h-sectores').textContent = `${est.hechos.size}/${SECTORES.length}`;
+  $('h-barra').style.width = (est.hechos.size / SECTORES.length * 100) + '%';
+  $('h-estrellas').textContent = est.estrellas;
+}
+$('b-rumbo').onclick = () => { const s = siguiente(); if (s) { est.destino = { x: s.x, y: s.y }; decir(`Fijando rumbo a «${s.nombre}». Piloto automático.`, 'Cualquier tecla de dirección te devuelve el control'); } };
+$('b-bitacora').onclick = () => {
+  est.abierto = { bitacora: true }; $('consola').hidden = false;
+  $('caja').innerHTML = `<header><span class="sector">Bitácora del astronauta</span><h2>La plataforma, sector por sector</h2></header>
+    <div class="bitacora">${SECTORES.map((s, i) => `<div class="fila ${est.hechos.has(s.id) ? 'hecho' : ''}"><span class="num">${est.hechos.has(s.id) ? '✓' : i + 1}</span><div>${s.nombre}<small>${s.taller} · ${s.lema}</small></div>
+      <button class="boton" data-ir="${s.id}" ${desbloqueado(s) ? '' : 'disabled'}>${est.hechos.has(s.id) ? 'Repasar' : 'Ir'}</button></div>`).join('')}</div>
+    <div class="acciones"><button class="boton" id="c-reiniciar">Reiniciar misión</button><button class="boton oro" id="c-cerrar">Cerrar</button></div>`;
+  $('c-cerrar').onclick = () => { $('consola').hidden = true; est.abierto = null; };
+  $('c-reiniciar').onclick = () => { est.hechos.clear(); est.estrellas = 0; guardar(); hud(); $('consola').hidden = true; est.abierto = null; est.nave.x = 0; est.nave.y = 260; decir(INTRO); };
+  $('caja').querySelectorAll('[data-ir]').forEach(b => b.onclick = () => {
+    const s = SECTORES.find(x => x.id === b.dataset.ir); $('consola').hidden = true; est.abierto = null;
+    if (est.hechos.has(s.id)) { est.nave.x = s.x; est.nave.y = s.y + 150; abrirConsola(s); est.etapa = 5; pintarEtapa(); }
+    else est.destino = { x: s.x, y: s.y };
+  });
+};
+
+// ══════════════════════ Entrada ══════════════════════
+addEventListener('keydown', e => { if (!$('consola').hidden) { if (e.key === 'Escape' && est.abierto?.bitacora) { $('consola').hidden = true; est.abierto = null; } return; } est.teclas[e.key.length === 1 ? e.key.toLowerCase() : e.key] = true; if (e.key.startsWith('Arrow') || e.key === ' ') e.preventDefault(); });
+addEventListener('keyup', e => { est.teclas[e.key.length === 1 ? e.key.toLowerCase() : e.key] = false; });
+lienzo.addEventListener('pointerdown', e => { est.destino = { x: e.clientX - W / 2 + est.cam.x, y: e.clientY - H / 2 + est.cam.y }; });
+
+// ══════════════════════ Bucle ══════════════════════
+let ultimoTrafico = 0;
+function cuadro() {
+  est.t++;
+  fondo(); rutas();
+  SECTORES.forEach(dibujarSector);
+  if (est.destino) { const [x, y] = P(est.destino.x, est.destino.y); ctx.strokeStyle = K.cian; ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.arc(x, y, 10 + Math.sin(est.t * 0.15) * 3, 0, 7); ctx.stroke(); ctx.globalAlpha = 1; }
+  if (est.t - ultimoTrafico > 50 && est.naves.length < 18) {   // tráfico ambiente por lo ya construido
+    const vivas = TRAFICO.filter(r => r[0].every(id => est.hechos.has(id)));
+    if (vivas.length) { const [r, c] = vivas[Math.floor(azar() * vivas.length)]; lanzar(r, c); } ultimoTrafico = est.t;
+  }
+  moverTrafico(); chispas();
+  if ($('consola').hidden) moverNave();
+  dibujarNave(); minimapa(); dibujarCosmo();
+  requestAnimationFrame(cuadro);
+}
+
+// ══════════════════════ CONTENIDO ══════════════════════
+// Fuente: los repos de Cosmos-SincoERP (ObligacionesPorPagar.*, .github, blog-ingenieria), leídos el 5 oct 2026.
+// Lo que esos repos no muestran va marcado «por confirmar».
+const FUENTE_REPOS = 'Fuente: repos de Cosmos-SincoERP leídos el 5 oct 2026';
+SECTORES.push(
+{ id: 'base', nombre: 'La base', lema: 'infraestructura como código', taller: 'Lab 1', estructura: 'anillo', x: 0, y: 0,
+  briefing: 'Antes de lanzar nada, necesitas un lugar donde existir: una suscripción de Azure, grupos de recursos y una red. Y nadie quiere crearlos a mano en el portal, porque mañana nadie sabría cómo se crearon. En Cosmos, cada bounded context describe su infraestructura en Terraform, en un repo propio.',
+  prediccion: { pregunta: 'Producción y desarrollo de Cosmos, ¿dónde viven?', opciones: [
+    ['En la misma suscripción, con nombres distintos', false, 'Prod vive en una suscripción propia: un error en dev no puede tocarla.'],
+    ['En suscripciones separadas', true, 'Sí: prod tiene su propia suscripción (ADR-0003 de .github).'],
+    ['Prod en Azure y dev en las laptops', false, 'Dev también vive en Azure, con sus propias VMs y Key Vault.']] },
+  ensamblaje: { instruccion: 'Arma la base. ¿Qué piezas la componen?', piezas: [
+    ['Repo *.Infraestructura con Terraform', 'Cada bounded context declara su infraestructura como código.', true, 'La infraestructura se revisa en PRs como cualquier código.'],
+    ['Estado remoto de Terraform', 'Un storage account por BC guarda el tfstate (sttfstate<bc>eus2001).', true, 'El estado vive en Azure, no en la laptop de nadie, ni en el repo.'],
+    ['Login de Terraform con OIDC', 'El runner hospedado de GitHub entra a Azure sin secretos guardados.', true, 'Federated credentials: no hay clave que robar.'],
+    ['Crear la red a mano en el portal', 'Clic, clic, clic.', false, 'Nadie podría reproducirla ni saber quién la cambió.']] },
+  construye: 'Aplicas el Terraform: aparece el anillo base, con su red y sus subredes. Todo lo que construyas después se apoya aquí.',
+  radioConstruido: 'Base en órbita. Desde aquí lanzaremos todo lo demás.',
+  prueba: { texto: 'Un plan de Terraform recorre la base y no encuentra cambios: lo que existe es exactamente lo que dice el código.', ruta: ['base', 'base'], color: K.cian },
+  aprendiste: 'La infraestructura de Cosmos es código: un repo *.Infraestructura por bounded context, estado remoto por BC y Terraform autenticado por OIDC, con prod en otra suscripción.',
+  codigo: 'uses: Cosmos-SincoERP/.github/.github/workflows/_reusable-terraform-apply.yml@v1\n# backend: sttfstate<bc>eus2001 · auth: OIDC',
+  fuente: FUENTE_REPOS + ' · .github/workflows/README.md, adr/0003. Los repos *.Infraestructura no estuvieron accesibles: red y NSG, por confirmar.' },
+
+{ id: 'astillero', nombre: 'El astillero', lema: 'Docker Swarm, una VM por BC', taller: 'Lab 2-3', estructura: 'astillero', x: 480, y: -260,
+  briefing: 'Tus servicios necesitan dónde correr y alguien que los levante si se caen. En Cosmos cada bounded context tiene su propia VM con Docker Swarm, por entorno: OXP dev, OXP prod, Impuestos, Contabilidad… Swarm compara lo que pediste con lo que hay, y corrige.',
+  prediccion: { pregunta: 'Un contenedor de Radicación se cae a las 3 a. m. ¿Qué pasa?', opciones: [
+    ['Queda caído hasta que alguien entre a la VM', false, 'Eso pasaría con contenedores sueltos.'],
+    ['Swarm lo vuelve a levantar', true, 'Sí: el servicio pide 1 réplica; si hay 0, Swarm arranca otra.']] },
+  ensamblaje: { instruccion: 'Arma el astillero de Obligaciones por Pagar.', piezas: [
+    ['Un stack de Swarm por producto', 'Todos los servicios de OXP en el stack obligaciones-por-pagar.', true, 'Se despliega con docker stack deploy.'],
+    ['Redes overlay oxp-public y oxp-internal', 'Las crea el cloud-init de la VM.', true, 'payment-polling solo vive en la interna: no se expone.'],
+    ['Actualización start-first con rollback', 'Arranca la versión nueva antes de bajar la vieja.', true, 'Si la nueva falla, Swarm vuelve a la anterior.'],
+    ['Un clúster compartido por todos los productos', 'Una sola VM gigante.', false, 'Cosmos aísla por bounded context: una VM por BC y entorno.']] },
+  construye: 'El astillero se arma y los primeros servicios encienden sus luces. Hoy es un solo nodo con una réplica por servicio; la documentación planea tres nodos en prod.',
+  radioConstruido: 'Astillero encendido. Ojo: es un solo nodo. Si la VM cae, cae todo el producto.',
+  prueba: { texto: 'Matas un contenedor y Swarm lo relanza: las luces se apagan y vuelven a encender.', ruta: ['astillero', 'base', 'astillero'], color: K.ok },
+  aprendiste: 'Cada bounded context corre en su propia VM con Docker Swarm, por entorno. Swarm mantiene las réplicas pedidas y hace rollback. Hoy son un nodo y una réplica, sin alta disponibilidad.',
+  codigo: 'docker stack deploy --with-registry-auth -c deploy/stack.prod.yml obligaciones-por-pagar\n# deploy: { replicas: 1, update_config: { order: start-first, failure_action: rollback } }',
+  fuente: FUENTE_REPOS + ' · */deploy/stack.prod.yml, _reusable-deploy-swarm.yml' },
+
+{ id: 'bodega', nombre: 'La bodega y la grúa', lema: 'ACR + GitHub Actions', taller: 'Lab 4-5', estructura: 'bodega', x: 960, y: -60,
+  briefing: 'Cada cambio tiene que convertirse en una imagen, guardarse y llegar al astillero sin que nadie copie archivos a mano. La grúa es un runner de GitHub dentro de la VM; la bodega, un Azure Container Registry por bounded context.',
+  prediccion: { pregunta: 'Para desplegar en producción, ¿se vuelve a compilar la imagen?', opciones: [
+    ['Sí, se compila de nuevo desde main', false, 'Entonces lo que va a prod no sería lo que probaste en dev.'],
+    ['No: prod promueve la misma imagen que corre en dev', true, 'Sí: prod lee el tag que tiene dev y despliega esa misma imagen.']] },
+  ensamblaje: { instruccion: 'Arma la cadena de entrega.', piezas: [
+    ['Workflows reusables de Cosmos-SincoERP/.github', 'tests, build-push, deploy-swarm, deploy-front, cleanup-acr.', true, 'Todos los repos usan la misma cadena, versionada (@v1).'],
+    ['Runner self-hosted en la VM', 'Build, push y deploy corren dentro de la red, por runner group de cada BC.', true, 'GitHub no entra a la VM: el runner sale hacia GitHub.'],
+    ['Tags pr-N-<sha> y main-<sha>', 'Cada imagen dice de qué commit salió.', true, 'Así prod puede promover exactamente lo que se probó.'],
+    ['Aprobación para prod', 'workflow_dispatch sobre main, solo el team prod-infra-approvers.', true, 'Nadie despliega a prod por accidente.'],
+    ['Un ACR público en Docker Hub', 'Más fácil de compartir.', false, 'Las imágenes del ERP no son públicas: cada BC tiene su ACR privado.']] },
+  construye: 'La grúa empieza a mover cajas: build → push al ACR → deploy al astillero.',
+  radioConstruido: 'Cadena de entrega lista. Dato curioso: prod descarga del ACR de dev, a propósito.',
+  prueba: { texto: 'Un merge a main sale de la bodega como imagen y aterriza en el astillero.', ruta: ['bodega', 'astillero'], color: K.ok },
+  aprendiste: 'CI/CD con workflows reusables y runner self-hosted en la VM, un ACR por BC, imágenes con el sha del commit, y promoción a prod de la misma imagen con aprobación del team prod-infra-approvers.',
+  codigo: 'runs-on: [self-hosted, azure, swarm-deploy]\naz login --identity && az acr login -n croxpdeveus2001',
+  fuente: FUENTE_REPOS + ' · .github/workflows, main-deploy-prod.yml, adr/0003' },
+
+{ id: 'boveda', nombre: 'La bóveda', lema: 'Key Vault → Swarm secrets', taller: 'Lab 4', estructura: 'boveda', x: 1320, y: -420,
+  briefing: 'Los servicios necesitan claves: la base, RabbitMQ, Service Bus, Storage, OpenAI. Si van en appsettings, viven para siempre en git y en la imagen. En Cosmos viven en un Key Vault por entorno y llegan al contenedor como Swarm secrets.',
+  prediccion: { pregunta: 'La VM necesita leer el Key Vault. ¿Con qué se identifica?', opciones: [
+    ['Con un usuario y contraseña guardados en la VM', false, 'Esa contraseña sería otro secreto que proteger.'],
+    ['Con la Managed Identity de la VM', true, 'Sí: az login --identity, y la VM tiene el rol Key Vault Secrets User.']] },
+  ensamblaje: { instruccion: 'Arma el camino de un secreto.', piezas: [
+    ['Key Vault por entorno', 'kv-oxp-dev-eus2-001 y kv-oxp-prod-eus2-001.', true, 'Dev y prod no comparten secretos.'],
+    ['Swarm secret versionado por hash', 'El deploy crea <prefix>_<nombre>_v<sha8> y limpia los huérfanos.', true, 'Cambiar un secreto crea uno nuevo: no hay que reiniciar a mano.'],
+    ['Lectura con AddKeyPerFile', 'La app lee los archivos de /run/secrets.', true, 'El secreto nunca pasa por una variable de entorno visible.'],
+    ['El secreto en appsettings.json', 'Cómodo para probar.', false, 'Queda en git y en la imagen del ACR. La auditoría encontró casos así: hay que rotarlos.']] },
+  construye: 'La bóveda gira y se sella. Cada servicio recibe solo los secretos que necesita.',
+  radioConstruido: 'Bóveda sellada. Pendiente de la vida real: rotar las credenciales que quedaron versionadas en dos repos.',
+  prueba: { texto: 'Un deploy pide sus secretos a la bóveda y los monta en el astillero.', ruta: ['boveda', 'bodega', 'astillero'], color: K.oro },
+  aprendiste: 'Los secretos viven en un Key Vault por entorno. El job de deploy los lee con la identidad de la VM y los convierte en Swarm secrets versionados por hash, que la app lee de /run/secrets.',
+  codigo: 'az keyvault secret show --vault-name kv-oxp-dev-eus2-001 --name pg-cs-radicaciondb\n# → docker secret create radicacion_pg_cs_radicaciondb_v<sha8>\nbuilder.Configuration.AddKeyPerFile("/run/secrets")',
+  fuente: FUENTE_REPOS + ' · _reusable-deploy-swarm.yml, Radicacion Program.cs' },
+
+{ id: 'archivo', nombre: 'El Archivo', lema: 'Postgres + Marten', taller: 'Lab 6', estructura: 'archivo', x: 980, y: -800,
+  briefing: 'Los contenedores son efímeros; los hechos no. Cada servicio guarda su diario de eventos con Marten en Postgres: una base por servicio. Y todos los clientes comparten tablas, separados por tenant_id.',
+  prediccion: { pregunta: 'Ferretería Sur y Constructora Andes usan Radicación. ¿Dónde están sus datos?', opciones: [
+    ['En bases separadas, una por cliente', false, 'Eso sería «base por tenant». El código usa otro modelo.'],
+    ['En las mismas tablas, separados por tenant_id', true, 'Sí: Marten en modo Conjoined. La decisión formal (ADR-0001) sigue pendiente.']] },
+  ensamblaje: { instruccion: 'Arma el Archivo.', piezas: [
+    ['Una base por servicio', 'pg-cs-radicaciondb, pg-cs-entradasdb…', true, 'Cada bounded context es dueño de sus datos.'],
+    ['Marten con TenancyStyle.Conjoined', 'Eventos y documentos llevan tenant_id.', true, 'Un tenant nuevo empieza a escribir sin aprovisionar nada.'],
+    ['Outbox durable de Wolverine', 'Los mensajes salen en la misma transacción del hecho.', true, 'Nunca hay un hecho sin su mensaje, ni un mensaje sin su hecho.'],
+    ['Una base compartida entre BCs', 'Menos conexiones.', false, 'Acoplaría los bounded contexts por la base.']] },
+  construye: 'El Archivo empieza a girar: cada hecho que entra se queda, en orden, con su tenant.',
+  radioConstruido: 'Archivo en línea. Si el tenant viniera de un header falso, se leerían datos de otro cliente: por eso importa la aduana.',
+  prueba: { texto: 'Los servicios del astillero escriben sus hechos en el Archivo.', ruta: ['astillero', 'archivo'], color: K.ok },
+  aprendiste: 'Una base Postgres por servicio, Marten en modo Conjoined (todos los tenants en las mismas tablas, separados por tenant_id) y el outbox de Wolverine en la misma base.',
+  codigo: 'opts.Events.TenancyStyle = TenancyStyle.Conjoined;\nopts.Policies.AllDocumentsAreMultiTenanted();',
+  fuente: FUENTE_REPOS + ' · Entradas ServicesCollectionExtensions.cs. Que sea PostgreSQL Flexible lo dice la documentación; en código, por confirmar.' },
+
+{ id: 'planetas', nombre: 'Los planetas', lema: 'los productos y sus bounded contexts', taller: 'Lab 3', estructura: 'planetas', x: 380, y: -980,
+  briefing: 'Ahora sí, los productos. Obligaciones por Pagar es un planeta con lunas: Entradas recibe documentos, Reconocimiento los lee, Radicación radica las obligaciones. Cada uno separa su API de comandos de su API de consultas.',
+  prediccion: { pregunta: 'Radicación tiene radicacion-comandos-api y radicacion-consultas-api. ¿Por qué dos?', opciones: [
+    ['Porque una es de dev y otra de prod', false, 'Las dos corren en cada entorno.'],
+    ['Escribir y leer son modelos distintos (CQRS)', true, 'Sí: comandos escribe hechos; consultas lee proyecciones.']] },
+  ensamblaje: { instruccion: 'Lanza los servicios de Obligaciones por Pagar.', piezas: [
+    ['entradas-api', 'Hace polling a Sinco y publica cada documento.', true, 'Es la puerta de los documentos.'],
+    ['reconocimiento-comandos/consultas', 'Extrae datos con Document Intelligence.', true, 'Event sourcing con Marten.'],
+    ['radicacion-comandos/consultas', 'Radica la obligación.', true, 'Más un payment-polling, solo en la red interna.'],
+    ['Servidores MCP', 'radicacion-*-mcp-server para el Asistente.', true, 'El Asistente usa herramientas de cada BC.'],
+    ['Un monolito con todo junto', 'Un solo despliegue.', false, 'Cada BC se despliega y escala por su cuenta.']] },
+  construye: 'Los planetas aparecen en órbita, cada uno con sus lunas.',
+  radioConstruido: 'Productos en órbita. Cada luna escucha en el puerto 8080 dentro del astillero.',
+  prueba: { texto: 'Los servicios arrancan en el astillero y empiezan a escribir en el Archivo.', ruta: ['astillero', 'planetas', 'archivo'], color: K.cian },
+  aprendiste: 'Obligaciones por Pagar son varios bounded contexts (Entradas, Reconocimiento, Radicación, Integraciones), cada uno con APIs de comandos y de consultas, más servidores MCP para el Asistente.',
+  codigo: 'radicacion-comandos-api · radicacion-consultas-api · radicacion-payment-polling (oxp-internal)\nreconocimiento-comandos-api · reconocimiento-consultas-api · entradas-api',
+  fuente: FUENTE_REPOS + ' · Radicacion/deploy/stack.prod.yml' },
+
+{ id: 'orbita', nombre: 'La órbita local', lema: 'RabbitMQ dentro del producto', taller: 'Lab 9', estructura: 'orbita', x: -180, y: -700,
+  briefing: 'Entradas recibe un documento y Radicación tiene que enterarse. Si Entradas la llamara por HTTP y Radicación estuviera caída, el documento se perdería. Dentro del producto, los mensajes viajan por RabbitMQ con Wolverine.',
+  prediccion: { pregunta: 'En la siguiente vuelta del polling, Entradas publica el mismo documento otra vez. ¿Qué debería pasar?', opciones: [
+    ['Radicación lo radica dos veces', false, 'Una obligación duplicada puede terminar en un pago doble.'],
+    ['Radicación lo reconoce por su clave de negocio y lo ignora', true, 'Sí: idempotencia. La auditoría encontró que hoy falta (accionable T2).']] },
+  ensamblaje: { instruccion: 'Conecta Entradas con Radicación.', piezas: [
+    ['Un exchange por servicio', 'Entradas publica en su exchange.', true, 'Wolverine lo crea con AutoProvision.'],
+    ['La cola Radicacion-From-EntradasExchange', 'Radicación escucha lo que publica Entradas.', true, 'Si Radicación cae, los mensajes esperan en la cola.'],
+    ['Idempotencia por clave de negocio', 'Documento de Sinco + tipo de fuente.', true, 'Un mensaje puede llegar dos veces; el efecto debe ocurrir una.'],
+    ['Llamada HTTP de Entradas a Radicación', 'Directo y rápido.', false, 'Si Radicación está caída, se pierde el documento.']] },
+  construye: 'La órbita local empieza a girar entre las lunas del planeta.',
+  radioConstruido: 'Órbita local activa. Recuerda: idempotencia por clave de negocio, todavía pendiente en el código real.',
+  prueba: { texto: 'Un documento viaja de Entradas a Radicación por la órbita local.', ruta: ['planetas', 'orbita', 'planetas'], color: K.naranja },
+  aprendiste: 'Dentro de un producto, los bounded contexts se hablan por RabbitMQ con Wolverine: exchanges por servicio, colas por consumidor, outbox durable. La idempotencia por clave de negocio es la defensa contra el duplicado.',
+  codigo: 'opts.HabilitarRabbitMq("RabbitMQ");\n// cola: Radicacion-From-EntradasExchange',
+  fuente: FUENTE_REPOS + ' · Entradas ServicesCollectionExtensions.cs, Radicacion Program.cs. Dónde corre RabbitMQ: por confirmar.' },
+
+{ id: 'hiper', nombre: 'El hiperespacio', lema: 'Azure Service Bus entre productos', taller: 'Lab 9', estructura: 'hiperespacio', x: -700, y: -960,
+  briefing: 'Obligaciones por Pagar necesita saber lo que pasa en Contabilidad, Impuestos y Estructura Organizacional, que viven en otras VMs. Entre productos, los eventos viajan por Azure Service Bus.',
+  prediccion: { pregunta: 'Contabilidad publica un evento. ¿Cómo llega a Radicación?', opciones: [
+    ['Radicación consulta a Contabilidad cada minuto', false, 'Eso es polling: lento y acoplado.'],
+    ['Por un topic de Service Bus con una suscripción de OXP', true, 'Sí: un topic por evento y la suscripción oxp-from-contabilidad.']] },
+  ensamblaje: { instruccion: 'Abre el hiperespacio.', piezas: [
+    ['Un topic por evento', 'Cada tipo de evento tiene su topic.', true, 'Así lo configura Wolverine en el código (no «un topic por BC», como dice un documento).'],
+    ['Suscripciones oxp-from-*', 'oxp-from-contabilidad, -impuestos, -estructura-organizacional.', true, 'Cada consumidor tiene su suscripción: no se pisan.'],
+    ['El tenant en el sobre del mensaje', 'DeliveryOptions.TenantId.', true, 'El consumidor sabe de qué cliente es el evento.'],
+    ['Una llamada HTTP de Radicación a Impuestos', 'Ya existe en el código.', false, 'Existe, y la topología la prohíbe: si Impuestos cae, Radicación falla. Es deuda, no diseño.']] },
+  construye: 'Se abre el corredor de hiperespacio. Los eventos de otros productos empiezan a llegar.',
+  radioConstruido: 'Hiperespacio abierto. Hoy se entra con una cadena de conexión SAS; el plan es pasar a Managed Identity (ADR-004).',
+  prueba: { texto: 'Un evento de Contabilidad cruza el hiperespacio hasta Obligaciones por Pagar.', ruta: ['hiper', 'planetas'], color: K.lila },
+  aprendiste: 'Entre productos, Azure Service Bus: un topic por evento y una suscripción por consumidor; el tenant viaja en el sobre. Hoy hay un solo namespace, se entra por SAS y no se usan sesiones.',
+  codigo: '// suscripciones: oxp-from-contabilidad · oxp-from-impuestos · oxp-from-estructura-organizacional\nConnectionStrings__AzureServiceBus  # SAS hoy; plan: Managed Identity',
+  fuente: FUENTE_REPOS + ' · MensajeriaWolverineExtensions.cs, topologia-equipos-despliegue.md' },
+
+{ id: 'faro', nombre: 'El faro', lema: 'el frontend', taller: 'Lab 7', estructura: 'faro', x: -1220, y: -640,
+  briefing: 'La gente necesita una pantalla. El front de OXP es React servido como archivos estáticos. El mismo build tiene que servir en dev y en prod sin recompilarse.',
+  prediccion: { pregunta: '¿Cómo sabe el front a qué API llamar en cada entorno?', opciones: [
+    ['La URL va compilada dentro del bundle', false, 'Entonces habría que compilar una vez por entorno.'],
+    ['Lee un env.js generado en el despliegue', true, 'Sí: window.__APP_CONFIG__, generado desde el Key Vault.']] },
+  ensamblaje: { instruccion: 'Enciende el faro.', piezas: [
+    ['React 19 + Vite + Module Federation', 'El front de OXP, como micro-frontend.', true, 'Se integra con los fronts de los demás productos.'],
+    ['Storage static website compartido', 'stfrontappl{dev,prod}eus2001, bajo /oxp/releases/<sha>/.', true, 'Cada release vive en su carpeta: volver atrás es cambiar un puntero.'],
+    ['env.js desde Key Vault', 'Secretos front-oxp-*, con las vars del Environment como prioridad.', true, 'Un solo build para todos los entornos.'],
+    ['Un servidor web propio en la VM', 'Más control.', false, 'Para archivos estáticos, el Storage es más barato y no se cae con la VM.']] },
+  construye: 'El faro se enciende y empieza a barrer el espacio.',
+  radioConstruido: 'Faro encendido. Todavía no hay puerta de entrada: eso viene en el portal.',
+  prueba: { texto: 'Un navegador descarga el front y su env.js.', ruta: ['faro', 'faro'], color: K.ok },
+  aprendiste: 'El front es React con Module Federation, servido desde un Storage static website compartido por los fronts del plano, con releases por sha y un env.js generado en el despliegue.',
+  codigo: 'window.__APP_CONFIG__ = { /* generado desde Key Vault: front-oxp-* */ }',
+  fuente: FUENTE_REPOS + ' · Front/src/shared/plataforma/env.ts, deploy-new.yml' },
+
+{ id: 'pasaporte', nombre: 'El pasaporte', lema: 'WorkOS: quién eres y de qué tenant', taller: 'Lab 8', estructura: 'pasaporte', x: -1560, y: -160,
+  briefing: 'Antes de dejar entrar a alguien, hay que saber quién es y a qué empresa pertenece. Cosmos usa WorkOS: cada empresa cliente es una organización de WorkOS, y el token de cada usuario dice su tenant.',
+  prediccion: { pregunta: 'El claim tenant_id del token, ¿qué contiene?', opciones: [
+    ['El id de la organización de WorkOS (org_…)', false, 'Ese es el id de WorkOS, no el de Cosmos.'],
+    ['El TenantId de Cosmos, guardado como external_id de la organización', true, 'Sí: el Control Plane crea la organización con ExternalId = TenantId.']] },
+  ensamblaje: { instruccion: 'Emite el pasaporte.', piezas: [
+    ['WorkOS AuthKit en el front', 'El login, con dominio propio auth.sincoerp.ai.', true, 'La identidad no se programa a mano.'],
+    ['Organización = tenant', 'La crea el Control Plane (UserManagement).', true, 'Así cada usuario queda atado a su empresa.'],
+    ['Plantilla JWT con tenant_id y user_email', 'Configurada en el dashboard de WorkOS.', true, 'Todo el sistema confía en esos claims.'],
+    ['El tenant elegido en un combo del front', 'El usuario escoge su empresa.', false, 'Cualquiera podría escoger la empresa de otro.']] },
+  construye: 'El pasaporte queda emitido. Cada usuario lleva su tenant firmado.',
+  radioConstruido: 'Pasaportes listos. Ahora falta alguien que los revise en la entrada.',
+  prueba: { texto: 'Un usuario inicia sesión y recibe su token con el tenant.', ruta: ['pasaporte', 'faro'], color: K.oro },
+  aprendiste: 'WorkOS es la identidad: cada empresa es una organización con ExternalId = TenantId, y el JWT lleva tenant_id y user_email. El tenant sale del token firmado, nunca de lo que elige el usuario.',
+  codigo: '// claims: { tenant_id: "<TenantId de Cosmos>", user_email: "..." }',
+  fuente: FUENTE_REPOS + ' · Front/docs/contratos/identidad-tenant.md, sesion.ts' },
+
+{ id: 'portal', nombre: 'El portal', lema: 'Azure Front Door', taller: 'Lab 8', estructura: 'portal', x: -1180, y: 300,
+  briefing: 'Los usuarios llegan desde internet a app.sincoerp.ai. Hace falta una sola puerta global, cerca de ellos, que mande cada petición a donde corresponde: /api/oxp, /api/impu, el front…',
+  prediccion: { pregunta: '¿Cómo sabe la aduana que una petición vino por el portal?', opciones: [
+    ['Por la IP del usuario', false, 'La IP del usuario no dice por dónde entró.'],
+    ['Por el header X-Azure-FDID con el id de este Front Door', true, 'Sí: Front Door lo pone y la aduana lo compara con el esperado.']] },
+  ensamblaje: { instruccion: 'Abre el portal.', piezas: [
+    ['Dominios app. y dev.sincoerp.ai', 'La entrada de producción y de desarrollo.', true, 'Cada entorno con su dominio.'],
+    ['Rutas por producto', '/api/oxp, /api/impu, /api/terc…', true, 'El portal ya sabe a qué producto va cada petición.'],
+    ['Header X-Azure-FDID', 'Marca cada petición con el id del portal.', true, 'Sin él, una petición directa se haría pasar por legítima.'],
+    ['Un Front Door por servicio', 'Uno para cada API.', false, 'La entrada es una sola, con rutas.']] },
+  construye: 'El portal se abre en el borde de la galaxia.',
+  radioConstruido: 'Portal abierto. Las peticiones ya pueden entrar… hasta la aduana.',
+  prueba: { texto: 'Peticiones de usuarios entran por el portal.', ruta: ['portal', 'faro'], color: K.cian },
+  aprendiste: 'Front Door es la única entrada: dominios por entorno, rutas por producto y el header X-Azure-FDID que prueba que la petición pasó por él.',
+  codigo: 'https://app.sincoerp.ai/api/oxp/...  ·  /api/impu/...  ·  /api/terc/...',
+  fuente: FUENTE_REPOS + ' · Front env.ts. La configuración del Front Door y el WAF: por confirmar.' },
+
+{ id: 'aduana', nombre: 'Las aduanas', lema: 'YARP del plano + nginx del producto', taller: 'Lab 8', estructura: 'aduana', x: -640, y: 520,
+  briefing: 'Pasar el portal no basta: alguien tiene que revisar el pasaporte. La aduana central es un YARP en la VM del Application Plane; dentro de cada producto hay una segunda aduana, nginx, que reparte a cada servicio.',
+  prediccion: { pregunta: 'El navegador manda un header X-Tenant-Id con la empresa de otro. ¿Qué hace la aduana YARP?', opciones: [
+    ['Lo deja pasar: viene del navegador', false, 'Eso sería leer y escribir datos de otro cliente.'],
+    ['Lo borra y pone el tenant del claim del token', true, 'Sí: borra X-Tenant-Id y X-User-Id entrantes y los reinyecta desde el JWT.']] },
+  ensamblaje: { instruccion: 'Arma las aduanas.', piezas: [
+    ['YARP del Application Plane', 'Valida el JWT de WorkOS y X-Azure-FDID; responde 401, 400 o 403.', true, 'Es el único lugar donde se confía en el token.'],
+    ['Reinyectar X-Tenant-Id y X-User-Id', 'Desde los claims, borrando los que trajo el cliente.', true, 'Anti-spoofing, con test que lo fija.'],
+    ['nginx del producto', 'Reparte por prefijo: /api/radicacion/comandos/, /api/entradas/…', true, 'No valida JWT: confía en lo que le manda el YARP.'],
+    ['Validar el JWT en cada servicio', 'Cada API revisa el token.', false, 'Los servicios confían en los headers de la aduana (TrustedHeadersTenantContext).']] },
+  construye: 'Las dos aduanas encienden sus anillos.',
+  radioConstruido: 'Aduanas en servicio. Riesgos reales: del YARP al nginx el tráfico va por HTTP, y el NSG de Impuestos está abierto a internet.',
+  prueba: { texto: 'Una petición pasa el portal, la aduana YARP y el nginx de OXP, y llega a Radicación.', ruta: ['portal', 'aduana', 'planetas', 'archivo'], color: K.cian },
+  aprendiste: 'Dos aduanas: el YARP del plano valida el JWT y el FDID y reinyecta el tenant; el nginx de cada producto reparte por prefijo. Los servicios leen el tenant de headers que solo pone la aduana.',
+  codigo: 'Front Door → YARP (vm-appl) → nginx del BC (:80) → radicacion-comandos-api (:8080)',
+  fuente: FUENTE_REPOS + ' · Gateway/nginx/conf.d/default.conf, identidad-tenant.md. El código del YARP (repo ApplicationPlane): por confirmar.' },
+
+{ id: 'estacion', nombre: 'La Estación de Control', lema: 'el Control Plane', taller: 'Lab 10', estructura: 'estacion', x: 520, y: 780,
+  briefing: 'Todo lo anterior sirve a clientes que ya existen. ¿Quién da de alta a una empresa nueva, crea su organización en WorkOS, la activa en cada producto y la suspende si no paga? El Control Plane.',
+  prediccion: { pregunta: 'Textiles Norte firma con Sinco. ¿Qué parte del sistema se entera primero?', opciones: [
+    ['El producto que compró', false, 'Los productos atienden tenants que ya existen.'],
+    ['El Control Plane, por Onboarding', true, 'Sí: la experiencia SaaS empieza en la estación.']] },
+  ensamblaje: { instruccion: 'Arma la estación.', piezas: [
+    ['Onboarding', 'Recibe al tenant nuevo (por ahora administrado por Sinco).', true, 'La puerta del cliente.'],
+    ['Tenant Manager', 'Registrado → Activado → Suspendido → Inactivo → Destruido.', true, 'Cada cambio de estado tiene consecuencias en los productos.'],
+    ['TenantProvisioning por producto', 'Repos *.TenantProvisioning (OXP, Contabilidad, Impuestos, Asistente…).', true, 'El puente: activa al tenant en cada producto.'],
+    ['UserManagement', 'Crea la organización de WorkOS con ExternalId = TenantId.', true, 'Ata la identidad al tenant.'],
+    ['Que cada producto dé sus propias altas', 'Cada uno a su manera.', false, 'El cliente tendría una experiencia distinta en cada producto.']] },
+  construye: 'La estación se enciende en el centro del sistema.',
+  radioConstruido: 'Estación en línea. Con Conjoined, activar un tenant puede ser solo empezar a escribir con su tenant_id.',
+  prueba: { texto: 'Nace un tenant: la estación crea su organización y lo activa en Obligaciones por Pagar.', ruta: ['estacion', 'pasaporte', 'estacion', 'planetas'], color: K.oro },
+  aprendiste: 'El Control Plane da la experiencia SaaS: Onboarding, Tenant Manager con el ciclo de vida, TenantProvisioning por producto y UserManagement con WorkOS. Facturación y Metrics están en el diseño.',
+  codigo: 'Cosmos.ControlPlane · ObligacionesPorPagar.TenantProvisioning · Cosmos.Contabilidad.TenantOnboarding',
+  fuente: FUENTE_REPOS + ' · .github/docs/repos-manifest.yml, blog «La forma de la plataforma». Los repos del Control Plane no estuvieron accesibles: su código, por confirmar.' },
+
+{ id: 'observatorio', nombre: 'El observatorio', lema: 'trazas, logs y métricas', taller: 'Lab 10', estructura: 'observatorio', x: 1160, y: 520,
+  briefing: 'Con todo funcionando, la pregunta es: ¿cómo sabes que funciona? Los servicios emiten trazas y métricas por OpenTelemetry, y los logs se consultan en Kibana.',
+  prediccion: { pregunta: 'Las proyecciones van atrasadas y Radicación decide con datos viejos. ¿Quién lo ve hoy?', opciones: [
+    ['Un panel de rezago en el observatorio', false, 'No existe: la auditoría encontró que nadie mide el rezago (hueco L6).'],
+    ['Nadie, todavía', true, 'Así es. Es justo lo que CosmosLens viene a cubrir.']] },
+  ensamblaje: { instruccion: 'Arma el observatorio.', piezas: [
+    ['OpenTelemetry hacia otel-agent', 'Trazas y métricas de Marten y Wolverine.', true, 'Un solo protocolo para todo.'],
+    ['Serilog a consola y OTel', 'Logs estructurados.', true, 'Se buscan en Kibana/Elastic (con Teleport).'],
+    ['/healthz con chequeo de Postgres', 'Swarm sabe si el servicio está sano.', true, 'El Dockerfile del gateway también trae HEALTHCHECK.'],
+    ['Console.WriteLine', 'Rápido.', false, 'Sin nivel ni contexto: no se puede alertar.']] },
+  construye: 'El observatorio abre su cúpula.',
+  radioConstruido: 'Observatorio abierto. Le falta un panel: el rezago de las proyecciones.',
+  prueba: { texto: 'Las trazas de los servicios llegan al observatorio.', ruta: ['planetas', 'observatorio'], color: K.ok },
+  aprendiste: 'OpenTelemetry hacia un otel-agent, Serilog, Kibana para logs y /healthz para la salud. Falta medir el rezago de las proyecciones.',
+  codigo: 'OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-agent:4317',
+  fuente: FUENTE_REPOS + ' · Cosmos.Infraestructure/HostExtensiones.cs, stack.prod.yml' },
+
+{ id: 'escudo', nombre: 'El escudo', lema: 'lo que todavía falta proteger', taller: 'Lab 11', estructura: 'escudo', x: 1640, y: 120,
+  briefing: 'El último sector no está construido en la plataforma real: es el que te toca construir a ti. El ADR-0003 dice que hoy no hay private endpoints, ni peering, ni DNS privado. Y la auditoría dejó una lista de riesgos abiertos.',
+  prediccion: { pregunta: '¿Cuál de estos riesgos deja leer y escribir datos de otro cliente?', opciones: [
+    ['El tráfico HTTP entre el YARP y el nginx', false, 'Es grave (sin cifrar), pero no cambia de tenant.'],
+    ['Un tenant tomado de un header que el cliente controla', true, 'Sí: con Conjoined, el tenant equivocado es acceso cruzado. Por eso la aduana lo reinyecta desde el claim.']] },
+  ensamblaje: { instruccion: 'Elige qué escudos levantar primero.', piezas: [
+    ['Rotar las credenciales versionadas', 'Storage y ERP en appsettings de dos repos.', true, 'Siguen en el historial de git hasta que se roten.'],
+    ['TLS del YARP al nginx', 'Hoy va por HTTP a cloudapp.azure.com:80.', true, 'Sin TLS, cualquiera en el camino lee el tráfico.'],
+    ['Service Bus con Managed Identity', 'En vez de la cadena SAS.', true, 'Es el plan del ADR-004.'],
+    ['Private endpoints para los datos', 'Que la base no tenga puerta pública.', true, 'Es el hardening que el ADR-0003 dejó pendiente.'],
+    ['Abrir más puertos para depurar', 'Temporalmente.', false, 'Lo temporal se queda: así quedó abierto el NSG de Impuestos.']] },
+  construye: 'Levantas el escudo alrededor de todo lo que construiste.',
+  radioConstruido: 'Escudo arriba. Misión completa: construiste la plataforma Cosmos de punta a punta.',
+  prueba: { texto: 'El escudo cubre toda la plataforma.', ruta: ['escudo', 'estacion', 'planetas', 'aduana'], color: K.ok },
+  aprendiste: 'Lo que falta: rotar credenciales, TLS entre aduanas, Managed Identity para Service Bus, private endpoints y cerrar los NSG abiertos. El escudo es trabajo pendiente de la plataforma real.',
+  codigo: '# pendientes reales: rotar secretos · TLS YARP→nginx · ASB con MI (ADR-004) · private endpoints (ADR-0003)',
+  fuente: FUENTE_REPOS + ' · adr/0003, AUDITORIA y ACCIONABLES del Application Plane' },
+);
+const CONEXIONES = [
+  ['base', 'astillero', K.cian], ['bodega', 'astillero', K.ok], ['boveda', 'astillero', K.oro], ['astillero', 'archivo', K.ok],
+  ['astillero', 'planetas', K.cian], ['planetas', 'orbita', K.naranja], ['hiper', 'planetas', K.lila], ['faro', 'portal', K.ok],
+  ['pasaporte', 'faro', K.oro], ['portal', 'aduana', K.cian], ['aduana', 'planetas', K.cian], ['estacion', 'pasaporte', K.oro],
+  ['estacion', 'planetas', K.oro], ['estacion', 'hiper', K.lila], ['planetas', 'observatorio', K.ok], ['escudo', 'estacion', K.ok],
+];
+const TRAFICO = [
+  [['bodega', 'astillero'], K.ok], [['astillero', 'archivo'], K.ok], [['planetas', 'orbita', 'planetas'], K.naranja], [['hiper', 'planetas'], K.lila],
+  [['portal', 'aduana', 'planetas'], K.cian], [['faro', 'portal'], K.ok], [['estacion', 'hiper', 'planetas'], K.oro], [['planetas', 'observatorio'], K.ok],
+];
+const INTRO = 'Hola, astronauta. Vamos a construir la plataforma Cosmos sector por sector. El primero, «La base», brilla en dorado: vuela hasta él.';
+
+hud();
+decir(est.hechos.size ? `Hola de nuevo. Llevas ${est.hechos.size} de ${SECTORES.length} sectores. Pulsa «Rumbo al siguiente».` : INTRO, 'Flechas o WASD para pilotar · clic en el espacio para ir ahí · Rumbo al siguiente para piloto automático');
+requestAnimationFrame(cuadro);
+</script>
+
