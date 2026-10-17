@@ -28,7 +28,16 @@ Con tu `bandeja_salida` en un solo proceso nunca lo viste: no había red que fal
 
 El dedup es el mismo patrón que ya usaste: el `ON CONFLICT DO NOTHING` que le pusiste a `pagos` en [La vista por consulta](./la-vista-por-consulta.md) para que reprocesar no duplicara — ahora con `envelope.Id` como llave en vez del `seq`.
 
-> 🛠️ **Inténtalo tú.** Clasifica el efecto: cobrar una multa **acumula**, así que dedup. Una tabla `procesados(mensaje_id PRIMARY KEY)`. En el consumidor, recibe el `Envelope`, y `INSERT INTO procesados(mensaje_id) VALUES(@id) ON CONFLICT DO NOTHING` con `envelope.Id`; **solo si insertaste** (una fila afectada) cobras. Para simular la reentrega, llama al handler dos veces con el **mismo** `envelope.Id` (un broker real lo hace por ti) y confirma que cobra **una** sola vez.
+Tu consumidor vive en `Facturacion`. `Envelope` viene de Wolverine y `NpgsqlConnection` de Npgsql, así que ese proyecto necesita los dos paquetes:
+
+```bash
+dotnet add Facturacion package Npgsql
+dotnet add Facturacion package WolverineFx
+```
+
+`Facturacion` tampoco ve la `cadena` de `Empresas.Historia`. Declara la suya: `public static class Conexion { public const string Cadena = "<la misma cadena de tu Postgres>"; }`, y abre la conexión con `Conexion.Cadena`. Cada contexto lleva su configuración; en producción cada uno tendría su propia base.
+
+> 🛠️ **Inténtalo tú.** Clasifica el efecto: cobrar una multa **acumula**, así que dedup. Una tabla `procesados(mensaje_id PRIMARY KEY)`. En el consumidor, recibe el `Envelope`, y `INSERT INTO procesados(mensaje_id) VALUES(@id) ON CONFLICT DO NOTHING` con `envelope.Id`; **solo si insertaste** (una fila afectada) cobras. Para simular la reentrega, desde el `Program.cs` de `Empresas.Historia` llama al handler dos veces con el **mismo** `envelope.Id` (un broker real lo hace por ti) y confirma que cobra **una** sola vez. Ese `Program.cs` no tiene `using Contratos;`. Escribe el mensaje con su nombre completo, `Contratos.EmpresaSuspendidaV1`, como en [El evento público](./el-evento-publico.md).
 
 <details>
 <summary>👉 Una forma de hacerlo</summary>
@@ -38,21 +47,42 @@ CREATE TABLE procesados(mensaje_id UUID PRIMARY KEY);
 ```
 
 ```csharp
+// Facturacion/Conexion.cs: la configuración de Facturacion, no la de Empresas.Historia
+public static class Conexion { public const string Cadena = "<la misma cadena de tu Postgres>"; }
+```
+
+```csharp
+// Facturacion/FacturacionHandler.cs
+using Contratos;   // EmpresaSuspendidaV1
+using Npgsql;
 using Wolverine;   // Envelope
+
+public static class MundoExterno { public static List<string> Recibidos = new(); }   // de §30, sigue aquí
 
 public static class FacturacionHandler
 {
     public static void Handle(EmpresaSuspendidaV1 msg, Envelope envelope)
     {
         // registra el id del mensaje; si ya estaba, no hago nada (dedup)
-        using var c = new NpgsqlConnection(cadena); c.Open();
+        using var c = new NpgsqlConnection(Conexion.Cadena); c.Open();
         using var cmd = c.CreateCommand();
         cmd.CommandText = "INSERT INTO procesados(mensaje_id) VALUES(@id) ON CONFLICT (mensaje_id) DO NOTHING";
         cmd.Parameters.AddWithValue("id", envelope.Id);
         if (cmd.ExecuteNonQuery() == 1)          // 1 = era nuevo; 0 = reentrega, ya lo procesé
             CobrarMulta(msg.Nit);                // el efecto que acumula, una sola vez
     }
+
+    static void CobrarMulta(string nit) => MundoExterno.Recibidos.Add($"multa NIT {nit}");   // el efecto que acumula
 }
+```
+
+Para simular la reentrega sin un broker, crea tú el sobre y llama al handler dos veces con él. `Envelope` ya lo resuelve el `using Wolverine;` que tu `Program.cs` tiene desde [El outbox](./el-outbox.md):
+
+```csharp
+// Empresas.Historia/Program.cs
+var sobre = new Envelope { Id = Guid.NewGuid() };
+FacturacionHandler.Handle(new Contratos.EmpresaSuspendidaV1("900123", "mora"), sobre);
+FacturacionHandler.Handle(new Contratos.EmpresaSuspendidaV1("900123", "mora"), sobre);   // mismo id: no cobra otra vez
 ```
 
 Si el efecto fuera natural —marcar la empresa suspendida en una vista— no necesitarías nada de esto: aplicarlo dos veces deja el mismo estado. El dedup es solo para los efectos que **duelen** al repetirse.
@@ -69,7 +99,7 @@ Entrega el mismo mensaje dos veces (mismo `envelope.Id`) contra el consumidor in
 
 Un transporte real entrega *at-least-once*: "exactamente una vez" pediría una transacción distribuida entre el bus y tu efecto —cara y frágil—, así que la industria acepta el duplicado y lo vuelve responsabilidad del **consumidor**. Ser idempotente no es una receta única, es criterio: te preguntas *¿repetir este efecto cambia el resultado?* — si sobrescribe un estado, no haces nada; si acumula o tiene lado (cobrar, enviar, llamar), deduplicas por el **id del mensaje**, que Wolverine mantiene estable entre reentregas. Es la misma idempotencia que le diste al proyector con `ON CONFLICT`, ahora contra el bus en vez del diario. Y el criterio de mantenedor: dedup por el id del **mensaje**, no por un dato del negocio, o borrarías eventos legítimos que casualmente se parecen.
 
-> 🌱 Llevas dos secciones adoptando la mensajería de Wolverine. Falta cerrar el otro hermano: aquel proyector que corría tu vista en bucle, con su checkpoint, ahora es el **daemon** de Marten — y con él, la consistencia eventual que mediste a mano en [El rezago](./el-rezago.md) deja de ser un accidente y pasa a ser algo que **declaras** y configuras. Ese es el próximo paso: [El daemon y la consistencia eventual](./el-daemon-y-la-consistencia-eventual.md).
+> 🌱 Facturación ya no cobra doble, pero cobra lo mismo a todas las empresas. La multa debería depender del **plan**, y el plan no es de Facturación: es de Empresas. ¿Se lo mandas en el anuncio, o Facturación se lo pregunta? La respuesta depende de para qué lo quiera: [El contrato lleva lo justo](./el-contrato-lleva-lo-justo.md).
 
 ## ✅ Compruébalo
 
@@ -80,6 +110,7 @@ Un transporte real entrega *at-least-once*: "exactamente una vez" pediría una t
 
 ## 🆘 Si algo salió mal
 
+- **`Envelope` o `NpgsqlConnection` no compilan en `Facturacion`:** faltan los paquetes en ese proyecto. Corre los dos `dotnet add Facturacion package ...` de arriba.
 - **Sigue cobrando doble:** haces el efecto **antes** de chequear el `ON CONFLICT`, o no condicionas el cobro a "inserté una fila". El cobro va solo cuando el `INSERT` afectó 1 fila.
 - **La segunda entrega también cobra:** estás simulando con **ids distintos**. Una reentrega real trae el **mismo** `envelope.Id`; para la prueba, reusa el mismo id.
 - **Deduplicas por el NIT y pierdes cobros legítimos:** dos suspensiones **distintas** de la misma empresa son mensajes con ids **distintos**; dedup por `envelope.Id`, no por el NIT.
@@ -103,4 +134,4 @@ Un transporte real entrega *at-least-once* —"exactamente una vez" pediría una
 
 [⬅️ Volver: El outbox](./el-outbox.md)
 
-[➡️ Siguiente: El daemon y la consistencia eventual](./el-daemon-y-la-consistencia-eventual.md)
+[➡️ Siguiente: El contrato lleva lo justo](./el-contrato-lleva-lo-justo.md)

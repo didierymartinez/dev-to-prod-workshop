@@ -8,7 +8,7 @@ Que el **tenant** —la organización dueña de la petición— viaje con cada o
 
 ## 💥 El dolor: el default silencioso manda el hecho al cliente equivocado
 
-Aclaremos los niveles primero. Una **`Empresa`** es un stream —lo que llevas 34 secciones construyendo—. Un **tenant** es la **organización que usa la plataforma** (un despacho contable, una filial): un cliente de Cosmos, no una `Empresa`. Cada tenant administra **sus** streams —sus empresas, sus pagos—, y los de un tenant no deben verse desde otro. Marten aísla eso con **tenancy**.
+Aclaremos los niveles primero. Una **`Empresa`** es un stream —lo que llevas todo el taller construyendo—. Un **tenant** es la **organización que usa la plataforma** (un despacho contable, una filial): un cliente de Cosmos, no una `Empresa`. Cada tenant administra **sus** streams —sus empresas, sus pagos—, y los de un tenant no deben verse desde otro. Marten aísla eso con **tenancy**.
 
 ```csharp
 await using var s = store.LightweightSession("acme");   // sesión del tenant "acme" (una organización)
@@ -37,7 +37,7 @@ Dos piezas. Primero, el tenant **viaja**: llega en la petición y se resuelve en
 
 > 🆕 **Tenancy conjoined + fail-fast.** `opts.Events.TenancyStyle = TenancyStyle.Conjoined` (de `JasperFx.MultiTenancy`) guarda todos los tenants en las **mismas** tablas, con una columna `tenant_id` que los aísla; una sesión por tenant solo ve lo suyo. (La alternativa sería una base o esquema **por** tenant: más aislamiento físico, más operación; conjoined es barato y suficiente cuando confías en el motor para el filtro.) Y `opts.Advanced.DefaultTenantUsageEnabled = false` **apaga el tenant por defecto**: abrir una sesión sin tenant lanza `DefaultTenantUsageDisabledException` en vez de caer en `*DEFAULT*`.
 
-> ⚠️ **Esto es un spike aparte — no lo cablees a tu app todavía.** Si activas `DefaultTenantUsageEnabled = false` sobre tu store real, **toda** sesión sin tenant (tus tests, el daemon, la API de [El host y la inyección](./el-host-y-la-inyeccion.md)) empezará a lanzar. Adóptalo cuando el servicio de verdad sea multi-tenant, resolviendo el tenant en cada borde.
+> ⚠️ **Esto es un spike aparte — no lo cablees a tu app todavía.** Si activas `DefaultTenantUsageEnabled = false` sobre tu store real, **toda** sesión sin tenant (tus tests, el daemon, la API de [El host y la inyección](./el-host-y-la-inyeccion.md)) empezará a lanzar. Adóptalo cuando el servicio de verdad sea multi-tenant, resolviendo el tenant en cada borde. Y córrelo contra una base **nueva** (en `psql`: `CREATE DATABASE spike_tenancy;`), no la de tu servicio: conjoined cambia la llave de `mt_streams` a `(tenant_id, id)`, y sobre el esquema de tu servicio la migración falla con `MartenSchemaException`.
 
 > 🛠️ **Inténtalo tú.** (1) Configura `TenancyStyle.Conjoined` (de `JasperFx.MultiTenancy`) y `DefaultTenantUsageEnabled = false`. (2) Escribe `emp-1` en el tenant `acme` y confirma que una sesión de `globex` **no** la ve (rehidratar → null). (3) Intenta abrir una sesión **sin** tenant y confirma que **lanza** —el default silencioso ya no existe—. (4) Nota de dónde saldría el tenant en un servicio real: un *claim* del JWT de la petición.
 
@@ -49,7 +49,7 @@ using JasperFx.MultiTenancy;   // TenancyStyle
 
 var store = DocumentStore.For(opts =>
 {
-    opts.Connection(cadena);
+    opts.Connection(cadena);                                  // la de la base nueva del spike, no la de tu servicio
     opts.Events.StreamIdentity = StreamIdentity.AsString;
     opts.Events.TenancyStyle = TenancyStyle.Conjoined;        // aísla por tenant_id, misma base
     opts.Advanced.DefaultTenantUsageEnabled = false;          // sin tenant por defecto: fail-fast
@@ -77,7 +77,9 @@ En un servicio real, el tenant no lo pasas a mano: llega en un *claim* (un dato 
 
 ## 🔨 Rómpelo: con y sin fail-fast
 
-Quita `DefaultTenantUsageEnabled = false` (vuelve al default de Marten) y escribe sin tenant: **no falla**, y el hecho aparece en `*DEFAULT*` — invisible para `acme`. Vuelve a ponerlo en `false`: el mismo código **lanza** al abrir la sesión. La diferencia no es cosmética: sin fail-fast el error se manifiesta días después, como datos que "faltan" en un cliente; con fail-fast, en la petición que olvidó el tenant, al instante.
+Quita `DefaultTenantUsageEnabled = false` (vuelve al default de Marten). Comenta la escritura de `emp-1`: ya quedó en `acme` en la primera corrida. Escribe sin tenant: **no falla**, y el hecho aparece en `*DEFAULT*` — invisible para `acme`. Vuelve a ponerlo en `false`: el mismo código **lanza** al abrir la sesión. La diferencia no es cosmética: sin fail-fast el error se manifiesta días después, como datos que "faltan" en un cliente; con fail-fast, en la petición que olvidó el tenant, al instante.
+
+En CosmosLens también se ve, si lo apuntas a la base del spike: la lista de **Streams** muestra el tenant de cada stream, y el campo **Cliente** filtra por él. Sin filtro, `emp-2` aparece con `*DEFAULT*`; con `acme`, no aparece.
 
 ## El Descubrimiento
 
@@ -96,6 +98,7 @@ Un **contexto que falta** —el tenant— es un bug traicionero: si el sistema l
 
 - **Escribir sin tenant no lanza:** te falta `opts.Advanced.DefaultTenantUsageEnabled = false`. Sin eso, Marten usa `*DEFAULT*` en silencio.
 - **`TenancyStyle` no compila:** vive en `JasperFx.MultiTenancy`.
+- **El spike lanza `MartenSchemaException` en el primer `SaveChangesAsync`:** lo apuntaste a la base de tu servicio. Crea una base nueva para el spike y usa su cadena.
 - **Se te caen los tests/el daemon al activar el fail-fast:** es lo esperado si lo pones en el store real — todas las sesiones sin tenant lanzan. Es un spike aparte hasta que el servicio sea multi-tenant de verdad.
 - **Migrar datos existentes:** los hechos ya escritos sin tenant quedaron en `*DEFAULT*`; activar tenancy no los reparte solo — es una migración aparte.
 

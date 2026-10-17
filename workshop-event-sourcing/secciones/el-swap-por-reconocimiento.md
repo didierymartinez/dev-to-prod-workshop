@@ -15,23 +15,30 @@ No hay un dolor nuevo — el dolor es la **suma** de los que ya viviste. Mira lo
 | Tabla `eventos` + `GetEvents`/`Guardar` (SQL crudo) | El **event store** de Marten (`StartStream`, `Append`) | **hoy** |
 | `PRIMARY KEY(stream, version)` para la concurrencia | Concurrencia optimista de Marten (integrada) | **hoy** |
 | Rehidratar con `AbrirStream<Empresa>(id).Get()` | `AggregateStreamAsync<Empresa>(id)` | **hoy** |
+| Tabla `localizador` + `GuardarNuevo` (un NIT, una empresa, de [Dos streams, la misma clave](./dos-streams-misma-clave.md)) | **Marten no lo trae**: `StartStream` no escribe el localizador ni mira el NIT | **sigue a mano**: tú escribes la fila al registrar |
 | `seq` + `CorrerProyector()` en bucle + tabla `checkpoint` + la vista `Suspendidas` | El **daemon** async de Marten + una proyección (`mt_event_progression` es su checkpoint) | [El daemon](./el-daemon-y-la-consistencia-eventual.md) |
 | `bandeja_salida` + `EntregarPendientes` + el claim | El **outbox** y los transportes de **Wolverine** | [El outbox](./el-outbox.md) |
 | El puerto `IEventStore` + el doble en memoria | Todo el motor recogido en una plantilla: `AggregateRoot` + una `MartenUnitOfWork` sobre la sesión + el doble | [La plantilla](./la-plantilla.md) |
 
-Cada fila de la izquierda es código tuyo que mantener, con sus bordes (¿y si el checkpoint se corrompe?, ¿y si dos escritores nacen el mismo stream?). Cada una de la derecha es lo mismo, atómico y probado, sobre la Postgres que ya usas. Construiste la izquierda **para entenderla**; ahora la cambias por la derecha **por alivio**.
+Cada fila de la izquierda es código tuyo que mantener, con sus bordes (¿y si el checkpoint se corrompe?, ¿y si dos escritores nacen el mismo stream?). Cada una de la derecha, menos el localizador, es lo mismo, atómico y probado, sobre la Postgres que ya usas. Construiste la izquierda **para entenderla**; ahora la cambias por la derecha **por alivio**.
+
+El localizador es la pieza que no se cambia. `StartStream` solo, sin tu fila en `localizador`, deja nacer dos streams con el mismo NIT. Tras el swap, esa fila la escribes tú al registrar, en una escritura aparte de `StartStream`. Así la unicidad del NIT deja de ser atómica con los hechos, como lo era en §23. Marten puede recuperarla con una proyección `Inline` (Marten la escribe en la misma transacción del hecho) y un índice único sobre el NIT; así lo hacen varios repos de la organización. Ese camino queda como criterio: el taller no lo construye.
 
 ## 🔧 Adoptar Marten como tu diario
 
 Marten es una librería de event sourcing sobre Postgres. Hoy adoptas su **event store**: guardar hechos en un stream, rehidratar un agregado, y su concurrencia optimista.
 
-> 🆕 **Marten: tu diario, hecho librería.** `session.Events.StartStream` nace un stream (tu registro); `session.Events.Append` agrega hechos a uno existente; `session.Events.AggregateStreamAsync<Empresa>(id)` **rehidrata** reproduciendo los hechos —tu `AbrirStream(id).Get()`, hecho por otros—. La concurrencia optimista está integrada: `Append(id, versiónEsperada, hecho)` rechaza la escritura si el stream avanzó. Todo sobre la misma Postgres, con `DocumentStore.For(...)` — **sin host ni inyección de dependencias todavía** (eso llega en [El host y la inyección](./el-host-y-la-inyeccion.md)).
+> 🆕 **Marten: tu diario, hecho librería.** `session.Events.StartStream` nace un stream (tu registro, menos el localizador del NIT); `session.Events.Append` agrega hechos a uno existente; `session.Events.AggregateStreamAsync<Empresa>(id)` **rehidrata** reproduciendo los hechos —tu `AbrirStream(id).Get()`, hecho por otros—. La concurrencia optimista está integrada: `Append(id, versión, hecho)` rechaza la escritura si el stream avanzó. Ese número es la versión que tendrá el stream **tras** el append: la que leíste más los hechos que agregas. Es la posición que declaraba tu sobre en [Concurrencia optimista](./concurrencia-optimista.md), no la versión leída. Todo sobre la misma Postgres, con `DocumentStore.For(...)` — **sin host ni inyección de dependencias todavía** (eso llega en [El host y la inyección](./el-host-y-la-inyeccion.md)).
 
 > ⚠️ **Marten 9 es async — pero eso no es la consistencia eventual.** *"As of Marten 9.0, only asynchronous data access is supported"*: leer y guardar pasan a `await` porque Marten no bloquea hilos en el I/O, punto. Es fuertemente **consistente**: si guardas un hecho y enseguida rehidratas ese stream, lo ves. La **consistencia eventual** —la vista que va atrás— no vive aquí; vive en el proyector async, que es el **daemon**, y llega en [El daemon](./el-daemon-y-la-consistencia-eventual.md). No confundas "todo es `await`" (I/O) con "la vista tarda" (el daemon).
 
 ### Paso 1 · El store (se muestra, no se reta)
 
-Esto es configuración de un paquete nuevo — idioma que aún no puedes adivinar, así que se muestra:
+Esto es configuración de un paquete nuevo — idioma que aún no puedes adivinar, así que se muestra. Primero, el paquete:
+
+```bash
+dotnet add Empresas.Historia package Marten
+```
 
 ```csharp
 using Marten;
@@ -46,9 +53,13 @@ var store = DocumentStore.For(opts =>
 
 `DocumentStore.For` te da el store directo, sin host ni DI: justo lo que necesitas para reconocer el diario sin arrastrar aún el andamiaje del servicio.
 
+Tu `Program.cs` ya declara un `store`: el `PostgresEventStore` de §23–§28. Renómbralo a `viejo`, donde lo declaras y donde lo usas. Desde aquí, `store` es el de Marten; el `viejo` se va en el Paso 3.
+
 ### Paso 2 · Adapta tu `Empresa`
 
-> 🛠️ **Inténtalo tú.** Tu `Empresa` casi no cambia. En [Refactorizando el motor](./refactorizando-el-motor.md) dejaste una semilla: *"un `Aplicar` por tipo… la volverás a encontrar, con un enrutador seguro en vez de `dynamic`"*. Esta es la cosecha: en vez de tu `Aplicar(object)` con `switch`, escribe un método `Apply(EmpresaRegistrada e)`, `Apply(PlanCambiado e)`, `Apply(EmpresaSuspendida e)`… uno por tipo, que Marten **descubre por convención** (el enrutador seguro, compilado, sin `dynamic`). Deja los setters **privados** —la encapsulación de [Decidir el futuro](./decidir-el-futuro.md) se queda: el agregado sigue siendo tuyo—; Marten rehidrata reproduciendo los hechos, no deserializando propiedades. Añade una propiedad `Id` (string).
+> 🛠️ **Inténtalo tú.** Tu `Empresa` pierde su base y sus verbos, y conserva sus propiedades. En [Refactorizando el motor](./refactorizando-el-motor.md) dejaste una semilla: *"un `Aplicar` por tipo… la volverás a encontrar, con un enrutador seguro en vez de `dynamic`"*. Esta es la cosecha: en vez de tu `Aplicar(object)` con `switch`, escribe un método `Apply(EmpresaRegistrada e)`, `Apply(PlanCambiado e)`, `Apply(EmpresaSuspendida e)`… uno por tipo, que Marten **descubre por convención** (el enrutador seguro, compilado, sin `dynamic`). Deja los setters **privados** —la encapsulación de [Decidir el futuro](./decidir-el-futuro.md) se queda: el agregado sigue siendo tuyo—; Marten rehidrata reproduciendo los hechos, no deserializando propiedades. Añade una propiedad `Id` (string).
+>
+> Quita también `: AggregateRoot`: sin el `switch`, nadie implementa su `Aplicar(object)` abstracto. Con la base se van los verbos que llaman a `Emitir` (`Registrar`, `CambiarPlan`, `Suspender`, `RegistrarPago`, `Reactivar`): coméntalos. Tu `Empresa` queda en estado + `Apply`; la base y los verbos vuelven en [La plantilla](./la-plantilla.md). Lo que llamaba a esos verbos deja de compilar, y lo comentas en el Paso 3.
 
 <details>
 <summary>👉 Una forma de hacerlo</summary>
@@ -71,19 +82,21 @@ public class Empresa
 }
 ```
 
-Los `Apply` son la forma que descartaste en §3 por usar `dynamic`; Marten los llama por el tipo del hecho, en código compilado. Conserva las propiedades que tu `Empresa` ya tenía — solo cambia el `switch` por métodos.
+Los `Apply` son la forma que descartaste en §3 por usar `dynamic`; Marten los llama por el tipo del hecho, en código compilado. Conserva las propiedades que tu `Empresa` ya tenía.
 
 </details>
 
 ### Paso 3 · Escribir, rehidratar, y la concurrencia
 
-> 🛠️ **Inténtalo tú.** Consigue esto contra Marten, con una sesión (`store.LightweightSession()`): nacer un stream con `StartStream` (el registro), agregar hechos con `Append`, rehidratar con `AggregateStreamAsync`, y ver la concurrencia optimista rechazar un choque. Y borra tu tabla `eventos`, `GetEvents` y `Guardar`: Marten los tiene.
+> 🛠️ **Inténtalo tú.** Consigue esto contra Marten, con una sesión (`store.LightweightSession()`): nacer un stream con `StartStream` (el registro), agregar hechos con `Append`, rehidratar con `AggregateStreamAsync`, y ver la concurrencia optimista rechazar un choque. Para el choque, abre **dos** sesiones que lean la misma versión con `FetchStreamStateAsync`; cada una appendea un hecho con la versión que tendrá el stream tras él. La primera entra y la segunda lanza.
+>
+> Antes de correr, borra tu diario a mano: la tabla `eventos` (`DROP TABLE eventos;` en `psql`), `GetEvents` y `Guardar`. Marten los tiene. Ahora no compila lo que usaba esos métodos o los verbos del Paso 2: `EventStream` y `AbrirStream`, los handlers de instancia (`SuspenderHandler`, `CambiarPlanHandler`, `PagarDeudaHandler`) y `CorrerProyector`, que rehidrataba con `AbrirStream`. Coméntalos ya, con `/* … */` o con `#if false` … `#endif`. Comenta también el `Despachador` con su `ICommandHandler<T>`: ya no hay handlers que registrar. Deja la clase `AggregateRoot`: compila sola, y la reescribes en [La plantilla](./la-plantilla.md). En tu `Program.cs`, comenta tu `viejo` y todo lo que lo usa: el registro de emp-7 de §23, el despachador, la entrega de la bandeja y el proyector con sus corridas. La escritura que comentas vuelve en [El outbox](./el-outbox.md), y la lectura en [El daemon](./el-daemon-y-la-consistencia-eventual.md).
 
 <details>
 <summary>👉 Una forma de hacerlo</summary>
 
 ```csharp
-// nacer un stream nuevo (tu registro) — todo async
+// nacer un stream nuevo (tu registro, menos la fila del localizador) — todo async
 await using (var s = store.LightweightSession())
 {
     s.Events.StartStream<Empresa>("emp-7",
@@ -101,44 +114,56 @@ await using (var s = store.LightweightSession())
 // rehidratar (tu AbrirStream(...).Get(), ahora de Marten): reproduce los hechos, respeta tus setters privados
 await using (var s = store.LightweightSession())
 {
-    var e = await s.Events.AggregateStreamAsync<Empresa>("emp-7");   // e.Suspendida == false, e.Reactivaciones == 1
+    var e = await s.Events.AggregateStreamAsync<Empresa>("emp-7");
+    Console.WriteLine($"Suspendida={e!.Suspendida} Reactivaciones={e.Reactivaciones} Plan={e.Plan}");   // Suspendida=False Reactivaciones=1 Plan=Basico
 }
 ```
 
 ```csharp
-// concurrencia optimista, integrada: espero una versión; si el stream avanzó, choca
-var estado = await s.Events.FetchStreamStateAsync("emp-7");
-s.Events.Append("emp-7", estado.Version, new EmpresaSuspendida("x"));   // otro que espere la MISMA versión
-await s.SaveChangesAsync();   // el segundo lanza EventStreamUnexpectedMaxEventIdException — tu ConcurrencyException, de Marten
+// concurrencia optimista, integrada: dos escritores leen la misma versión de emp-7
+await using var a = store.LightweightSession();
+await using var b = store.LightweightSession();
+var estadoA = await a.Events.FetchStreamStateAsync("emp-7");   // Version == 3
+var estadoB = await b.Events.FetchStreamStateAsync("emp-7");   // Version == 3: la misma
+
+// el número es la versión que tendrá el stream TRAS el append: la leída + los hechos que agregas
+a.Events.Append("emp-7", estadoA!.Version + 1, new EmpresaSuspendida("x"));
+await a.SaveChangesAsync();   // el primero entra: emp-7 queda en la versión 4
+
+b.Events.Append("emp-7", estadoB!.Version + 1, new EmpresaSuspendida("x"));
+await b.SaveChangesAsync();   // el segundo lanza EventStreamUnexpectedMaxEventIdException — tu ConcurrencyException, de Marten
 ```
 
-No hay tabla `eventos` ni `GetEvents`/`Guardar` que mantengas: el diario es de Marten. Ojo: tu proyector, la medición de rezago y la vista `pagos` leían esa tabla `eventos`, así que **quedan inoperantes** hasta que los migres — se mudan al **daemon** de Marten en [El daemon](./el-daemon-y-la-consistencia-eventual.md), y tu `bandeja_salida` a **Wolverine** en [El outbox](./el-outbox.md). (Por eso borras `eventos` ahora pero el read-side a mano se retira del todo en §32.)
+No hay tabla `eventos` ni `GetEvents`/`Guardar` que mantengas: el diario es de Marten. Tu proyector, la medición de rezago y la vista `pagos` leían esa tabla, así que se quedan sin qué leer hasta que el **daemon** de Marten los reemplace. La escritura en `bandeja_salida` vivía dentro de `Guardar`, así que tu outbox a mano tampoco recibe nada hasta que lo reemplace **Wolverine**.
 
 </details>
 
 ## 🔨 Rómpelo: comprueba que Marten hace lo tuyo
 
-Nace `emp-7` con un registro + una suspensión, agrégale una reactivación, y rehidrata → `Suspendida == false`, `Reactivaciones == 1`, `Plan == "Basico"` (el replay que escribiste a mano lo hace `AggregateStreamAsync`, y tus setters privados siguen intactos). Luego reproduce tu prueba de concurrencia de [Concurrencia optimista](./concurrencia-optimista.md): dos escrituras que esperan la misma versión → la segunda lanza `EventStreamUnexpectedMaxEventIdException`. Es tu `ConcurrencyException`, ahora impuesta por Marten — no la escribiste, pero sabes exactamente qué protege.
+Nace `emp-7` con un registro + una suspensión, agrégale una reactivación, y rehidrata → `Suspendida == false`, `Reactivaciones == 1`, `Plan == "Basico"` (el replay que escribiste a mano lo hace `AggregateStreamAsync`, y tus setters privados siguen intactos). Luego reproduce tu prueba de concurrencia de [Concurrencia optimista](./concurrencia-optimista.md): dos escritores leen la versión 3 y cada uno appendea un hecho con la versión 4 → el primero entra y el segundo lanza `EventStreamUnexpectedMaxEventIdException`. Es tu `ConcurrencyException`, ahora impuesta por Marten — no la escribiste, pero sabes exactamente qué protege. Ahora comenta el bloque que nace `emp-7` y el que le agrega la reactivación: `emp-7` ya existe, y `StartStream` no la nace dos veces. Quita el `+ 1` y pásale a `Append` la versión leída. Envuelve cada `SaveChangesAsync` en un `try`/`catch` que escriba la excepción, para que el primer fallo no corte el programa, y vuelve a correr: fallan **los dos**. Marten compara con la versión que dejará el append, no con la que leíste.
 
 ## El Descubrimiento
 
-El swap no es rendirse: es **reconocer**. Construiste a mano el diario, la concurrencia y la rehidratación no para producirlos, sino para **entender qué hace falta** — y ahora reconoces cada uno en Marten y lo adoptas, atómico y correcto, sobre la misma Postgres. Ganaste algo que no se pierde con el swap: el **criterio**. Sabes qué protege la concurrencia optimista porque la armaste con un `PRIMARY KEY`; sabes por qué rehidratar puede ser caro porque lo hiciste a mano; reconociste el `Apply` por tipo de [§3](./refactorizando-el-motor.md) en la convención de Marten. Adoptar la librería sin ese criterio es magia; adoptarla con él es ingeniería. Y el reconocimiento sigue: el proyector es su **daemon** (§32), tu outbox es **Wolverine** (§30), y todo el motor se recoge en una plantilla —`AggregateRoot` + una unidad de trabajo sobre Marten + el doble en memoria— (§38).
+El swap no es rendirse: es **reconocer**. Construiste a mano el diario, la concurrencia y la rehidratación no para producirlos, sino para **entender qué hace falta** — y ahora reconoces cada uno en Marten y lo adoptas, atómico y correcto, sobre la misma Postgres. Ganaste algo que no se pierde con el swap: el **criterio**. Sabes qué protege la concurrencia optimista porque la armaste con un `PRIMARY KEY`; sabes por qué rehidratar puede ser caro porque lo hiciste a mano; reconociste el `Apply` por tipo de [§3](./refactorizando-el-motor.md) en la convención de Marten. Adoptar la librería sin ese criterio es magia; adoptarla con él es ingeniería. Y el reconocimiento sigue: el proyector es su **daemon** (§37), tu outbox es **Wolverine** (§30), y todo el motor se recoge en una plantilla —`AggregateRoot` + una unidad de trabajo sobre Marten + el doble en memoria— (§44).
 
 > 🌱 Marten se llevó el diario. Pero tu `bandeja_salida` y su entrega reclamada —el outbox y la cola que empezaste a mano en [El hecho y su anuncio](./el-hecho-y-su-anuncio.md) y [El mensaje y la cola](./el-mensaje-y-la-cola.md)— siguen siendo tuyas. Marten tiene un hermano, **Wolverine**, para exactamente eso: un outbox durable en la misma transacción del hecho, sin el bucle de `SELECT ... SKIP LOCKED` que ibas a escribir. Adoptarlo paga la deuda del dual-write que dejaste pendiente: [El outbox](./el-outbox.md).
 
 ## ✅ Compruébalo
 
 - [ ] Marten guarda (`StartStream`/`Append`) y rehidrata (`AggregateStreamAsync`) tu `Empresa` con `Apply` por tipo y setters **privados** — sin tu tabla `eventos` ni tu `GetEvents`.
-- [ ] La concurrencia optimista integrada rechaza dos escrituras que esperan la misma versión (`EventStreamUnexpectedMaxEventIdException`) — sin que escribieras la verificación.
-- [ ] Tu código de diario ahora es `async` (Marten 9 no da acceso síncrono) — y sabes decir por qué eso es I/O no bloqueante, **no** la consistencia eventual (esa es el daemon, §32).
-- [ ] Sabes emparejar cada pieza (diario, concurrencia, rehidratar) con su equivalente en Marten, y cuál se adopta ahora y cuál en §30/§32/§38.
+- [ ] Dos escritores leen la misma versión y le pasan a `Append` la que tendrá el stream tras su hecho (la leída + 1): el primero entra y el segundo lanza `EventStreamUnexpectedMaxEventIdException` — sin que escribieras la verificación. Con la versión leída, sin el `+ 1`, fallan los dos.
+- [ ] Sabes que `StartStream` no escribe tu `localizador`: la fila del NIT la escribes tú al registrar, y la unicidad ya no es atómica con los hechos.
+- [ ] Tu código de diario ahora es `async` (Marten 9 no da acceso síncrono) — y sabes decir por qué eso es I/O no bloqueante, **no** la consistencia eventual (esa es el daemon, §37).
+- [ ] Sabes emparejar cada pieza (diario, concurrencia, rehidratar) con su equivalente en Marten, y cuál se adopta ahora y cuál en §30/§37/§44.
 
 ## 🆘 Si algo salió mal
 
+- **`CS0534`: 'Empresa' no implementa el miembro abstracto heredado 'AggregateRoot.Aplicar(object)':** cambiaste el `switch` por los `Apply` pero dejaste `: AggregateRoot`. Quita la base, como en el Paso 2.
 - **Marten no descubre tus `Apply`:** deben ser métodos de instancia `Apply(TEvento)` en la clase (no el `Aplicar(object)` con `switch`), y la clase necesita una propiedad `Id` (`string`, con `StreamIdentity.AsString`).
 - **`NotSupportedException: only asynchronous data access is supported`:** quedó un `.ToList()`/`.Single()` síncrono. En Marten 9 todo es `await ...Async()`.
-- **Setters privados y rehidratar:** funcionan — `AggregateStreamAsync` reconstruye reproduciendo los hechos (llama tus `Apply`), no deserializando propiedades. (Un *snapshot* persistido sí exigiría setters públicos, pero eso es cosa del daemon en §32.)
+- **Setters privados y rehidratar:** funcionan — `AggregateStreamAsync` reconstruye reproduciendo los hechos (llama tus `Apply`), no deserializando propiedades. (Un *snapshot* persistido sí exigiría setters públicos, pero eso es cosa del daemon en §37.)
 - **`StartStream` falla porque el stream ya existe:** `StartStream` es para nacer; a un stream existente se le hace `Append`.
+- **Los dos escritores lanzan `EventStreamUnexpectedMaxEventIdException`:** le pasaste a `Append` la versión que leíste. Marten espera la que tendrá el stream tras el append: la leída `+ 1` si agregas un hecho, `+ 2` si agregas dos.
 
 ## 📓 Registra tu avance
 
@@ -152,7 +177,7 @@ git push
 
 ## 🧠 En una frase
 
-El swap no es rendirse sino reconocer: tu diario a mano —event store, concurrencia optimista, rehidratación— existe en **Marten**, atómico y probado, sobre la misma Postgres (y ahora async, que es I/O no bloqueante, no la consistencia eventual del daemon); lo adoptas por alivio y conservas el criterio de saber qué hace y por qué — y el reconocimiento sigue con el daemon (§32) y Wolverine (§30).
+El swap no es rendirse sino reconocer: tu diario a mano —event store, concurrencia optimista, rehidratación— existe en **Marten**, atómico y probado, sobre la misma Postgres (y ahora async, que es I/O no bloqueante, no la consistencia eventual del daemon); lo adoptas por alivio y conservas el criterio de saber qué hace y por qué — y el reconocimiento sigue con el daemon (§37) y Wolverine (§30).
 
 ---
 
