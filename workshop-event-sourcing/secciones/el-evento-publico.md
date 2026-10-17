@@ -11,12 +11,12 @@ Anunciar un hecho al mundo de afuera con un **contrato propio** —plano y estab
 El reflejo es meter en el `mensaje` tu evento tal cual: serializas `EmpresaSuspendida` y listo. Vívelo. Para que facturación lo deserialice contra **tu** tipo, su proyecto tiene que **referenciar tu dominio**:
 
 ```csharp
-// en Facturacion, con una referencia a Dominio:
-var e = JsonSerializer.Deserialize<Dominio.EmpresaSuspendida>(mensaje);   // usa TU tipo interno
+// en Facturacion, con una referencia a Empresas.Historia:
+var e = JsonSerializer.Deserialize<EmpresaSuspendida>(mensaje);           // usa TU tipo interno (el de Empresas.Historia)
 Console.WriteLine($"Facturación procesa: {e.Motivo}");                    // y usa su campo Motivo
 ```
 
-Compila y funciona. Ahora tú, por razones **internas**, evolucionas ese evento —le renombras `Motivo` a `Razon`, o lo partes con un upcaster como en [La forma del hecho se congela](./la-forma-del-hecho-se-congela.md)—. Vuelve a compilar la solución: **`Facturacion` deja de compilar**, porque su `e.Motivo` ya no existe en tu tipo. Le rompiste el código a un consumidor que ni controlas, por un cambio que era **asunto tuyo**. El evento interno es una pieza privada que cambia a tu ritmo; en el momento en que lo publicas, cada cambio tuyo es un cambio de contrato para otros.
+Compila y funciona. Ahora tú, por razones **internas**, evolucionas ese evento —le renombras `Motivo` a `Razon`, o lo partes con un upcaster como en [La forma del hecho se congela](./la-forma-del-hecho-se-congela.md)—. Vuelve a compilar con `dotnet build Facturacion`: **`Facturacion` deja de compilar**, porque su `e.Motivo` ya no existe en tu tipo. Le rompiste el código a un consumidor que ni controlas, por un cambio que era **asunto tuyo**. El evento interno es una pieza privada que cambia a tu ritmo; en el momento en que lo publicas, cada cambio tuyo es un cambio de contrato para otros.
 
 ## 🔧 Un evento público, en su propio proyecto
 
@@ -27,18 +27,21 @@ Separa las dos cosas que estabas mezclando en un solo tipo. El **evento interno*
 El grafo de proyectos —y quién referencia a quién— es lo que hace cumplir el límite:
 
 ```
-Dominio      → Contratos      (el dominio PUBLICA el contrato: lo referencia para traducir)
-Facturacion  → Contratos      (el consumidor solo conoce el contrato)
-Contratos    → (nada)         (no ve tu dominio: no puede filtrar lo privado)
+Empresas.Historia → Contratos      (el dominio PUBLICA el contrato: lo referencia para traducir)
+Empresas.Historia → Facturacion    (composición raíz: su Program.cs cablea al consumidor)
+Facturacion       → Contratos      (el consumidor solo conoce el contrato; NUNCA referencia Empresas.Historia)
+Contratos         → (nada)         (no ve tu dominio: no puede filtrar lo privado)
 ```
 
 ```bash
-# tu proyecto de siempre es Dominio; en el dolor le pusiste a Facturacion una referencia a Dominio
+# tu proyecto de siempre es Empresas.Historia; en el dolor le pusiste a Facturacion una referencia a Empresas.Historia
 dotnet new classlib -o Contratos
-dotnet new classlib -o Facturacion               # el consumidor (si no lo creaste en el dolor)
-dotnet add Dominio     reference Contratos        # el dominio traduce a este contrato
-dotnet add Facturacion reference Contratos        # el consumidor solo conoce el contrato
-dotnet remove Facturacion reference Dominio       # quita la del dolor: el consumidor NO ve tu dominio
+dotnet new classlib -o Facturacion                      # el consumidor (si no lo creaste en el dolor)
+# PRIMERO quita la del dolor (con la ruta al .csproj): el consumidor NO ve tu dominio, y así no hay ciclo
+dotnet remove Facturacion reference Empresas.Historia/Empresas.Historia.csproj
+dotnet add Empresas.Historia reference Contratos        # el dominio traduce a este contrato
+dotnet add Facturacion reference Contratos              # el consumidor solo conoce el contrato
+dotnet add Empresas.Historia reference Facturacion      # composición raíz: su Program.cs cablea al consumidor
 ```
 
 ### Paso 1 · El contrato en su proyecto
@@ -54,10 +57,10 @@ public record EmpresaSuspendidaV1(string Nit, string Motivo);
 
 Aquí se paga el peaje, y hace trabajo real: tu evento interno `EmpresaSuspendida(Motivo)` **no tiene** el NIT —internamente el stream id identifica—, así que traducir al público te obliga a **buscar el NIT** del id. Es el `localizador` de [Dos streams, la misma clave](./dos-streams-misma-clave.md), leído en la otra dirección: dado un stream, su NIT. En §23 esa tabla mapeaba NIT→stream para reservar la unicidad; la misma tabla responde también stream→NIT.
 
-> 🛠️ Dale al store un `NitDe(string streamId)` (un `SELECT nit FROM localizador WHERE stream = @id`). En el handler que suspende, arma el público con el NIT buscado y el motivo del comando, y deja **su JSON** en la bandeja.
+> 🛠️ Desde [El puerto propio](./el-puerto-propio.md), el handler recibe un `IEventStore`, no el store concreto. Por eso `store.NitDe(...)` solo compila si `NitDe` está en la **interfaz**. Declara en `IEventStore` un `string NitDe(string streamId)` e impleméntalo en las dos clases. El `PostgresEventStore` hace un `SELECT nit FROM localizador WHERE stream = @id`. El `InMemoryEventStore` lee al revés su diccionario NIT→id de §23: busca la entrada cuyo id es `streamId` y devuelve su NIT. En el handler que suspende, arma el público con el NIT buscado y el motivo del comando, y deja **su JSON** en la bandeja.
 
 ```csharp
-// en el handler (Dominio → referencia Contratos):
+// en el handler, en Empresas.Historia (que referencia Contratos):
 e.Suspender(cmd.Motivo);
 var nit = store.NitDe(cmd.EmpresaId);                               // id interno → NIT de negocio
 var publico = new Contratos.EmpresaSuspendidaV1(nit, cmd.Motivo);   // el contrato lleva el NIT, nunca emp-7
@@ -90,13 +93,13 @@ public static class Consumidor
 }
 ```
 
-¿Cómo llega el mensaje hasta `Facturacion`? En [El hecho y su anuncio](./el-hecho-y-su-anuncio.md), `EntregarPendientes()` volcaba a `MundoExterno`. Ahora no hardcodea el destino: recibe **a quién publicar**, y quien arma la aplicación (la composición raíz, que sí conoce todos los proyectos) cablea ese destino al consumidor.
+¿Cómo llega el mensaje hasta `Facturacion`? En [El hecho y su anuncio](./el-hecho-y-su-anuncio.md), `EntregarPendientes()` volcaba a `MundoExterno`. Ahora no hardcodea el destino: recibe **a quién publicar**. Quien arma la aplicación cablea ese destino al consumidor. Ese es tu `Empresas.Historia`: su `Program.cs` es la composición raíz, y por eso referencia también a `Facturacion`. `Facturacion` nunca lo referencia a él.
 
 ```csharp
 // EntregarPendientes ya no conoce al consumidor: recibe un callback
 public int EntregarPendientes(Action<string> publicar) { /* …lee pendientes; por cada uno: publicar(mensaje); marca entregado… */ }
 
-// en la composición raíz (el proyecto que referencia Dominio Y Facturacion):
+// en el Program.cs de Empresas.Historia, la composición raíz (referencia Contratos Y Facturacion):
 store.EntregarPendientes(mensaje => Consumidor.Recibir(mensaje));
 ```
 
@@ -106,8 +109,8 @@ Ese `Action<string> publicar` es una **costura**: hoy llama a un método in-proc
 
 ## 🔨 Rómpelo: el límite es de compilación, no de disciplina
 
-- En `Facturacion`, escribe `using Dominio;` y usa `EmpresaSuspendida`. **No compila:** `error CS0246: el tipo 'Dominio' no se encontró` — no hay referencia, y no la agregas. (Es justo lo que hiciste vivir en el dolor, ahora prohibido.)
-- En `Contratos`, intenta `public record Malo(Dominio.EmpresaSuspendida Interno)`. **Tampoco compila**, por lo mismo: el proyecto de contratos, al no ver tu dominio, no puede filtrar nada privado.
+- En `Facturacion`, usa `EmpresaSuspendida` (el tipo interno de `Empresas.Historia`). **No compila:** `error CS0246: El nombre del tipo o del espacio de nombres 'EmpresaSuspendida' no se encontró`. No hay referencia, y no la agregas: además de prohibida, cerraría un ciclo con `Empresas.Historia → Facturacion`. (Es justo lo que hiciste vivir en el dolor, ahora prohibido.)
+- En `Contratos`, intenta `public record Malo(EmpresaSuspendida Interno)`. **Tampoco compila**, por lo mismo: el proyecto de contratos, al no ver tu dominio, no puede filtrar nada privado.
 
 En el mundo de un solo proyecto nada te lo impedía y el acople se colaba en silencio. Ahora el compilador lo **prohíbe**.
 
@@ -119,16 +122,18 @@ Un evento interno y un evento público son dos cosas distintas que es tentador f
 
 ## ✅ Compruébalo
 
-- [ ] El proyecto `Contratos` **no** referencia tu dominio; `Dominio` referencia `Contratos` (para traducir); `Facturacion` referencia **solo** `Contratos`.
+- [ ] El proyecto `Contratos` **no** referencia tu dominio; `Empresas.Historia` referencia `Contratos` (para traducir) y `Facturacion` (es la composición raíz); `Facturacion` referencia **solo** `Contratos`.
 - [ ] El handler deja en la bandeja el **JSON del evento público** con el **NIT** (no tu `emp-7`); el consumidor lo deserializa como `EmpresaSuspendidaV1` sin conocer `EmpresaSuspendida`.
 - [ ] Intentar usar `EmpresaSuspendida` desde `Facturacion` (o embeberlo en `Contratos`) **no compila** — y sabes por qué.
-- [ ] Evolucionas el evento interno (renombras `Motivo`): la solución sigue compilando, porque `Facturacion` está al otro lado de la traducción — a diferencia del dolor, donde sí se rompía.
+- [ ] Evolucionas el evento interno (renombras `Motivo`): `dotnet build Facturacion` y `dotnet build Empresas.Historia` siguen compilando, porque `Facturacion` está al otro lado de la traducción — a diferencia del dolor, donde sí se rompía.
 
 ## 🆘 Si algo salió mal
 
-- **`Facturacion` compila usando `EmpresaSuspendida`:** le quedó la referencia a `Dominio` del dolor. Quítala: el consumidor solo conoce `Contratos`.
+- **`Facturacion` compila usando `EmpresaSuspendida`:** le quedó la referencia a `Empresas.Historia` del dolor. Quítala: el consumidor solo conoce `Contratos`.
 - **No tienes el NIT en el handler:** el agregado no lo expone; sácalo con `store.NitDe(cmd.EmpresaId)` (lee el `localizador` de §23 por su columna `stream`). Si `NitDe` no encuentra fila, es una empresa registrada **antes** del localizador: márcala `SIN-NIT-LEGADO` —el mismo criterio del dato faltante en [La forma del hecho se congela](./la-forma-del-hecho-se-congela.md)— hasta que el negocio la complete.
-- **`Dominio` no compila al usar `Contratos.EmpresaSuspendidaV1`:** falta la referencia `Dominio → Contratos`. Esa dirección es sana: el dominio *publica* el contrato.
+- **No compila `store.NitDe(...)` (`error CS1061: "IEventStore" no contiene una definición para "NitDe"`):** lo agregaste solo al `PostgresEventStore`, y el handler recibe un `IEventStore`. Declara `NitDe` en la interfaz. Si el error pasa a ser `CS0535` (`'InMemoryEventStore' no implementa el miembro de interfaz 'IEventStore.NitDe(string)'`), impleméntalo también en el doble, leyendo al revés su diccionario NIT→id.
+- **`Empresas.Historia` no compila al usar `Contratos.EmpresaSuspendidaV1`:** falta la referencia `Empresas.Historia → Contratos`. Esa dirección es sana: el dominio *publica* el contrato.
+- **`error MSB4006` (dependencia circular) al compilar:** agregaste `Empresas.Historia → Facturacion` sin quitar `Facturacion → Empresas.Historia` del dolor. Quítala con la ruta al `.csproj`: `dotnet remove Facturacion reference Empresas.Historia/Empresas.Historia.csproj`. Con solo la carpeta, `dotnet remove` dice que no encuentra la referencia y no quita nada.
 - **Quieres cambiar `EmpresaSuspendidaV1`:** no lo edites y rompas a los consumidores — crea `EmpresaSuspendidaV2` al lado, y deja el `V1` mientras alguien lo escuche.
 
 ## 📓 Registra tu avance

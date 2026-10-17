@@ -65,6 +65,7 @@ public interface IEventStore
 {
     List<EventoAlmacenado> GetEvents(string id);
     void Guardar(string id, IReadOnlyList<EventoAlmacenado> sobres, IReadOnlyList<string> anuncios);
+    void GuardarNuevo(string id, string nit, IReadOnlyList<object> hechos);   // de «Dos streams, la misma clave», sin cambios
 }
 
 // PostgresEventStore: los hechos Y los anuncios, en la MISMA transacción (todo o nada, ahora de las dos cosas)
@@ -117,7 +118,7 @@ public void Handle(SuspenderEmpresa cmd)
 }
 ```
 
-Los otros handlers (`CambiarPlan`, `PagarDeuda`) siguen llamando `Append(agg)` sin cambios: delega con anuncios vacíos.
+Los otros handlers (`CambiarPlanHandler`, `PagarDeudaHandler`) siguen llamando `Append(agg)` sin cambios: delega con anuncios vacíos. El registro tampoco anuncia: sigue persistiendo con `GuardarNuevo`, sin cambios.
 
 </details>
 
@@ -167,7 +168,7 @@ Fíjalo en un test. **Con la versión ingenua** (anunciar directo + `Append`), i
 
 Dos escrituras a **dos** sistemas no se pueden hacer atómicas: no hay transacción —ni siquiera un 2PC, que el mundo de afuera no va a hablar— que abarque tu base y a facturación a la vez, así que un corte entre ellas deja un fantasma (anunciaste algo que no pasó) o un hecho perdido (pasó y nadie se enteró). El truco es **no tener dos escrituras**: reduces el problema a **una** escritura atómica —el hecho y la *intención* de anunciarlo, en la misma transacción de tu base— y dejas la entrega como un paso separado que puede fallar y reintentarse sin mentir. Eso es el patrón **outbox**. Lo armaste a mano; falta ver qué le falta.
 
-> 🌱 Dos cabos quedan sueltos, y cada uno abre lo que sigue. **Uno:** ese `"suspendida:emp-1"` que inventaste ya es un contrato hacia afuera, pero improvisado; y si un día metes tu evento interno tal cual, atas a facturación a la forma privada de tu dominio. Hace falta un anuncio con **contrato propio** → [El evento público](./el-evento-publico.md). **Dos:** la entrega la disparas a mano y va a una lista en tu proceso; el día que facturación sea otro proceso en otra máquina, ese mensaje tiene que **viajar** —y una entrega durable, que reintente sola y no duplique, no se arma con un `UPDATE ... entregado=true`: necesita reintento e idempotencia → [El mensaje y la cola](./el-mensaje-y-la-cola.md). Lo primero es el próximo dolor.
+> 🌱 Dos cabos quedan sueltos, y cada uno abre lo que sigue. **Uno:** ese `"suspendida:emp-1"` que inventaste ya es un contrato hacia afuera, pero improvisado; y si un día metes tu evento interno tal cual, atas a facturación a la forma privada de tu dominio. Hace falta un anuncio con **contrato propio** → [El evento público](./el-evento-publico.md). **Dos:** la entrega la disparas a mano y va a una lista en tu proceso; el día que facturación sea otro proceso en otra máquina, ese mensaje tiene que **viajar** —y una entrega durable, que reintente sola y no duplique, no se arma con un `UPDATE ... entregado=true`: necesita reintento (y, más adelante, idempotencia) → [El mensaje y la cola](./el-mensaje-y-la-cola.md). Lo primero es el próximo dolor.
 
 ## ✅ Compruébalo
 

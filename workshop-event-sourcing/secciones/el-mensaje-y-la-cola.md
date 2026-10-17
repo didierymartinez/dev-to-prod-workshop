@@ -8,9 +8,9 @@ Ver qué garantías da una **cola** —un transporte entre procesos— que una l
 
 ## 💥 El dolor: dos consumidores, el mismo mensaje, dos veces
 
-Un método que llama a otro no cruza la frontera de un proceso: facturación corre en **otra** máquina y no está en tu memoria para que la llames. El mensaje tiene que **viajar**, y lo único que puede es la tabla `bandeja_salida`: quien quiera el anuncio la **sondea**.
+Un método que llama a otro no cruza la frontera de un proceso: facturación corre en **otra** máquina y no está en tu memoria para que la llames. El mensaje tiene que **viajar**, y hoy solo sale de la tabla `bandeja_salida`: tu relay la **sondea** y se lo entrega a facturación.
 
-En [El evento público](./el-evento-publico.md) tu `EntregarPendientes` era **un** relay, en tu proceso. Ahora súbelo a dos —dos instancias para no quedarte corto, o facturación misma sondeando la tabla—: **dos lectores compitiendo por las mismas filas**. Sin nada que los coordine, ambos hacen el mismo `SELECT ... WHERE NOT entregado` **antes** de que ninguno marque:
+En [El evento público](./el-evento-publico.md) tu `EntregarPendientes` era **un** relay, en tu proceso. Ahora súbelo a dos —dos instancias para no quedarte corto—: **dos lectores compitiendo por las mismas filas**. Sin nada que los coordine, ambos hacen el mismo `SELECT ... WHERE NOT entregado` **antes** de que ninguno marque:
 
 ```
 consumidor A → {1, 2, 3}
@@ -26,7 +26,7 @@ La primera: que dos consumidores no agarren la misma fila. Postgres tiene justo 
 
 > 🆕 **Una cola es un transporte con garantías, no una tabla que sondeas.** Lo que hiciste —sondear `bandeja_salida`— es una cola de juguete; una de verdad es un **canal** entre procesos que promete lo que un método no: entrega **reclamada** (un mensaje, un consumidor), reintento, orden, sobrevivir reinicios. La primera de esas garantías, el *claim*, sí se la puedes pedir a Postgres: `SELECT ... FOR UPDATE SKIP LOCKED` **bloquea** las filas que un consumidor toma y **salta** las que otro ya bloqueó. Ese bloqueo dura lo que dure la transacción (por eso el `SELECT` va dentro de una); `FOR UPDATE` a secas *esperaría* a que el otro libere — `SKIP LOCKED` en cambio *salta* y sigue.
 
-> 🛠️ **Inténtalo tú.** Reescribe la entrega de tu `EntregarPendientes` (en `PostgresEventStore`) para que **reclame de a una**: en vez de leer todo, toma **una** fila con `FOR UPDATE SKIP LOCKED LIMIT 1`, la procesa y la marca, todo en una transacción. Arranca **dos** de esos consumidores a la vez (dos `Task`, o dos veces el programa) contra la misma tabla, y confirma que entre los dos reclaman **todas** las filas **sin repetir ninguna**.
+> 🛠️ **Inténtalo tú.** Reescribe la entrega de tu `EntregarPendientes` (en `PostgresEventStore`) para que **reclame de a una**: en vez de leer todo, toma **una** fila con `FOR UPDATE SKIP LOCKED LIMIT 1`, la procesa y la marca, todo en una transacción. Arranca **dos** de esos consumidores a la vez (dos `Task`, o dos veces el programa) contra la misma tabla, y confirma que entre los dos reclaman **todas** las filas **sin repetir ninguna**. Para ver el reparto, que cada consumidor escriba su nombre junto al mensaje que recibe.
 
 <details>
 <summary>👉 Una forma de hacerlo</summary>
@@ -61,6 +61,7 @@ long ReclamarYEntregar(Action<string> publicar)
 
 ```csharp
 // dos consumidores compitiendo: cada uno vacía la cola reclamando de a una
+void Recibir(string quien, string m) => Console.WriteLine($"{quien}: {m}");   // dice qué consumidor recibió cada mensaje
 var A = Task.Run(() => { while (ReclamarYEntregar(m => Recibir("A", m)) != -1) { } });
 var B = Task.Run(() => { while (ReclamarYEntregar(m => Recibir("B", m)) != -1) { } });
 Task.WaitAll(A, B);

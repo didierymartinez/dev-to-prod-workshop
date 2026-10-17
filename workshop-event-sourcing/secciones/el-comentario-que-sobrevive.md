@@ -16,7 +16,7 @@ opts.Policies.UseDurableLocalQueues();   // el consumidor local también entrega
 
 Ese comentario parece útil, pero dice la **mecánica** —qué hace la línea—, que es casi lo que el nombre del método ya grita. Meses después, alguien hace limpieza. Lee "entrega durable, sobrevive reinicios" y piensa: *"casi nunca reiniciamos, y esto hace un `INSERT` por mensaje —más lento—; lo quito"*. El commit queda verde: todo compila, los tests pasan. El comentario que tenías **no lo detuvo**, porque le explicaba lo que la línea hace, no lo que pasa **sin** ella.
 
-Hasta que un despliegue reinicia el servicio en el instante justo: unos anuncios que estaban en la cola local **en memoria** se pierden — sin excepción, sin log, sin dead-letter. Facturación no se enteró de unas suspensiones, y nadie sabe por qué. La línea era una red de seguridad; su ausencia no rompe nada **visible**, y eso la hace peligrosísima.
+Hasta que un despliegue reinicia el servicio en el instante justo: unos pedidos y respuestas del proceso que estaban en la cola local **en memoria** se pierden — sin excepción, sin log, sin dead-letter. A Facturación nunca le llegó el `CobrarMultaV1`, o su `MultaCobradaV2` nunca volvió. La suspensión se queda con Facturación `EnCurso`, y nadie sabe por qué. La línea era una red de seguridad; su ausencia no rompe nada **visible**, y eso la hace peligrosísima.
 
 ## 🔧 Comenta el síntoma, no la mecánica
 
@@ -31,20 +31,33 @@ Lo que protege una línea así no es describir qué hace (el nombre ya lo dice),
 
 ```csharp
 // NO quitar: sin esto la entrega local es en memoria y NO sobrevive a un reinicio →
-// se pierden anuncios en silencio (sin excepción ni dead-letter). Muro de "El mensaje y la cola".
+// se pierden pedidos y respuestas del proceso en silencio (sin excepción ni dead-letter),
+// y la suspensión se queda EnCurso. Muro de "El mensaje y la cola".
 // (incidente #___  ← el número real cuando exista; en el taller no hay, queda como recordatorio del enlace)
 opts.Policies.UseDurableLocalQueues();
 ```
 
-Compara: el de §30 (`// entrega DURABLE (sobrevive reinicios)`) describe la **mecánica** que el nombre ya insinúa — no le da al que limpia una razón para no borrarla. Este nombra el **síntoma** que el nombre esconde ("se pierden anuncios en silencio") — y esa razón sí lo detiene. La misma idea aplica a otras líneas silenciosas-si-se-quitan que fuiste dejando: el `if` de versión del doble fiel en [El puerto propio](./el-puerto-propio.md) (sin él, verde falso), la idempotencia del consumidor en [Llegó dos veces](./llego-dos-veces.md) (sin ella, el mismo mensaje se aplica dos veces en silencio), el `DefaultTenantUsageEnabled = false` de [El contexto que falta](./el-contexto-que-falta.md) (sin él, datos en el cliente equivocado).
+Compara: el de §30 (`// entrega DURABLE (sobrevive reinicios)`) describe la **mecánica** que el nombre ya insinúa — no le da al que limpia una razón para no borrarla. Este nombra el **síntoma** que el nombre esconde ("se pierden pedidos y respuestas en silencio") — y esa razón sí lo detiene. La misma idea aplica a otras líneas silenciosas-si-se-quitan que fuiste dejando:
+
+- el `if` de versión del doble fiel en [El puerto propio](./el-puerto-propio.md): sin él, verde falso.
+- la idempotencia del consumidor en [Llegó dos veces](./llego-dos-veces.md): sin ella, el mismo mensaje se aplica dos veces en silencio.
+- los `IncludeAssembly` de Facturación y Accesos: sin ellos, sus handlers no existen para Wolverine, y el pedido se descarta con un `No routes` en el log.
+- el `MultipleHandlerBehavior.Separated` de [Dos respuestas, ningún dueño](./dos-respuestas-ningun-dueno.md): sin él, dos handlers del mismo mensaje corren en una sola cadena, y la falla de uno se lleva la respuesta del otro.
+- el `DefaultTenantUsageEnabled = false` de [El contexto que falta](./el-contexto-que-falta.md): sin él, datos en el cliente equivocado.
+
+Y una que viste en la librería: el `IRevisioned` de la saga en [El proceso tiene dueño](./el-proceso-tiene-dueno.md). Sin él, dos respuestas a la vez se pisan y una se pierde, sin excepción ni dead letter.
 
 </details>
 
 ## El aporte de vuelta a la librería
 
-Hay un segundo movimiento, y cierra un arco que **vienes viviendo**: **usar** la librería (el swap de Marten/Wolverine) → **mantenerla** (observarla, §36) → **aportar**. Que *tú* tengas que poner un comentario "NO quitar" sobre `UseDurableLocalQueues()` es una señal: su ausencia falla **en silencio**, y un usuario razonable esperaría que la entrega local fuera durable por defecto, o que **al menos avisara**. Eso se **devuelve** a la librería: un issue en el repo de Wolverine que nombra el síntoma que viviste, con tu caso concreto.
+Hay un segundo movimiento, y cierra un arco que **vienes viviendo**: **usar** la librería (el swap de Marten/Wolverine) → **mantenerla** (observarla, §42) → **aportar**. Que *tú* tengas que poner un comentario "NO quitar" sobre `UseDurableLocalQueues()` es una señal: su ausencia falla **en silencio**, y un usuario razonable esperaría que la entrega local fuera durable por defecto, o que **al menos avisara**. Eso se **devuelve** a la librería: un issue en el repo de Wolverine que nombra el síntoma que viviste, con tu caso concreto.
 
-Ojo con el criterio: no todo default que no te gusta merece un issue. El no-durable **podría** ser a propósito (durable es más lento, un `INSERT` por mensaje). Lo que lo hace reportable no es que te incomode, sino que **falla en silencio**: ahí el issue justo quizá no sea "hazlo durable por defecto", sino "al menos advierte cuando la cola local no es durable". Es lo que hacen bien los proyectos reales de tu organización cuando un default les mordió: dejan el síntoma escrito pegado al código —un `TODO[dueño]` (una nota dirigida al equipo que mantiene la librería) con el enlace al issue— **y** abren el hilo hacia afuera. El comentario que sobrevive en tu código y el issue que abres en la librería son la misma pieza vista desde dentro y desde fuera: nombrar el síntoma para que no vuelva a morder — ni a ti, ni al siguiente.
+Ojo con el criterio: no todo default que no te gusta merece un issue. El no-durable **podría** ser a propósito (durable es más lento, un `INSERT` por mensaje). Lo que lo hace reportable no es que te incomode, sino que **falla en silencio**: ahí el issue justo quizá no sea "hazlo durable por defecto", sino "al menos advierte cuando la cola local no es durable".
+
+Tienes un segundo caso, y este trae evidencia. En [El proceso tiene dueño](./el-proceso-tiene-dueno.md) viste que la documentación de Wolverine dice que las sagas sobre Marten traen la comprobación de versión. Con sesiones ligeras y una `Saga` simple, no es así: sin `IRevisioned`, dos respuestas a la vez se pisan y una se pierde en silencio. Ese issue no pide cambiar un default. Muestra la diferencia entre lo que dice la documentación y lo que pasa, con el código mínimo que la reproduce.
+
+Es lo que hacen bien los proyectos reales de tu organización cuando un default les mordió: dejan el síntoma escrito pegado al código —un `TODO[dueño]` (una nota dirigida al equipo que mantiene la librería) con el enlace al issue— **y** abren el hilo hacia afuera. El comentario que sobrevive en tu código y el issue que abres en la librería son la misma pieza vista desde dentro y desde fuera: nombrar el síntoma para que no vuelva a morder — ni a ti, ni al siguiente.
 
 ## ✅ Compruébalo
 
@@ -56,7 +69,7 @@ Ojo con el criterio: no todo default que no te gusta merece un issue. El no-dura
 ## 🆘 Si algo salió mal
 
 - **Tu comentario repite el nombre del método:** no protege nada. Reescríbelo en términos del **síntoma** de su ausencia (qué se pierde/corrompe, cómo se nota).
-- **No encuentras líneas "silenciosas":** busca las que pusiste tras un `🔨 Rómpelo` que fallaba en silencio (el doble que miente §22, la idempotencia §31, el fail-fast §35) — **o** las que ni siquiera pudiste meter en un test, como `UseDurableLocalQueues` (esas son las más peligrosas: ni el `🔨` las delata).
+- **No encuentras líneas "silenciosas":** busca las que pusiste tras un `🔨 Rómpelo` que fallaba en silencio (el doble que miente §22, la idempotencia §31, las dos colas de `Separated` §33, el fail-fast §41) — **o** las que ni siquiera pudiste meter en un test, como `UseDurableLocalQueues` (esas son las más peligrosas: ni el `🔨` las delata).
 - **Dejaste `#___` literal:** es aspiracional — el enlace al incidente/issue va cuando exista; en el taller no hay, así que es un recordatorio, no un dato.
 - **Crees que basta con el comentario:** protege tu código; el issue upstream protege a todos los que usan la librería con ese default. Son las dos mitades. (Aquí solo **formulas** el issue; abrirlo de verdad es opcional — se hace en la pestaña *Issues* del repo en GitHub.)
 

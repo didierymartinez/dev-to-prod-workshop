@@ -75,7 +75,7 @@ public class InMemoryEventStore : IEventStore
 }
 ```
 
-`grep -r "Npgsql" Dominio/` sale vacío, y la suite de reglas corre sin Docker.
+Tus tests de reglas ya no tocan `Npgsql`: dependen de `IEventStore`, y la suite corre sin Docker.
 
 </details>
 
