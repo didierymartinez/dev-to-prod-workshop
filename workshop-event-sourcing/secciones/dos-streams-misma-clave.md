@@ -36,7 +36,7 @@ Una invariante de conjunto solo la sostiene quien puede decidir de forma **atóm
 ¿Dónde vive ese `INSERT`? En [El puerto propio](./el-puerto-propio.md) sacaste `Npgsql` del dominio: los handlers solo hablan con `IEventStore`. Así que la reserva del NIT **no** puede ser SQL crudo en un handler — es una capacidad del **store**. El puerto gana un método para el único caso que la necesita: **crear** un stream nuevo reservando su clave de negocio.
 
 > 🛠️ **Inténtalo tú, en tres pasos.**
-> 1. **Añade el NIT al hecho.** Cambia `EmpresaRegistrada(Nombre, Plan)` → `EmpresaRegistrada(Nit, Nombre, Plan)` y `Registrar(nombre, plan)` → `Registrar(nit, nombre, plan)`. *(Sí: estás cambiando la forma de un hecho — guarda esa incomodidad, es el próximo dolor.)*
+> 1. **Añade el NIT al hecho.** Cambia `EmpresaRegistrada(Nombre, Plan)` → `EmpresaRegistrada(Nit, Nombre, Plan)` y `Registrar(nombre, plan)` → `Registrar(nit, nombre, plan)`. Ajusta también tus tests que construyen `EmpresaRegistrada` con dos argumentos: ahora llevan el NIT primero. *(Sí: estás cambiando la forma de un hecho — guarda esa incomodidad, la vives en [La forma del hecho se congela](./la-forma-del-hecho-se-congela.md).)*
 > 2. **Dale al puerto un método de creación.** Agrega a `IEventStore` un `void GuardarNuevo(string id, string nit, IReadOnlyList<object> hechos)`. Recibe los **hechos crudos** (los mismos de `SinConfirmar`), porque un stream nuevo se numera trivial: versiones `1..N`. En `PostgresEventStore`, dentro de **una** transacción: `INSERT` en `localizador(nit, id)` + los eventos numerados desde 1 (con tu `NombreDe` de siempre); atrapa `PostgresException` con `SqlState == "23505"` y lánzalo como un `NitYaExisteException`. En `InMemoryEventStore` (tu doble), replica **la misma garantía** con un diccionario NIT→id — o el verde mentirá, como viste en el puerto.
 > 3. **Registra por ahí.** Crea la empresa, emite su `Registrar(nit, …)`, y persiste con `store.GuardarNuevo(id, nit, e.SinConfirmar)` (en vez de `Append`). Si captura `NitYaExisteException`, no crea un hecho nuevo — de eso trata el 🔨.
 
@@ -87,6 +87,7 @@ public void GuardarNuevo(string id, string nit, IReadOnlyList<object> hechos)
 Y el registro que lo usa —el id interno lo eliges al crear (aquí un literal; en producción, un `Guid` fresco)—:
 
 ```csharp
+var nit = "900123";
 var e = new Empresa();
 e.Registrar(nit, "Constructora Andes", "Premium");   // emite EmpresaRegistrada(nit, …)
 try
@@ -112,7 +113,7 @@ La misma pieza cubre otro caso: el usuario hace doble clic en "Registrar", o el 
 
 Leer-antes-de-escribir no es una garantía: es una apuesta con una ventana que un día se abre. Una invariante de **conjunto** —"un NIT, una empresa"— solo la sostiene quien decide de forma atómica: el store, con un índice único escrito en la misma transacción que los hechos. Fíjate en la elección de fondo: **elegir el id es elegir dónde vive la identidad**. Si atas el id a una clave de negocio (el NIT), heredas gratis la unicidad pero quedas atrapado cuando esa clave cambia; si el id es interno y estable, la unicidad del NIT la pones aparte, en un índice mutable que sí puedes corregir. Y la idempotencia del doble clic **la decides tú al escribir** (que el segundo intento no cree un hecho); no es un filtro que le pidas a la base.
 
-> 🌱 El paso 1 te hizo cambiar la **forma** de `EmpresaRegistrada`: ahora lleva `Nit`. Pero tus empresas viejas se registraron **sin** él: sus hechos, ya escritos en el diario, no tienen ese campo. El día que los releas, ¿qué llega en `Nit`? Cambiar la forma de un hecho que ya está en disco es el próximo dolor ([La forma del hecho se congela](./la-forma-del-hecho-se-congela.md)).
+> 🌱 El NIT cupo en un índice porque lo prohibido era una clave repetida. Llegan los grupos empresariales, donde una empresa puede ser filial de otra, con una regla entre empresas que no es una clave: que ninguna termine colgando de sí misma a través de otras. Ni el localizador ni la versión de cada stream la sostienen ([El árbol de empresas](./el-arbol-de-empresas.md)).
 
 ## ✅ Compruébalo
 
@@ -146,4 +147,4 @@ git push
 
 [⬅️ Volver: El puerto propio](./el-puerto-propio.md)
 
-[➡️ Siguiente: La forma del hecho se congela](./la-forma-del-hecho-se-congela.md)
+[➡️ Siguiente: El árbol de empresas](./el-arbol-de-empresas.md)

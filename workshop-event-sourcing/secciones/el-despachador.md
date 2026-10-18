@@ -126,7 +126,7 @@ Lee cada entrada: la lambda recibe `comando` como `object` (la tabla guarda func
 
 ### 💥 El dolor: repites el tipo, y puedes desalinearlo
 
-Mira el patrón de cada `Add`: `typeof(X)` … `(X)comando`. El mismo tipo `X`, repetido por entrada. Y **nada obliga a que coincidan** la llave, el cast y el handler — esto **compila** y revienta al despachar:
+Mira el patrón de cada `Add`: `typeof(X)` … `(X)comando`. El mismo tipo `X`, repetido por entrada. Y **nada obliga a que coincidan** la llave, el cast y el handler — esto **compila** y revienta al despachar. Pruébalo **reemplazando** tu entrada de `SuspenderEmpresa` por esta (si la agregas junto a la buena, `Add` lanza antes `ArgumentException` por la llave repetida):
 
 ```csharp
 // 💥 la llave dice un tipo, el cast dice otro
@@ -175,7 +175,7 @@ _handlers[typeof(T)] = comando => handler.Handle((T)comando);
 > [!NOTE]
 > 💡 **El truco de la lambda — y por qué `Registrar` es más seguro, no solo más corto.** El genérico `T` solo existe al **registrar** (ahí C# sabe que es `SuspenderEmpresa`). La lambda `comando => handler.Handle((T)comando)` **captura** ese `T` y queda como un `Action<object>` uniforme, así la tabla es homogénea aunque cada handler reciba un comando distinto. Y como la llave, el cast y el handler son **el mismo `T`**, ya **no puedes** desalinearlos como en el `Add` a mano: el compilador lo garantiza. Sin `dynamic`, sin reflexión — solo un diccionario y un delegado.
 
-Úsalo: registras cada handler una vez, y despachas comandos que llegan **como `object`**, sin saber qué clase los maneja:
+Úsalo: registras cada handler una vez, y despachas comandos que llegan **como `object`**, sin saber qué clase los maneja. **🔁 Reemplaza** la tabla a mano (deja solo el `var stream`):
 
 ```csharp
 var despachador = new Despachador();
@@ -184,6 +184,8 @@ despachador.Registrar(new SuspenderHandler(stream));
 
 object comando = new SuspenderEmpresa("falta de pago");   // llega como object
 despachador.Enviar(comando);                              // encuentra SuspenderHandler por el tipo y lo llama
+
+Console.WriteLine(stream.Get().Suspendida ? "suspendida" : "activa");   // suspendida
 ```
 
 > [!NOTE]
@@ -219,7 +221,7 @@ Pero todo esto sigue sobre **una sola** empresa, en un stream suelto. ¿Y cuando
 ## ✅ Compruébalo
 
 - [ ] Cada comando es un **`record`** propio, y los handlers reciben su comando (`Handle(CambiarPlanDeEmpresa)`), no un `string`.
-- [ ] Tus handlers implementan **`ICommandHandler<T>`**, y tu `Despachador` enruta un `object comando` a su handler por `comando.GetType()`, **sin** `switch` y sin nombrar clases.
+- [ ] Tus handlers implementan **`ICommandHandler<T>`**, y tu `Despachador` enruta un `object comando` a su handler por `comando.GetType()`, **sin** `switch` y sin nombrar clases: `dotnet run` imprime `suspendida`.
 - [ ] Explicas por qué el despachador **necesita** las dos piezas: el `record` (para rutear por tipo — con `string` colisionarían) y la interfaz (para llamar `Handle` de forma tipada sin reflexión/`dynamic`).
 - [ ] Explicas qué tendría que darte una herramienta para jubilar tu Despachador: armar la tabla sola (tu `Registrar`) y rutear por tipo (tu `Enviar`).
 

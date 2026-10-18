@@ -149,7 +149,7 @@ Pero hoy los hechos que anotas los **fabricas a mano**, sin que nadie vigile las
 - [ ] `dotnet run` imprime `Constructora Andes: plan Premium`, con los hechos **anotados por `Append`** y la empresa obtenida vía `.Get()` (sin `new Empresa(historia)` ni `new List<object>{ … }` sueltos por ahí).
 - [ ] El consumidor escribe y lee sin tocar la lista cruda: solo `Append(...)` y `.Get()`.
 - [ ] Intenta `new EventStream<string>()` y observa que **no compila**: `string` no es un `AggregateRoot`, y la restricción `where` lo impide.
-- [ ] Quítale a `Empresa` el constructor `public Empresa() { }` y mira el error: sin constructor sin parámetros, `new T()` deja de compilar — eso es lo que exige el `new()` del `where`.
+- [ ] Cambia `public Empresa() { }` por `private Empresa() { }` y mira el error: `new EventStream<Empresa>()` deja de compilar (`CS0310`), porque el `new()` del `where` exige un constructor **público** sin parámetros. (Si lo borras, compila: a una clase que no declara ningún constructor, C# le da uno vacío.)
 
 ---
 

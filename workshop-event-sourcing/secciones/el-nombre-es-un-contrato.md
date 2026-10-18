@@ -109,10 +109,10 @@ public class EventStore
 
 ## Ahora renombrar es seguro
 
-Vuelve a escribir una empresa y abre su `.log`: el `Tipo` ya no menciona ninguna clase de C#.
+Borra la carpeta `datos/`: sus líneas dicen `"EmpresaRegistrada"`, un nombre que `_porNombre` ya no tiene, y leerlas lanza `KeyNotFoundException`. Vuelve a escribir una empresa y abre su `.log`: el `Tipo` ya no menciona ninguna clase de C#.
 
 ```json
-{"Version":1,"Tipo":"empresa-registrada","Datos":{"Nombre":"Constructora Andes","Plan":"Básico"}}
+{"Version":1,"Tipo":"empresa-registrada","Datos":{"Nombre":"Constructora Andes","Plan":"B\u00E1sico"}}
 {"Version":2,"Tipo":"plan-cambiado","Datos":{"NuevoPlan":"Enterprise"}}
 ```
 

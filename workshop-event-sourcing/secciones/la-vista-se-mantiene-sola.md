@@ -54,12 +54,15 @@ Para poner al día una empresa, ya tienes todo: **rehidrátala del diario** (`Ab
 >
 > ```csharp
 > // primero, siembra un escenario limpio para que los números cuadren:
-> // vacía las tres tablas (eventos, empresas_estado, checkpoint) y appendea 4 hechos, SIN tocar la vista —
+> // en psql, TRUNCATE eventos, empresas_estado; y deja en 0 la fila de tu vista en checkpoint.
+> // Luego appendea 4 hechos, SIN tocar la vista —
 > //   emp-1: Registrar("Andes","Básico"), CambiarPlan("Premium"), Suspender("falta")   → 3 hechos
 > //   emp-2: Registrar("Beta","Enterprise")                                             → 1 hecho
 > int aplicados = CorrerProyector();   // lee desde el checkpoint, pone al día la vista, avanza el checkpoint
-> // esperado: aplicados == 4 la 1ª vez y 0 la 2ª — la vista queda al día sin que ningún handler la tocara
+> // esperado: aplicados == 4 la 1ª vez y 0 la 2ª (dos llamadas seguidas, en la misma corrida) — la vista queda al día sin que ningún handler la tocara
 > ```
+>
+> La siembra corre una sola vez: 🔁 coméntala antes de volver a correr. Sobre la `emp-1` ya suspendida, `CambiarPlan` lanza.
 >
 > Necesitas: (1) una tabla `checkpoint(nombre TEXT PRIMARY KEY, ultimo_seq BIGINT)` con una fila para tu vista en `0`; (2) un `CorrerProyector()` que lea el `ultimo_seq`, traiga de `eventos` el `seq` y el `stream` de los hechos con `seq > ultimo_seq` **ordenados por `seq`**, y por cada uno **rehidrate esa empresa y llame `Actualizar(id, empresa)`**; al final guarde el `seq` más alto que aplicó y **devuelva cuántos aplicó** (para comprobarlo). **Y quita el `Actualizar` de los handlers que la tocaban** (`SuspenderHandler`, `PagarDeudaHandler`): la vista ya no es su trabajo.
 
@@ -107,7 +110,7 @@ El dolor era "cada handler tiene que acordarse de actualizar la vista". No lo el
 - [ ] Tras sembrar los 4 hechos (que solo hacen `Append`) y antes de correr el proyector, la vista está **vacía**: los handlers ya no la tocan.
 - [ ] `CorrerProyector()` la primera vez devuelve **4** y la vista queda completa: `emp-1` suspendida **con su plan Premium** (no en blanco), `emp-2` activa con su plan. La sacó del **diario**, no del handler.
 - [ ] Correrlo otra vez devuelve **0**: el checkpoint está al día. Es **idempotente**.
-- [ ] Cambia el plan de una empresa (`CambiarPlanDeEmpresa`) y corre el proyector: la columna `plan` de la vista se actualiza sola — sin un `if` por tipo de hecho.
+- [ ] Cambia el plan de `emp-2` (`CambiarPlanDeEmpresa`) y corre el proyector: la columna `plan` de la vista se actualiza sola — sin un `if` por tipo de hecho.
 - [ ] Pon el `ultimo_seq` del checkpoint en `0` y corre: la vista se **reconstruye entera** desde el diario. Bajar el checkpoint a 0 **es** reconstruir.
 
 ## 🆘 Si algo salió mal

@@ -1,6 +1,6 @@
 # Refactorizando el motor
 
-En la sección anterior, la clase `Empresa` se reconstruía con un `foreach` lleno de `if` dentro del constructor. Funciona — pero ya lo sentimos venir: **ese `if` va a crecer feo**. Vamos a evolucionarlo en tres pasos, y cada paso **lo vas a hacer tú** (te reto, lo intentas, y luego te muestro una forma de hacerlo).
+Tu `Empresa` se reconstruye con un `foreach` lleno de `if` dentro del constructor. Funciona, pero **ese `if` va a crecer feo**. Lo vas a evolucionar en tres pasos, y cada paso lo haces tú.
 
 ## 🎯 El Objetivo
 
@@ -31,9 +31,9 @@ public class Empresa
 
 ## 🔧 Refactor 1: separar "recorrer" de "aplicar"
 
-El constructor hace **dos** cosas a la vez: recorre la historia **y** decide qué hace cada hecho. Son responsabilidades distintas.
+El constructor hace **dos** cosas: recorre la historia **y** decide qué hace cada hecho.
 
-> 🛠️ **Inténtalo tú.** En tu `Empresa`, **saca** la lógica de los cuatro `if` a un método aparte —llámalo `Aplicar(object hecho)`— y deja el constructor con **solo** el `foreach` llamando a `Aplicar`. Corre `dotnet run`: debe imprimir lo mismo. Cuando lo tengas (o si te trabas), abre la solución:
+> 🛠️ **Inténtalo tú.** En tu `Empresa`, **saca** la lógica de los cuatro `if` a un método aparte —llámalo `Aplicar(object hecho)`— y deja el constructor con **solo** el `foreach` llamando a `Aplicar`. Corre `dotnet run`: debe imprimir lo mismo.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -62,20 +62,20 @@ public class Empresa
 }
 ```
 
-Mismo comportamiento, pero ahora "recorrer la historia" y "aplicar un hecho" son piezas separadas. Esto que hiciste tiene nombre: **separación de responsabilidades**.
+Mismo comportamiento, con "recorrer la historia" y "aplicar un hecho" en piezas separadas. Tiene nombre: **separación de responsabilidades**.
 </details>
 
 ## 🔧 Refactor 2: el motor es idéntico para todos → una clase base
 
-Mira el `foreach` que recorre la historia: *"toma la lista de hechos y aplícalos uno por uno"*. Ese bucle es **idéntico** para cualquier cosa con historia. El día que tengas una `Factura` event-sourced, copiarías exactamente ese `foreach`… y un mes después tendrías dos copias que ya no coinciden. La mecánica común (recorrer) debería vivir **una sola vez**.
+El `foreach` que recorre la historia es **idéntico** para cualquier cosa con historia. El día que tengas una `Factura` event-sourced, lo copiarías, y un mes después tendrías dos copias que ya no coinciden. Recorrer debe vivir **una sola vez**.
 
-> 🛠️ **Inténtalo tú.** Crea una clase base **`AggregateRoot`** con un método público `Load(IEnumerable<object>)` que haga el `foreach`; deja el "qué hace cada hecho" para las hijas. Haz que `Empresa` **herede** de ella y conserve solo su `Aplicar`. *(Pista: la base **no sabe** aplicar un hecho concreto —eso es de cada hija—; en C# ese método "obligatorio pero sin cuerpo aquí" es `protected abstract`.)*
-
-> [!NOTE]
-> 🆕 **Idioma de C#: herencia con `abstract` / `protected` / `override`.** `abstract class AggregateRoot` es una **clase base incompleta** —no se crea con `new`, solo se hereda—. `protected abstract void Aplicar(object hecho);` declara un método **obligatorio pero sin cuerpo** (`abstract`): la base exige que exista, pero no sabe implementarlo. `protected` lo hace visible **solo dentro de la base y sus hijas** (ni público ni privado). Cada hija da el cuerpo con `protected override void Aplicar(...)` (`override` = "estoy reemplazando el método de la base"). `Empresa : AggregateRoot` significa "`Empresa` **hereda de** `AggregateRoot`": recibe gratis el `Load` y solo aporta su `Aplicar`.
+> 🛠️ **Inténtalo tú.** Crea una clase base **`AggregateRoot`** con un método público `Load(IEnumerable<object>)` que haga el `foreach`; deja el "qué hace cada hecho" para las hijas. Haz que `Empresa` **herede** de ella y conserve solo su `Aplicar`. *(Pista: la base **no sabe** aplicar un hecho concreto; en C# un método obligatorio que la base deja sin cuerpo es `protected abstract`.)*
 
 > [!NOTE]
-> 🆕 **Idioma de C#: cuerpo de expresión (`=>`).** `public Empresa(...) => Load(historia);` es la forma corta de un método/constructor de **una sola línea**: `=> expresión;` equivale a `{ expresión; }`. Es solo azúcar sintáctica; el clásico sería `public Empresa(...) { Load(historia); }`.
+> 🆕 **Idioma de C#: herencia con `abstract` / `protected` / `override`.** `abstract class AggregateRoot` es una **clase base incompleta**: no se crea con `new`, solo se hereda. `protected abstract void Aplicar(object hecho);` declara un método **obligatorio sin cuerpo**: la base exige que exista, pero no sabe implementarlo. `protected` lo deja visible **solo en la base y sus hijas**. Cada hija da el cuerpo con `protected override void Aplicar(...)` (`override` = "reemplazo el método de la base"). `Empresa : AggregateRoot` significa "`Empresa` **hereda de** `AggregateRoot`": recibe el `Load` y solo aporta su `Aplicar`.
+
+> [!NOTE]
+> 🆕 **Idioma de C#: cuerpo de expresión (`=>`).** `public Empresa(...) => Load(historia);` es la forma corta de un método o constructor de **una sola línea**: equivale a `public Empresa(...) { Load(historia); }`.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -98,7 +98,7 @@ public abstract class AggregateRoot
 }
 ```
 
-Y `Empresa` se queda solo con lo suyo (hereda el `Load`, ya no repite el bucle):
+Y `Empresa` se queda solo con su `Aplicar`:
 
 ```csharp
 public class Empresa : AggregateRoot
@@ -119,25 +119,19 @@ public class Empresa : AggregateRoot
     }
 }
 ```
-
-Ahora, crear una `Factura` event-sourced es heredar de `AggregateRoot` y escribir solo **su** `Aplicar`. El motor `Load` ya no se copia: se reutiliza.
 </details>
 
 > [!NOTE]
-> **¿Y por qué una clase abstracta, no una interfaz?**
-> Las dos sirven para estandarizar ("toda entidad sabe cargar su historia"). La diferencia que importa **aquí**: una **clase abstracta** lleva **código real compartido** (el bucle `Load`, escrito una vez) y puede guardar **estado**; además es "incompleta" — no se crea sola con `new`. Una **interfaz** —la **lista de lo que una clase promete tener**, sin código propio— es ante todo un **contrato**: aunque el C# moderno le permite traer métodos *por defecto*, **no guarda estado de instancia**, y una clase puede implementar muchas. Como nuestro motor es **el mismo para todos** y pronto tendrá estado, encaja una clase abstracta: lo escribes **una vez** y cada hija lo hereda. (Con una interfaz, en la práctica, acabarías **repitiendo** el motor en cada clase.)
-
-> [!NOTE]
-> 🌱 **Semilla — este ciclo lo escribes a mano a propósito.** "Cargar la historia → aplicar hecho por hecho" es tan universal que tarde o temprano algo lo hará por ti. Lo construyes ahora para que ese atajo, cuando un muro real lo reclame, no sea magia: sabrás qué hace por debajo, porque lo escribiste.
+> **¿Por qué una clase abstracta y no una interfaz?** Una **clase abstracta** lleva **código real compartido** (el bucle `Load`, escrito una vez) y puede guardar **estado**. Una **interfaz** es la **lista de lo que una clase promete tener**: aunque el C# moderno le permite métodos *por defecto*, **no guarda estado de instancia**. El motor es el mismo para todos y va a guardar estado, así que va en una clase abstracta: lo escribes **una vez** y cada hija lo hereda. Con una interfaz acabarías **repitiendo** el motor en cada clase.
 
 ## 🔧 Refactor 3: del `if` encadenado al `switch`
 
-Queda un olor en `Aplicar`: esa pila de `if (hecho is …)`. Repite `is` en cada línea, y si mañana hay 15 hechos, son 15 `if` sueltos donde es fácil olvidar uno. C# tiene algo hecho a la medida de "según el **tipo** del hecho, haz una cosa u otra": un **`switch` por patrones de tipo** (lo que se llama **pattern matching**).
+Queda la pila de `if (hecho is …)` en `Aplicar`: repite `is` en cada línea, y con 15 hechos son 15 `if` sueltos donde es fácil olvidar uno. C# tiene algo hecho para "según el **tipo** del hecho, haz una cosa u otra": el **`switch` por tipo** (**pattern matching**).
 
-> 🛠️ **Inténtalo tú.** Convierte los cuatro `if (hecho is …)` de `Aplicar` en un **`switch`** por tipo. *(Pista: `case EmpresaRegistrada r:` te entrega el hecho ya convertido en `r`, y cada rama termina en `break;`.)*
+> 🛠️ **Inténtalo tú.** Convierte los cuatro `if (hecho is …)` de `Aplicar` en un **`switch`** por tipo. *(Pista: cada rama termina en `break;`.)*
 
 > [!NOTE]
-> 🆕 **Idioma de C#: pattern matching de tipo (`case Tipo x:`).** Un `switch` clásico compara valores (`case 1:`, `case "hola":`). Aquí el `switch` ramifica según el **tipo** del objeto: `case EmpresaRegistrada r:` significa "si `hecho` **es** un `EmpresaRegistrada`, entra aquí y dámelo ya convertido en la variable `r`". Es el mismo `hecho is EmpresaRegistrada r` que ya usabas en los `if`, ahora como rama del `switch`. Si no necesitas la variable (porque el hecho no trae datos), omites el nombre: `case EmpresaSuspendida:`.
+> 🆕 **Idioma de C#: pattern matching de tipo (`case Tipo x:`).** Un `switch` clásico compara valores (`case 1:`). Este ramifica según el **tipo** del objeto: `case EmpresaRegistrada r:` significa "si `hecho` **es** un `EmpresaRegistrada`, entra aquí y dámelo convertido en la variable `r`". Es el mismo `hecho is EmpresaRegistrada r` de tus `if`. Si no necesitas la variable, omites el nombre: `case EmpresaSuspendida:`.
 
 <details>
 <summary>👉 Muéstrame una forma de hacerlo</summary>
@@ -155,11 +149,11 @@ protected override void Aplicar(object hecho)
 }
 ```
 
-Cada `case` es "si el hecho es de **este tipo**, recíbelo ya convertido (`r`, `p`) y haz esto". Misma lógica que los `if`, pero agrupada, sin repetir `is`, y mucho más fácil de leer y crecer: un hecho nuevo = un `case` más.
+Misma lógica que los `if`, sin repetir `is`: un hecho nuevo es un `case` más.
 </details>
 
 > [!NOTE]
-> **Otra forma de enrutar por tipo (que NO usaremos, pero vale la pena ver entera).** En vez del `switch`, el enrutado podría vivir en la clase base, y cada hija tener un método `Aplicar` **por tipo**. El cambio completo sería así:
+> **Otra forma de enrutar por tipo.** En vez del `switch`, el enrutado vive en la clase base, y cada hija tiene un método `Aplicar` **por tipo**. El cambio completo:
 > ```csharp
 > // la base: el Load enruta por el tipo REAL del hecho, en ejecución
 > public abstract class AggregateRoot
@@ -180,21 +174,33 @@ Cada `case` es "si el hecho es de **este tipo**, recíbelo ya convertido (`r`, `
 >     public bool   Suspendida    { get; private set; }
 >     public int    Reactivaciones { get; private set; }
 >
+>     public Empresa(IEnumerable<object> historia) => Load(historia);
+>
 >     public void Aplicar(EmpresaRegistrada r) { Nombre = r.Nombre; Plan = r.Plan; }
 >     public void Aplicar(PlanCambiado p)      { Plan = p.NuevoPlan; }
 >     public void Aplicar(EmpresaSuspendida s) { Suspendida = true; }
 >     public void Aplicar(EmpresaReactivada e) { Suspendida = false; Reactivaciones++; }
 > }
 > ```
-> Funciona, y se parece a lo que un framework hace por dentro (un `Aplicar` por tipo, enrutado solo). **Pero** `(dynamic)` enruta en ejecución y **el compilador deja de verificarte los tipos**: si te falta un `Aplicar`, el error sale al correr el programa, no al compilar (y es más lento). Por eso **nos quedamos con el `switch`** de arriba: la misma idea, pero tipada.
+> Funciona, y se parece a lo que un framework hace por dentro. **Pero** `(dynamic)` elige en ejecución qué `Aplicar` llamar, y **el compilador deja de verificarlo** (además es más lento).
+
+> 🔨 **Rómpelo tú.** Al final de tu `Program.cs` agrega un hecho nuevo, `public record NombreCorregido(string Nuevo);`, y mételo al final de la historia: `new NombreCorregido("Constructora Andes S.A.")`, sin escribirle su rama. Guarda una copia del archivo (`cp Program.cs Program.bak`; igual en PowerShell) y reemplaza tu `AggregateRoot` y tu `Empresa` por las de arriba, que no tienen un `Aplicar(NombreCorregido)`. Compila sin una queja. Corre `dotnet run`:
 >
-> 🌱 Guarda eso sí la **forma** —un `Aplicar` por tipo—: la volverás a encontrar más adelante, con un enrutador seguro en vez de `dynamic`. Cuando la veas, recuerda que aquí ya decidiste por qué el enrutado en ejecución no te sirve.
+> ```
+> Unhandled exception. Microsoft.CSharp.RuntimeBinder.RuntimeBinderException: The best overloaded method match for 'Empresa.Aplicar(EmpresaRegistrada)' has some invalid arguments
+> ```
+>
+> El `dynamic` no encontró un `Aplicar(NombreCorregido)`. Agregar el hecho a la historia no se quejó; cargar la empresa, sí. Y mientras ese hecho esté en la historia, **toda** carga de esta empresa lanza. Recupera tu copia (`cp Program.bak Program.cs`, y borra `Program.bak`) y corre otra vez: tu `switch` carga la misma historia sin lanzar.
+
+Por eso **nos quedamos con el `switch`**: un hecho sin su `case` no rompe la carga de la empresa.
+
+> 🌱 Tu `switch` todavía imprime `Constructora Andes`: saltó el `NombreCorregido` sin avisar, y el compilador no te dice que le falta un `case`. Ese silencio lo vas a sentir en [El agregado recuerda](el-agregado-recuerda.md). La **forma** de un `Aplicar` por tipo volverá más adelante, con un enrutador seguro en vez de `dynamic`.
 
 ---
 
 ## 🔍 Comprueba
 
-Refactorizaste el motor en tres pasos. Como refactorizar cambia la **forma**, no el **comportamiento**, la salida debe seguir igual. **Corre:**
+Refactorizar cambia la **forma**, no el **comportamiento**. **Corre:**
 
 ```bash
 dotnet run
@@ -204,21 +210,22 @@ dotnet run
 > ```
 > Constructora Andes: plan Premium, suspendida, reactivada 1 vez/veces
 > ```
-> Si no coincide, un refactor alteró el comportamiento (no debería). Y revisa que en tu código quede **una sola** clase `Empresa` (la del `switch`) y **una** `AggregateRoot`: si dejaste pegada alguna versión anterior de los refactores, no compilará.
+> Si no compila, revisa que quede **una sola** clase `Empresa` (la del `switch`) y **una** `AggregateRoot`, sin versiones anteriores de los refactores pegadas.
 
 ---
 
 ### El Descubrimiento
 
-En tres saltos —separar, subir a una base, y rutear por tipo— pasaste de un `if` que crecía feo a un **motor de replay reutilizable**: una clase base **`AggregateRoot`** con el bucle `Load`, y un `Aplicar` por entidad resuelto con **pattern matching**. No es un `if` mejorado: es la forma en que se escribe esto en serio. Y lo **escribiste tú** — por eso, cuando una librería te lo dé hecho, sabrás exactamente qué hace. Pero mira cómo lo usas: la historia sigue siendo una `List<object>` pelada que armas a mano y le pasas al constructor. Cualquiera puede reordenarla o meterle basura antes de que llegue. Ese cabo suelto es el siguiente.
+Pasaste de un `if` que crecía feo a un **motor de replay reutilizable**: una clase base **`AggregateRoot`** con el bucle `Load`, y un `Aplicar` por entidad resuelto con **pattern matching**. Lo **escribiste tú**: cuando una librería te lo dé hecho, sabrás qué hace por debajo. Pero la historia sigue siendo una `List<object>` pelada que armas a mano y le pasas al constructor: cualquiera puede reordenarla o meterle basura antes de que llegue. Ese cabo suelto es el siguiente.
 
 ---
 
 ## ✅ Compruébalo
 
-- [ ] `dotnet run` imprime **lo mismo** que en la sección anterior (`plan Premium`, `reactivada 1 vez/veces`): refactorizaste sin cambiar el comportamiento.
-- [ ] Agrega un hecho nuevo, p. ej. `public record NombreCorregido(string Nuevo);`, y manéjalo con **un solo `case`** en el `switch` (`case NombreCorregido n: Nombre = n.Nuevo; break;`).
-- [ ] Intenta `new AggregateRoot()` y observa que **no compila**: una clase abstracta no se instancia sola (por eso sirve para compartir el motor, no para usarse directa).
+- [ ] `dotnet run` imprime **lo mismo** que en la sección anterior: refactorizaste sin cambiar el comportamiento.
+- [ ] Con el enrutado `dynamic` del 🔨, el `NombreCorregido` sin su `Aplicar` hace lanzar `RuntimeBinderException` al cargar la empresa. Con tu `switch`, la misma historia carga.
+- [ ] Dale a `NombreCorregido` su rama con **un solo `case`** en el `switch` (`case NombreCorregido n: Nombre = n.Nuevo; break;`): ahora imprime `Constructora Andes S.A.`.
+- [ ] Intenta `new AggregateRoot()`: **no compila**, porque una clase abstracta solo se hereda.
 - [ ] Explica, con la consecuencia concreta, por qué el motor va en una **clase abstracta** y no en una interfaz.
 
 ---
@@ -227,7 +234,7 @@ En tres saltos —separar, subir a una base, y rutear por tipo— pasaste de un 
 
 Piensa la respuesta a esto (es tu reflexión de la sección):
 
-> 💭 ¿Por qué el motor (`Load`) vive en la base `AggregateRoot` y el `Aplicar` en cada entidad? ¿Qué ganó el `switch` frente al `if`? …y ¿qué habrías perdido si hubieras elegido el enrutado con `dynamic`? Esa última déjala también en tu `DECISIONES.md`: elegiste enrutado tipado — el compilador avisa si falta un `Aplicar`.
+> 💭 ¿Por qué el motor (`Load`) vive en la base `AggregateRoot` y el `Aplicar` en cada entidad? ¿Qué ganó el `switch` frente al `if`? …y ¿qué habrías perdido si hubieras elegido el enrutado con `dynamic`? Esa última déjala también en tu `DECISIONES.md`: «Enruto con un `switch`: un hecho sin su `case` no rompe la carga de la empresa. Con `dynamic`, toda carga lanzaba.»
 
 Y **escríbela tú, con tus palabras, en el mensaje del commit** — reemplaza el placeholder, no pegues la pregunta:
 

@@ -18,27 +18,27 @@ consumidor B → {1, 2, 3}     (nadie marcó todavía)
 → los tres mensajes se entregan DOS veces
 ```
 
-El atajo de tenerlo en tu mismo proceso escondía el problema: con un solo lector, nadie competía. En cuanto el mensaje **viaja** a otro proceso, aparecen todas las preguntas que una cola de verdad ya respondió.
+Con un solo lector en tu proceso, nadie competía. En cuanto el mensaje **viaja** a otro proceso, aparecen todas las preguntas que una cola de verdad ya respondió.
 
 ## 🔧 Una pieza real: reclamar la fila
 
-La primera: que dos consumidores no agarren la misma fila. Postgres tiene justo eso — `FOR UPDATE SKIP LOCKED`: cada consumidor **bloquea** las filas que toma y **salta** las que otro ya bloqueó.
+> 🆕 **Una cola es un transporte con garantías, no una tabla que sondeas.** Sondear `bandeja_salida` es una cola de juguete; una de verdad es un **canal** entre procesos que promete lo que un método no: entrega **reclamada** (un mensaje, un consumidor), reintento, orden, sobrevivir reinicios. La primera, el *claim*, sí se la puedes pedir a Postgres: `SELECT ... FOR UPDATE SKIP LOCKED` **bloquea** las filas que un consumidor toma y **salta** las que otro ya bloqueó. Ese bloqueo dura lo que dure la transacción (por eso el `SELECT` va dentro de una); `FOR UPDATE` a secas *esperaría* a que el otro libere.
 
-> 🆕 **Una cola es un transporte con garantías, no una tabla que sondeas.** Lo que hiciste —sondear `bandeja_salida`— es una cola de juguete; una de verdad es un **canal** entre procesos que promete lo que un método no: entrega **reclamada** (un mensaje, un consumidor), reintento, orden, sobrevivir reinicios. La primera de esas garantías, el *claim*, sí se la puedes pedir a Postgres: `SELECT ... FOR UPDATE SKIP LOCKED` **bloquea** las filas que un consumidor toma y **salta** las que otro ya bloqueó. Ese bloqueo dura lo que dure la transacción (por eso el `SELECT` va dentro de una); `FOR UPDATE` a secas *esperaría* a que el otro libere — `SKIP LOCKED` en cambio *salta* y sigue.
-
-> 🛠️ **Inténtalo tú.** Reescribe la entrega de tu `EntregarPendientes` (en `PostgresEventStore`) para que **reclame de a una**: en vez de leer todo, toma **una** fila con `FOR UPDATE SKIP LOCKED LIMIT 1`, la procesa y la marca, todo en una transacción. Arranca **dos** de esos consumidores a la vez (dos `Task`, o dos veces el programa) contra la misma tabla, y confirma que entre los dos reclaman **todas** las filas **sin repetir ninguna**. Para ver el reparto, que cada consumidor escriba su nombre junto al mensaje que recibe.
+> 🛠️ **Inténtalo tú.** Reescribe la entrega de tu `PostgresEventStore` para que **reclame de a una**:
+>
+> **(1)** Un método `public long ReclamarYEntregar(Action<string> publicar)`: en vez de leer todo, toma **una** fila con `FOR UPDATE SKIP LOCKED LIMIT 1`, la publica y la marca, todo en una transacción. Devuelve el id de la fila, o `-1` si no quedaba ninguna. Es `public` porque lo llama tu `Program.cs`. **(2)** `EntregarPendientes(publicar)` queda como un bucle que llama a `ReclamarYEntregar` hasta el `-1` y cuenta las filas: tu test de [El hecho y su anuncio](./el-hecho-y-su-anuncio.md) la sigue usando. **(3)** Para tener qué repartir, deja cuatro filas pendientes desde `psql`: `INSERT INTO bandeja_salida(mensaje) VALUES ('m1'), ('m2'), ('m3'), ('m4');`. **(4)** En tu `Program.cs`, deja la cadena y el `store`, y en lugar de los pasos de [El evento público](./el-evento-publico.md) arranca **dos** consumidores a la vez (dos `Task`, o dos veces el programa) contra la misma tabla. Confirma que entre los dos reclaman **todas** las filas **sin repetir ninguna**. Para ver el reparto, que cada consumidor escriba su nombre junto al mensaje que recibe.
 
 <details>
 <summary>👉 Una forma de hacerlo</summary>
 
 ```csharp
-// un consumidor: reclama UNA fila, la procesa y la marca, dentro de su transacción
-long ReclamarYEntregar(Action<string> publicar)
+// PostgresEventStore: un consumidor reclama UNA fila, la publica y la marca, dentro de su transacción
+public long ReclamarYEntregar(Action<string> publicar)   // public: lo llama tu Program.cs
 {
     using var c = new NpgsqlConnection(_cadena); c.Open();
     using var tx = c.BeginTransaction();
     long id; string mensaje;
-    using (var q = c.CreateCommand())                 // el lector se cierra antes del UPDATE (el detalle de Npgsql de §26)
+    using (var q = c.CreateCommand())                 // el lector se cierra antes del UPDATE (el detalle de Npgsql de §28)
     {
         q.Transaction = tx;
         q.CommandText = "SELECT id, mensaje FROM bandeja_salida WHERE NOT entregado ORDER BY id FOR UPDATE SKIP LOCKED LIMIT 1";
@@ -57,20 +57,65 @@ long ReclamarYEntregar(Action<string> publicar)
     tx.Commit();                                       // aquí se libera el lock
     return id;
 }
+
+// la entrega de siempre, ahora un bucle sobre el claim
+public int EntregarPendientes(Action<string> publicar)
+{
+    var entregadas = 0;
+    while (ReclamarYEntregar(publicar) != -1) entregadas++;
+    return entregadas;
+}
 ```
 
 ```csharp
-// dos consumidores compitiendo: cada uno vacía la cola reclamando de a una
+// Program.cs: dos consumidores compitiendo; cada uno vacía la cola reclamando de a una
 void Recibir(string quien, string m) => Console.WriteLine($"{quien}: {m}");   // dice qué consumidor recibió cada mensaje
-var A = Task.Run(() => { while (ReclamarYEntregar(m => Recibir("A", m)) != -1) { } });
-var B = Task.Run(() => { while (ReclamarYEntregar(m => Recibir("B", m)) != -1) { } });
+var A = Task.Run(() => { while (store.ReclamarYEntregar(m => Recibir("A", m)) != -1) { } });
+var B = Task.Run(() => { while (store.ReclamarYEntregar(m => Recibir("B", m)) != -1) { } });
 Task.WaitAll(A, B);
-// con 4 filas → uno reclama {2,4} y el otro {1,3} (o el reparto que toque): las 4, ninguna dos veces
+// con las 4 filas → A: m1 · B: m2 · A: m3 · B: m4 (o el reparto que toque): las 4, ninguna dos veces
 ```
 
-Es el `EntregarPendientes` de [El evento público](./el-evento-publico.md), ahora reclamando de a una con lock en vez de leer todo de golpe.
-
 </details>
+
+## 🔨 Rómpelo: el claim sin `ORDER BY`
+
+Tu claim lleva `ORDER BY id`. Sin él, Postgres suele devolver las filas en el orden en que entraron, pero no lo garantiza. Fíjalo en un test, con el arnés de [La forma del hecho se congela](./la-forma-del-hecho-se-congela.md), cuyo fixture ya crea y vacía `bandeja_salida`. El test llama a tu `ReclamarYEntregar` como tu `Program.cs`.
+
+```csharp
+[Collection("postgres")]
+public class ElMensajeYLaCola(PostgresFixture db) : IAsyncLifetime
+{
+    public Task InitializeAsync() { db.Limpiar(); return Task.CompletedTask; }
+    public Task DisposeAsync() => Task.CompletedTask;
+
+    [Fact]
+    public void El_claim_toma_la_mas_vieja()
+    {
+        db.Ejecutar("INSERT INTO bandeja_salida(mensaje) VALUES ('m1'), ('m2'), ('m3')");
+        db.Ejecutar("UPDATE bandeja_salida SET entregado = false WHERE mensaje = 'm1'");   // un reintento vuelve a marcar la primera
+
+        var recibidos = new List<string>();
+        new PostgresEventStore(db.Cadena).ReclamarYEntregar(m => recibidos.Add(m));
+
+        Assert.Equal(new[] { "m1" }, recibidos);
+    }
+}
+```
+
+Verde. Ahora quita el `ORDER BY id` del claim y corre otra vez: rojo, con `Expected: ["m1"]` y `Actual: ["m2"]`. El `UPDATE` no le cambió ningún dato a `m1`, pero la movió de lugar. En Postgres, un `UPDATE` escribe una versión nueva de la fila en otro sitio de la tabla. Míralo en `psql` sobre la base de pruebas (`docker exec -it empresas-db psql -U postgres -d empresas_tests`). La columna `ctid` es la posición física de cada fila: página y lugar.
+
+```sql
+TRUNCATE bandeja_salida;
+INSERT INTO bandeja_salida(mensaje) VALUES ('m1'), ('m2'), ('m3');
+SELECT ctid, mensaje FROM bandeja_salida;   -- (0,1) m1 · (0,2) m2 · (0,3) m3
+UPDATE bandeja_salida SET entregado = false WHERE mensaje = 'm1';
+SELECT ctid, mensaje FROM bandeja_salida;   -- (0,2) m2 · (0,3) m3 · (0,4) m1
+```
+
+Sin `ORDER BY`, Postgres devuelve las filas en el orden en que las encuentra al recorrer la tabla, y cada `UPDATE` cambia ese orden: una fila que se reintenta una y otra vez queda siempre al final. Devuelve el `ORDER BY id`: el orden lo pide la consulta.
+
+El claim consume la fila que toma: la marca `entregado`. Un sondeo que solo lee no consume nada: si revisa cada minuto 50 empresas suspendidas con `LIMIT 50`, sin orden puede leer siempre las mismas 50 y no llegar nunca a las demás. Ahí, además del `ORDER BY`, hace falta un cursor: guardar el último id leído y pedir `WHERE id > @ultimo ORDER BY id LIMIT 50`. Es el checkpoint de [La vista se mantiene sola](./la-vista-se-mantiene-sola.md): `seq > ultimo_seq`, `ORDER BY seq`.
 
 ## 🔨 Rómpelo: el claim es una piedra, no el muro
 
@@ -81,28 +126,29 @@ Pusiste **una** garantía. Mira las que faltan, y que cada una es otra pieza igu
 - **Dead-letter.** Un mensaje envenenado que nunca procesa no puede bloquear la cola — apártalo (lo viviste con el proyector en [El proyector tropieza](./el-proyector-tropieza.md), ahora para el transporte).
 - **Orden, fan-out, backpressure, sobrevivir reinicios.** Entregar en orden; que varios interesados reciban el mismo anuncio; no ahogar a un consumidor lento; retomar tras un reinicio sin perder ni repetir.
 
-Cada una tiene su `SELECT ... SKIP LOCKED` equivalente, y todas juntas, correctas y probadas, son un **broker de mensajes**. Puedes construirlo — pero es un proyecto, no una tarde, y es fácil equivocarse en silencio.
+Cada una tiene su `SELECT ... SKIP LOCKED` equivalente, y todas juntas, correctas y probadas, son un **broker de mensajes**. Puedes construirlo, pero es un proyecto, no una tarde, y es fácil equivocarse en silencio.
 
-¿Y por qué no tomar un broker que ya existe (RabbitMQ y compañía) ahora mismo? Podrías —están hechos justo para esto—; armar el claim a mano no fue para reemplazarlos, sino para **sentir** qué te dan. Y hay algo mejor todavía: ni siquiera hace falta un broker aparte, porque la Postgres que ya tienes puede ser la cola.
+¿Por qué no tomar ya un broker que existe (RabbitMQ y compañía)? Podrías tomarlo: armar el claim a mano fue para **sentir** qué te dan, no para reemplazarlos.
 
 ## El Descubrimiento
 
-Es el momento de [Todo o nada](./todo-o-nada.md) otra vez, ahora para el transporte. Allí "las dos o ninguna" resultó ser una **transacción**, algo que le pertenece a una base de datos y no a tu código. Aquí "que el mensaje viaje entre procesos, reclamado, sin perderse, con reintento y dead-letter" es una **cola durable** — algo que le pertenece a un transporte, no a tu bucle de `SELECT`. Reclamar la fila con `SKIP LOCKED` es una piedra de verdad; el muro entero es un broker. La salida madura no es armarlo: es reconocer que ya existe hecho y correcto.
+Es el momento de [Todo o nada](./todo-o-nada.md) otra vez, ahora para el transporte. Allí "las dos o ninguna" resultó ser una **transacción**, algo que le pertenece a una base de datos y no a tu código. Aquí "que el mensaje viaje entre procesos, reclamado, sin perderse, con reintento y dead-letter" es una **cola durable**, algo que le pertenece a un transporte. Reclamar la fila con `SKIP LOCKED` es una piedra de verdad; el muro entero es un broker, y la salida madura es reconocer que ya existe hecho y correcto.
 
-> 🌱 Mira todo lo que llevas reconstruido a mano: proyector, checkpoint, las claves primarias que protegen orden y unicidad, la transacción del outbox, y ahora el arranque de una cola. Cada pieza fue el trabajo de una base de datos o un transporte, no tuyo. Existe una pareja de librerías —una para el diario y sus proyecciones, otra para los mensajes y transportes— que ya trae todo eso, atómico y correcto, **sobre la misma Postgres que ya usas** (incluida una cola en la propia base, sin broker aparte). No las adoptas por moda: las adoptas por **alivio**, cuando reconoces que reescribiste —peor— lo que ellas ya resolvieron. Ese reconocimiento es lo que sigue: [El swap por reconocimiento](./el-swap-por-reconocimiento.md).
+> 🌱 Llevas reconstruido a mano el proyector, el checkpoint, las claves primarias que protegen orden y unicidad, la transacción del outbox, y ahora el arranque de una cola. Existe una pareja de librerías —una para el diario y sus proyecciones, otra para los mensajes y transportes— que ya trae todo eso, atómico y correcto, **sobre la misma Postgres que ya usas** (incluida una cola en la propia base, sin broker aparte). Las adoptas por **alivio**, cuando reconoces que reescribiste —peor— lo que ellas ya resolvieron: [El swap por reconocimiento](./el-swap-por-reconocimiento.md).
 
 ## ✅ Compruébalo
 
-- [ ] Con dos consumidores sin claim, el mismo mensaje se entrega dos veces (ambos lo leen antes de marcar).
-- [ ] Con `FOR UPDATE SKIP LOCKED`, dos consumidores reclaman filas **distintas** — ninguno agarra la que el otro bloqueó.
+- [ ] Sin claim, dos consumidores entregan el mismo mensaje dos veces; con `FOR UPDATE SKIP LOCKED`, reclaman filas **distintas**.
+- [ ] Sin `ORDER BY id`, `El_claim_toma_la_mas_vieja` cae: tras el `UPDATE` sobre `m1`, el claim toma `m2`. Con `ORDER BY id`, toma `m1`.
+- [ ] Sabes decir por qué un sondeo que no consume filas necesita, además del `ORDER BY`, un cursor que avanza.
 - [ ] Sabes nombrar al menos cuatro garantías más que una cola da y tu bucle de `SELECT` no (ack/at-least-once, reintento, dead-letter, orden…).
 - [ ] Sabes decir por qué "una cola durable" es a un transporte lo que "una transacción" fue a la base: algo que no te toca reimplementar.
 
 ## 🆘 Si algo salió mal
 
 - **Los dos consumidores siguen agarrando la misma fila:** te falta `FOR UPDATE SKIP LOCKED`, o el `SELECT` no está dentro de una transacción (el lock vive mientras la transacción esté abierta).
-- **Un consumidor se queda esperando en vez de saltar:** usaste `FOR UPDATE` sin `SKIP LOCKED` — eso **bloquea** hasta que el otro libere, en vez de saltar la fila. Necesitas `SKIP LOCKED`.
-- **Perdiste un mensaje al caer:** marcaste `entregado` antes de que el consumidor confirmara. Ese es justo el problema *at-least-once* que ninguna solución a mano resuelve del todo — motivo del swap.
+- **Un consumidor se queda esperando en vez de saltar:** usaste `FOR UPDATE` sin `SKIP LOCKED`, que **bloquea** hasta que el otro libere.
+- **Tu test de [El hecho y su anuncio](./el-hecho-y-su-anuncio.md) ya no compila:** reemplazaste `EntregarPendientes` por `ReclamarYEntregar`. Conserva `EntregarPendientes(publicar)` como un bucle que llama a `ReclamarYEntregar` hasta que devuelva `-1`, y que cuente las filas entregadas.
 
 ## 📓 Registra tu avance
 
@@ -116,7 +162,7 @@ git push
 
 ## 🧠 En una frase
 
-Una llamada a un método no cruza procesos, así que el anuncio viaja por una **cola**: un transporte con garantías —claim, at-least-once, reintento, dead-letter, orden— de las que solo puedes armar a mano la primera (`FOR UPDATE SKIP LOCKED`) antes de darte cuenta de que el resto es reescribir un broker; igual que "todo o nada" era una transacción, "que el mensaje viaje sin perderse" es una cola durable, y no te toca reimplementarla.
+Una llamada a un método no cruza procesos, así que el anuncio viaja por una **cola**: un transporte con garantías (claim, at-least-once, reintento, dead-letter, orden). A mano solo armas la primera (`FOR UPDATE SKIP LOCKED`); el resto es reescribir un broker. Igual que "todo o nada" era una transacción, "que el mensaje viaje sin perderse" es una cola durable, y no te toca reimplementarla. Y un lote lleva `ORDER BY`: sin él, cada `UPDATE` cambia el orden de la tabla y el claim deja de tomar la fila más vieja.
 
 ---
 

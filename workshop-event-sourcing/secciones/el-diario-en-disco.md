@@ -36,7 +36,7 @@ Para eso necesitas dos cosas nuevas: leer/escribir un archivo, y convertir cada 
 > - `Environment.NewLine` es el salto de línea del sistema — lo añades para que cada sobre quede en su propia línea.
 
 > [!NOTE]
-> 🆕 **Idioma de C#: `System.Text.Json`.** `JsonSerializer.Serialize(algo)` convierte un objeto en una cadena JSON; `JsonSerializer.Deserialize<T>(cadena)` hace el camino inverso. Viene en .NET (`using System.Text.Json;`). Un detalle: `Deserialize<T>` puede devolver `null`, y el `!` al final (`Deserialize<T>(linea)!`) le dice al compilador "confía, aquí no será null" para que no te avise.
+> 🆕 **Idioma de C#: `System.Text.Json`.** `JsonSerializer.Serialize(algo)` convierte un objeto en una cadena JSON; `JsonSerializer.Deserialize<T>(cadena)` hace el camino inverso. Viene en .NET: pon `using System.Text.Json;` en la **primera línea** del `Program.cs`, antes del código suelto (junto a la clase no compila). Un detalle: `Deserialize<T>` puede devolver `null`, y el `!` al final (`Deserialize<T>(linea)!`) le dice al compilador "confía, aquí no será null" para que no te avise.
 
 > 🛠️ **Inténtalo tú.** Cambia **solo** las tripas de `EventStore` (deja igual `EventStream`, los handlers y la `Empresa`). Como ahora escribe a un archivo, el almacén necesita saber **en qué carpeta**: recíbela por constructor y crea la carpeta ahí mismo — eso obliga a cambiar tus `new EventStore()` por `new EventStore("datos")`. En `AppendEvent`, serializa el sobre y **agrégalo como una línea** al archivo de ese id (mantén la verificación de versión que ya hacías: lee lo que ya hay antes de aceptar). En `GetEvents`, si el archivo existe, lee cada línea y **deserialízala** de vuelta a `EventoAlmacenado`; si no, devuelve una lista vacía.
 
@@ -44,7 +44,7 @@ Para eso necesitas dos cosas nuevas: leer/escribir un archivo, y convertir cada 
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```csharp
-using System.Text.Json;
+// using System.Text.Json;  → en la primera línea del Program.cs, no aquí
 
 public class EventStore
 {
@@ -97,10 +97,12 @@ s.Append(e);                           // el modelo acumulador de §11: Append r
 Abre el archivo `datos/emp-7.log`: los hechos **están ahí**.
 
 ```json
-{"Version":1,"EventData":{"Nombre":"Constructora Andes","Plan":"Básico"}}
+{"Version":1,"EventData":{"Nombre":"Constructora Andes","Plan":"B\u00E1sico"}}
 {"Version":2,"EventData":{"NuevoPlan":"Enterprise"}}
 {"Version":3,"EventData":{"Motivo":"falta de pago"}}
 ```
+
+El `\u00E1` es la `á` de `Básico`: `System.Text.Json` escapa por defecto lo que no es ASCII, y al leer vuelve a ser `á`.
 
 Ahora pide la empresa de vuelta — `Get` la rehidrata leyendo el disco, igual que haría la próxima vez que arranques:
 
@@ -141,7 +143,7 @@ Si el problema es que el texto no dice qué clase es, **escríbelo tú**: junto 
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```csharp
-using System.Text.Json;
+// (el using System.Text.Json; ya está en la primera línea del Program.cs)
 
 // Una línea del archivo: datos + el tipo que los rotula. Datos entra como object
 // (al leer volverá como JsonElement, igual que el EventData de tu sobre).
@@ -198,6 +200,8 @@ public class EventStore
 
 ## Ahora sí sobrevive al reinicio
 
+Antes de correr, **borra la carpeta `datos/`**: sus líneas son del formato sin `Tipo`, y tu `GetEvents` nuevo lanza `NullReferenceException` al leerlas.
+
 Para probar que sobrevive de verdad, necesitas **escribir en una corrida y leer en otra**. Un truco simple: siembra los hechos **solo si el diario está vacío**, y luego rehidrata siempre.
 
 ```csharp
@@ -220,11 +224,13 @@ Console.WriteLine($"{empresa.Nombre}: plan {empresa.Plan}, {(empresa.Suspendida 
 
 Corre una vez (siembra e imprime) y **vuelve a correr sin borrar `datos`**: la segunda vez **no** siembra —el diario ya no está vacío— y aun así imprime `Constructora Andes: plan Enterprise, suspendida`. Los hechos sobrevivieron al proceso anterior.
 
-> 🌱 Ese **mapa de nombre → clase** lo llenas a mano. Reactiva una empresa (emite un `EmpresaReactivada`, un evento que aún **no** pusiste en el mapa), reinicia, y al leer el diario:
+> 🌱 Ese **mapa de nombre → clase** lo llenas a mano. Haz que `emp-7` pague y se reactive: `new PagarDeudaHandler(store).Handle(new PagarDeuda("emp-7", 500));`. Ni `PagoRegistrado` ni `EmpresaReactivada` están en el mapa. El pago se escribe, pero antes de escribir la reactivación, `AppendEvent` relee el diario para verificar la versión, y revienta:
 >
 > ```
-> 💥 KeyNotFoundException: The given key 'EmpresaReactivada' was not present in the dictionary.
+> 💥 KeyNotFoundException: The given key 'PagoRegistrado' was not present in the dictionary.
 > ```
+>
+> Después, quita esa línea y borra la carpeta `datos/`: el pago quedó escrito en `emp-7.log`, y mientras esté ahí toda corrida revienta al leer `emp-7`.
 >
 > La historia en disco depende de una lista que mantienes sincronizada a mano con cada evento que inventas. Olvidas uno y deja de leerse. Ese dolor es el que abre lo que sigue.
 
