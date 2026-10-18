@@ -1,8 +1,14 @@
 // Modo presentación: las mismas láminas del video, pero avanzas tú.
 // → / espacio / AvPág / clic: siguiente golpe (con su animación).  ← / RePág: anterior.
-// 1–9: salta al inicio de esa sección.  F: pantalla completa.  H: muestra u oculta la ayuda.
+// Un número (p. ej. 4 y 2): salta al inicio de esa sección.  F: pantalla completa.  H: ayuda.
 import { Player, type PlayerRef } from "@remotion/player";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createRoot } from "react-dom/client";
 import { secciones } from "../src/contenido";
 import { lienzo } from "../src/estilo/tema";
@@ -32,7 +38,9 @@ const Ayuda: React.FC<{ alCerrar: () => void }> = ({ alCerrar }) => (
   >
     <b>Modo presentación</b>
     <br />→ espacio AvPág clic: siguiente · ← RePág: anterior
-    <br />1–9: ir a la sección · F: pantalla completa · H: ocultar esta ayuda
+    <br />
+    número (p. ej. 4 y 2): ir a la sección · F: pantalla completa · H: ocultar
+    esta ayuda
   </div>
 );
 
@@ -45,6 +53,10 @@ const App: React.FC = () => {
   const actual = useRef(indice);
   const detenerEn = useRef<number | null>(null);
   const [ayuda, setAyuda] = useState(true);
+  // Los dígitos que vas tecleando para saltar a una sección (se aplican a los 0,7 s).
+  const numero = useRef("");
+  const [tecleado, setTecleado] = useState("");
+  const temporizador = useRef<number | undefined>(undefined);
 
   const ir = useCallback(
     (n: number, animar: boolean) => {
@@ -88,19 +100,32 @@ const App: React.FC = () => {
   useEffect(() => {
     const alTeclear = (e: KeyboardEvent) => {
       const k = actual.current;
-      if (["ArrowRight", " ", "PageDown", "Enter", "ArrowDown"].includes(e.key)) {
+      if (
+        ["ArrowRight", " ", "PageDown", "Enter", "ArrowDown"].includes(e.key)
+      ) {
         e.preventDefault();
         ir(k + 1, true);
-      } else if (["ArrowLeft", "PageUp", "Backspace", "ArrowUp"].includes(e.key)) {
+      } else if (
+        ["ArrowLeft", "PageUp", "Backspace", "ArrowUp"].includes(e.key)
+      ) {
         e.preventDefault();
         ir(k - 1, false);
       } else if (e.key === "Home") {
         ir(0, false);
       } else if (e.key === "End") {
         ir(paradas.length - 1, false);
-      } else if (/^[1-9]$/.test(e.key)) {
-        const destino = paradas.findIndex((p) => p.seccion === Number(e.key) && p.primeraDeSeccion);
-        if (destino >= 0) ir(destino, true);
+      } else if (/^[0-9]$/.test(e.key)) {
+        numero.current = (numero.current + e.key).slice(-2);
+        setTecleado(numero.current);
+        window.clearTimeout(temporizador.current);
+        temporizador.current = window.setTimeout(() => {
+          const destino = paradas.findIndex(
+            (p) => p.seccion === Number(numero.current) && p.primeraDeSeccion,
+          );
+          numero.current = "";
+          setTecleado("");
+          if (destino >= 0) ir(destino, true);
+        }, 700);
       } else if (e.key === "f" || e.key === "F") {
         if (document.fullscreenElement) void document.exitFullscreen();
         else void document.documentElement.requestFullscreen();
@@ -116,7 +141,12 @@ const App: React.FC = () => {
   return (
     <div
       onClick={() => ir(actual.current + 1, true)}
-      style={{ position: "fixed", inset: 0, background: "#000", cursor: "pointer" }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "#000",
+        cursor: "pointer",
+      }}
       title={`Sección ${p?.seccion} · lámina ${(p?.lamina ?? 0) + 1}`}
     >
       <Player
@@ -134,6 +164,23 @@ const App: React.FC = () => {
         spaceKeyToPlayOrPause={false}
         acknowledgeRemotionLicense
       />
+      {tecleado ? (
+        <div
+          style={{
+            position: "fixed",
+            left: 24,
+            bottom: 24,
+            background: "rgba(14,19,32,0.92)",
+            color: "#4ECDC4",
+            border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: 14,
+            padding: "10px 18px",
+            font: "700 22px -apple-system, 'Segoe UI', sans-serif",
+          }}
+        >
+          Ir a la sección {tecleado}…
+        </div>
+      ) : null}
       {ayuda ? (
         <div onClick={(e) => e.stopPropagation()}>
           <Ayuda alCerrar={() => setAyuda(false)} />

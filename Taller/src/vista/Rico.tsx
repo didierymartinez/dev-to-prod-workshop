@@ -4,7 +4,10 @@ import { color, fuente, sinLigaduras } from "../estilo/tema";
 // Texto con `código` en línea y **negrita**, como en taller.md.
 const PARTES = /(`[^`]+`|\*\*[^*]+\*\*)/g;
 
-export const Rico: React.FC<{ texto: string; acento?: string }> = ({ texto, acento }) => {
+export const Rico: React.FC<{ texto: string; acento?: string }> = ({
+  texto,
+  acento,
+}) => {
   const trozos = texto.split(PARTES).filter((t) => t !== "");
   return (
     <>
@@ -20,7 +23,7 @@ export const Rico: React.FC<{ texto: string; acento?: string }> = ({ texto, acen
                 background: color.codigoEnLinea,
                 borderRadius: 10,
                 padding: "0.04em 0.28em",
-                whiteSpace: "pre",
+                whiteSpace: "pre-wrap",
               }}
             >
               {t.slice(1, -1)}
@@ -29,8 +32,11 @@ export const Rico: React.FC<{ texto: string; acento?: string }> = ({ texto, acen
         }
         if (t.startsWith("**") && t.endsWith("**")) {
           return (
-            <strong key={i} style={{ fontWeight: 800, color: acento ?? color.texto }}>
-              {t.slice(2, -2)}
+            <strong
+              key={i}
+              style={{ fontWeight: 800, color: acento ?? color.texto }}
+            >
+              <Rico texto={t.slice(2, -2)} />
             </strong>
           );
         }

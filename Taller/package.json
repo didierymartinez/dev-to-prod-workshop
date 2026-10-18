@@ -9,9 +9,11 @@
   },
   "private": true,
   "dependencies": {
+    "@remotion/bundler": "4.0.536",
     "@remotion/cli": "4.0.536",
     "@remotion/google-fonts": "4.0.536",
     "@remotion/player": "4.0.536",
+    "@remotion/renderer": "4.0.536",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "remotion": "4.0.536"
@@ -29,7 +31,7 @@
   "scripts": {
     "presentar": "node presentador/servir.mjs",
     "dev": "remotion studio --port=3456",
-    "fotos": "bash scripts/fotos.sh",
+    "fotos": "node scripts/fotos.mjs",
     "render:seccion-01": "remotion render seccion-01 out/seccion-01.mp4",
     "render:seccion-02": "remotion render seccion-02 out/seccion-02.mp4",
     "render:seccion-03": "remotion render seccion-03 out/seccion-03.mp4",
