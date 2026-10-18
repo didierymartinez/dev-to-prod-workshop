@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "taller-presentacion",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "Taller", "run", "presentar"],
+      "port": 5640
+    },
+    {
+      "name": "taller-studio",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "Taller", "run", "dev"],
+      "port": 3456
+    }
+  ]
+}
