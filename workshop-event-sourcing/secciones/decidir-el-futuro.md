@@ -139,20 +139,24 @@ Con la guarda puesta, vuelve a correr el demo de arriba: `orden2` venía **recar
 Pero la guarda **sola** no basta. Si reúsas la **misma** instancia sin recargar, no dispara:
 
 ```csharp
-var e = stream.Get();              // Suspendida = false
-stream.Append(e.Suspender("x"));   // emite (ok)
-stream.Append(e.Suspender("x"));   // ⚠ ¡emite OTRA VEZ! e.Suspendida SIGUE en false:
+var otra = new EventStream<Empresa>();   // otra empresa, activa: la del demo ya quedó suspendida
+otra.Append(new EmpresaRegistrada("Constructora Andes", "Básico"));
+var e = otra.Get();                // Suspendida = false
+otra.Append(e.Suspender("x"));     // emite (ok)
+otra.Append(e.Suspender("x"));     // ⚠ ¡emite OTRA VEZ! e.Suspendida SIGUE en false:
                                    //   decide no mutó e → el if (Suspendida) nunca se cumple
 ```
 
 El `if` solo no logra la idempotencia. La logra **recargar** entre órdenes: el `Get()` rehidrata desde el diario. Es justo lo que hará el [Command Handler](el-command-handler.md) en cada comando.
 
-Y como `Suspender` ahora puede devolver `null`, **comprueba antes de archivar** (no metas `null` en el diario):
+Y como `Suspender` ahora puede devolver `null`, **comprueba antes de archivar** (no metas `null` en el diario). **🔁 En el demo, reemplaza** la línea `stream.Append(orden2.Suspender("falta de pago"));` por:
 
 ```csharp
-var hecho = orden2.Suspender("falta de pago");
-if (hecho is not null) stream.Append(hecho);
+var suspension = orden2.Suspender("falta de pago");   // otro nombre: `hecho` ya existe en el ciclo de arriba
+if (suspension is not null) stream.Append(suspension);
 ```
+
+Para ver la validación, agrega al final `stream.Get().CambiarPlan("Premium");` y corre. La empresa del demo ya quedó suspendida, así que lanza `ReglaDeNegocioException: No se puede cambiar el plan de una empresa suspendida.` Después quita esa línea.
 
 > [!IMPORTANT]
 > 🏷️ **Dos motivos distintos para NO emitir un hecho — no los confundas:**

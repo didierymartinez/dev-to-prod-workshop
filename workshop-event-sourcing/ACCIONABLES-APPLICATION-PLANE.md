@@ -26,6 +26,26 @@ indicativa con `gh search code`. **Sin builds, sin ejecutar tests, sin datos de 
 Las severidades son **juicio sobre código estático**: valídalas con el contexto que solo tiene el equipo
 dueño. Las referencias `archivo:línea` son del `HEAD` de la rama por defecto al momento de la auditoría.
 
+> ⚠️ **Correcciones tras verificar con paquetes reales (17-oct-2026, Marten 9.50.3 · WolverineFx 6.51.0).** Al llevar
+> estos accionables al taller se probaron con código que corre, y tres afirmaciones de este inventario no se sostienen:
+> - **L3 y Cosmos.BuildingBlocks#7 (el doble y los `Apply` privados).** Marten 9 genera el despachador al compilar y
+>   **solo llama `Apply` públicos** (Marten 8 sí veía los privados). Un `Apply` privado se salta en silencio; si todos
+>   lo son, Marten lanza `InvalidProjectionException`. El doble fiel es el que busca **solo** los públicos: hacer que
+>   vea también los privados lo deja ver más que Marten. El arreglo es `Apply` públicos + un test de contrato
+>   doble-contra-Postgres (ver `secciones/la-plantilla.md`).
+> - **ObligacionesPorPagar.Radicacion#4 (el tipo de la excepción en modo `Rich`).** En 9.50.3 hay un solo
+>   `EventStreamUnexpectedMaxEventIdException` (de `JasperFx.Events`, hereda de `JasperFx.ConcurrencyException`) y el
+>   modo de append no cambia el tipo. Capturar la base sigue siendo lo correcto (cubre sagas y versiones futuras).
+> - **El "hueco de secuencia" por choques de concurrencia.** Los choques no dejan hueco: Marten rellena con un evento
+>   `tombstone`. Un hueco real lo deja un `seq` reservado sin confirmar o una transacción abierta.
+>
+> - **ObligacionesPorPagar.Entradas#3 (mover el `ScheduleAsync` a un `finally`).** En WolverineFx 6.51.0, si un handler
+>   programa un mensaje y después lanza, el mensaje no sale (aunque el handler no use Marten): el `finally` no salva la
+>   cadena. Lo que la salva es un disparo aparte del trabajo, o el cron nativo (`opts.Schedules.ScheduleRecurring`), que
+>   corre una sola vez en el clúster (ver `secciones/el-trabajo-que-nadie-pidio.md`).
+>
+> El detalle de cada spike está en [`COBERTURA-ACCIONABLES.md`](COBERTURA-ACCIONABLES.md) ("Lo que ya dijeron los spikes").
+
 ---
 
 ## 🚨 Bloque 0 — Seguridad: hacer esta semana

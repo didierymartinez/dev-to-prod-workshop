@@ -1,123 +1,230 @@
 # El contexto que falta
 
-Todo lo que construiste asume una empresa, un cliente. Pero la plataforma la usan **muchas organizaciones** a la vez, y cada petición tiene que saber de cuál es.
+Tu pantalla se entera sola de cada suspensión efectiva. Ahora la plataforma la usa una segunda organización.
 
 ## 🎯 El Objetivo
 
-Que el **tenant** —la organización dueña de la petición— viaje con cada operación, y que el sistema **falle fuerte** si falta, en vez de rellenarlo con un valor por defecto.
+Que tu servicio atienda a dos organizaciones en la misma base, cada una con sus empresas. Y que una petición que no dice de cuál organización es falle, en vez de caer en un lugar por defecto.
 
-## 💥 El dolor: el default silencioso manda el hecho al cliente equivocado
+## 💥 El dolor: dos organizaciones, un solo diario
 
-Aclaremos los niveles primero. Una **`Empresa`** es un stream —lo que llevas todo el taller construyendo—. Un **tenant** es la **organización que usa la plataforma** (un despacho contable, una filial): un cliente de Cosmos, no una `Empresa`. Cada tenant administra **sus** streams —sus empresas, sus pagos—, y los de un tenant no deben verse desde otro. Marten aísla eso con **tenancy**.
+Acme usa la plataforma desde el principio. Ahora llega globex, otro despacho contable. Cada uno administra **sus** empresas, y una misma empresa puede ser cliente de los dos: Vidriería Andina, NIT 916000000, es cliente de acme y de globex. Con tu servicio arrancado, regístrala para acme y luego para globex:
 
-```csharp
-await using var s = store.LightweightSession("acme");   // sesión del tenant "acme" (una organización)
-s.Events.StartStream<Empresa>("emp-1", new EmpresaRegistrada("900", "Constructora Andes", "Básico"));
+```bash
+curl -s -w "\n" -X POST http://localhost:5000/empresas -H "Content-Type: application/json" -d "{\"empresaId\":\"emp-160\",\"nit\":\"916000000\",\"nombre\":\"Vidriería Andina\",\"plan\":\"Basico\"}"    # acme → 202
+curl -s -w "\n" -X POST http://localhost:5000/empresas -H "Content-Type: application/json" -d "{\"empresaId\":\"emp-161\",\"nit\":\"916000000\",\"nombre\":\"Vidriería Andina\",\"plan\":\"Premium\"}"   # globex → 409
 ```
 
-`acme` ve `emp-1`; el tenant `globex`, abriendo su propia sesión, **no** —aislado—. ¿Y por qué no basta con los ids de stream que ya usas? Porque el id aísla **un** stream, pero una consulta o una proyección barren **muchos** — y una que olvide filtrar por organización cruzaría clientes sin querer. La tenancy sube ese aislamiento **al motor**: no depende de que cada consulta recuerde el filtro. Que es, otra vez, el patrón de siempre: *acordarse no basta* (el hecho huérfano de [El agregado recuerda](./el-agregado-recuerda.md) que mentía sin explotar, el dual-write de [El hecho y su anuncio](./el-hecho-y-su-anuncio.md)).
+Las dos peticiones son iguales: nada en ellas dice de cuál organización son. Globex recibe `409` y `Ya existe una empresa con ese NIT.`, por una empresa que nunca registró. Y `curl http://localhost:5000/empresas/emp-160` le muestra a globex la ficha de acme.
 
-Y ahí está el filo. Mira qué pasa cuando un acto **olvida** el tenant (una sesión sin especificarlo):
+Aclaremos los niveles. Una **`Empresa`** es un stream, lo que llevas todo el taller construyendo. Un **tenant** es la **organización que usa la plataforma**: acme, globex. Cada tenant administra sus streams, y los de un tenant no deben verse desde otro. El `409` no viene de una consulta: viene de la llave del localizador, el NIT, que es una para todas las organizaciones. Un filtro en las consultas no arregla una llave. Marten separa a las organizaciones en el motor con **tenancy**: cada hecho y cada documento llevan su tenant, en su llave, y una sesión abierta para un tenant solo ve lo suyo. Contabilidad e Impuestos guardan así a sus organizaciones, en las mismas tablas.
 
-```csharp
-await using var s = store.LightweightSession();   // ← sin tenant
-s.Events.StartStream<Empresa>("emp-2", new EmpresaRegistrada("901", "…", "Básico"));
+## 🔧 Paso 1 · Cada hecho y cada documento, con su tenant
+
+> 🆕 **Tenancy conjoined.** `opts.Events.TenancyStyle = TenancyStyle.Conjoined;` (de `JasperFx.MultiTenancy`) guarda todos los tenants en las mismas tablas, con una columna `tenant_id`. La llave de `mt_streams` pasa a ser `(tenant_id, id)`: acme y globex pueden tener cada uno su `emp-1`. `opts.Policies.AllDocumentsAreMultiTenanted();` hace lo mismo con cada documento: tus vistas y tu localizador. La otra forma es una base o un esquema por tenant: más aislamiento físico, y más bases que operar.
+
+Marten no puede cambiar la llave de las tablas que ya tienes: sobre tu base, el primer registro responde `500` con `MartenSchemaException: DDL Execution for 'All Configured Changes' Failed!`, y tus tests caen igual. Crea una base nueva para tu servicio y recrea la de tus tests, las dos con las tablas de Facturación, como en [El arnés usa la misma configuración](./el-arnes-usa-la-misma-configuracion.md):
+
+```bash
+docker exec empresas-db psql -U postgres -c "CREATE DATABASE empresas;"
+docker exec empresas-db psql -U postgres -c "DROP DATABASE empresas_tests WITH (FORCE);" -c "CREATE DATABASE empresas_tests;"
+docker exec empresas-db sh -c "pg_dump -U postgres -s -t multas -t procesados -t plan_de_empresa -t mensualidades postgres | psql -U postgres -d empresas"
+docker exec empresas-db sh -c "pg_dump -U postgres -s -t multas -t procesados -t plan_de_empresa -t mensualidades postgres | psql -U postgres -d empresas_tests"
 ```
 
+Desde la raíz de tu solución, apunta a la base nueva tu servicio y tu directorio de secretos, como en [La configuración viene de afuera](./la-configuracion-viene-de-afuera.md). En PowerShell, la variable va con `$env:CADENA_POSTGRES = "…"` y el archivo con `Set-Content`, como allá. Si usas CosmosLens, arráncalo con la cadena nueva. Tus empresas de antes se quedan en la base vieja: llevarlas a un tenant es una migración aparte.
+
+```bash
+export CADENA_POSTGRES="Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=empresas"
+dotnet user-secrets set "ConnectionStrings:Postgres" "$CADENA_POSTGRES" --project Empresas.Historia
+echo "$CADENA_POSTGRES" > ~/secretos-empresas/ConnectionStrings__Postgres
 ```
-emp-2 en acme     → (nada)
-emp-2 en DEFAULT  → escrita ahí
-```
 
-Marten no falló: usó un tenant **por defecto** (`*DEFAULT*`) y escribió `emp-2` ahí. Para `acme`, `emp-2` **no existe**. Un hecho cayó en otro contexto, invisible, sin una sola excepción. Un contexto que falta y que el sistema **rellena solo** no se nota hasta que alguien pregunta por un dato que "desapareció".
-
-## 🔧 Que el tenant viaje, y fallar si falta
-
-Dos piezas. Primero, el tenant **viaja**: llega en la petición y se resuelve en la sesión (`LightweightSession(tenant)`). Segundo —lo que mata el dolor—: **prohíbe el tenant por defecto**, para que olvidarlo **falle fuerte** en la puerta.
-
-> 🆕 **Tenancy conjoined + fail-fast.** `opts.Events.TenancyStyle = TenancyStyle.Conjoined` (de `JasperFx.MultiTenancy`) guarda todos los tenants en las **mismas** tablas, con una columna `tenant_id` que los aísla; una sesión por tenant solo ve lo suyo. (La alternativa sería una base o esquema **por** tenant: más aislamiento físico, más operación; conjoined es barato y suficiente cuando confías en el motor para el filtro.) Y `opts.Advanced.DefaultTenantUsageEnabled = false` **apaga el tenant por defecto**: abrir una sesión sin tenant lanza `DefaultTenantUsageDisabledException` en vez de caer en `*DEFAULT*`.
-
-> ⚠️ **Esto es un spike aparte — no lo cablees a tu app todavía.** Si activas `DefaultTenantUsageEnabled = false` sobre tu store real, **toda** sesión sin tenant (tus tests, el daemon, la API de [El host y la inyección](./el-host-y-la-inyeccion.md)) empezará a lanzar. Adóptalo cuando el servicio de verdad sea multi-tenant, resolviendo el tenant en cada borde. Y córrelo contra una base **nueva** (en `psql`: `CREATE DATABASE spike_tenancy;`), no la de tu servicio: conjoined cambia la llave de `mt_streams` a `(tenant_id, id)`, y sobre el esquema de tu servicio la migración falla con `MartenSchemaException`.
-
-> 🛠️ **Inténtalo tú.** (1) Configura `TenancyStyle.Conjoined` (de `JasperFx.MultiTenancy`) y `DefaultTenantUsageEnabled = false`. (2) Escribe `emp-1` en el tenant `acme` y confirma que una sesión de `globex` **no** la ve (rehidratar → null). (3) Intenta abrir una sesión **sin** tenant y confirma que **lanza** —el default silencioso ya no existe—. (4) Nota de dónde saldría el tenant en un servicio real: un *claim* del JWT de la petición.
+> 🛠️ **Inténtalo tú.** En el `AddMarten` de tu `AgregarEmpresas`, agrega las dos líneas de la tenancy, después de la de `StreamIdentity`. Arranca tu servicio y registra emp-160 con el mismo `curl` del dolor. Luego mira dónde quedó, con `docker exec -it empresas-db psql -U postgres -d empresas`:
+>
+> ```sql
+> SELECT tenant_id, id FROM mt_streams;
+> -- *DEFAULT* | emp-160
+> ```
 
 <details>
 <summary>👉 Una forma de hacerlo</summary>
 
 ```csharp
-using JasperFx.MultiTenancy;   // TenancyStyle
-
-var store = DocumentStore.For(opts =>
-{
-    opts.Connection(cadena);                                  // la de la base nueva del spike, no la de tu servicio
-    opts.Events.StreamIdentity = StreamIdentity.AsString;
-    opts.Events.TenancyStyle = TenancyStyle.Conjoined;        // aísla por tenant_id, misma base
-    opts.Advanced.DefaultTenantUsageEnabled = false;          // sin tenant por defecto: fail-fast
-});
-
-// con tenant: escribe y aísla
-await using (var s = store.LightweightSession("acme"))
-{
-    s.Events.StartStream<Empresa>("emp-1", new EmpresaRegistrada("900", "Constructora Andes", "Básico"));
-    await s.SaveChangesAsync();
-}
-// acme ve emp-1; globex (su propia sesión) rehidrata null — aislados en la misma base.
-
-// SIN tenant: ya no cae en DEFAULT en silencio, lanza en la puerta (al ABRIR la sesión)
-await using (var s = store.LightweightSession())   // 💥 DefaultTenantUsageDisabledException (aquí, al abrir)
-{
-    s.Events.StartStream<Empresa>("emp-2", new EmpresaRegistrada("901", "…", "Básico"));
-    await s.SaveChangesAsync();
-}
+// Empresas.Historia/Configuracion.cs, con using JasperFx.MultiTenancy; para TenancyStyle
+opts.Events.StreamIdentity = StreamIdentity.AsString;
+opts.Events.TenancyStyle = TenancyStyle.Conjoined;   // cada hecho, con su tenant: mt_events.tenant_id
+opts.Policies.AllDocumentsAreMultiTenanted();        // cada documento también: las vistas y el localizador
 ```
-
-En un servicio real, el tenant no lo pasas a mano: llega en un *claim* (un dato firmado dentro del **JWT**, el token de identidad que trae la petición) como `tenant: acme`; un *middleware* (código que corre antes del endpoint) lo lee y abre la sesión con `LightweightSession(tenantDelJwt)`. Resolverlo desde el JWT es plomería de la nube —no la vives entera con el juguete—, pero la garantía que importa la tienes: si el tenant no llega, **nada se escribe**. *(Ojo: este "claim" es el del token de identidad, no el "reclamar una fila" de la cola en [El mensaje y la cola](./el-mensaje-y-la-cola.md) — misma palabra, otro sentido.)*
 
 </details>
 
-## 🔨 Rómpelo: con y sin fail-fast
+El registro respondió `202`, como siempre. El hecho quedó en `*DEFAULT*`, el tenant que Marten usa cuando nadie le dice cuál. Tu servicio todavía no sabe de qué organización es la petición.
 
-Quita `DefaultTenantUsageEnabled = false` (vuelve al default de Marten). Comenta la escritura de `emp-1`: ya quedó en `acme` en la primera corrida. Escribe sin tenant: **no falla**, y el hecho aparece en `*DEFAULT*` — invisible para `acme`. Vuelve a ponerlo en `false`: el mismo código **lanza** al abrir la sesión. La diferencia no es cosmética: sin fail-fast el error se manifiesta días después, como datos que "faltan" en un cliente; con fail-fast, en la petición que olvidó el tenant, al instante.
+## 🔧 Paso 2 · La petición dice de qué tenant es
 
-En CosmosLens también se ve, si lo apuntas a la base del spike: la lista de **Streams** muestra el tenant de cada stream, y el campo **Cliente** filtra por él. Sin filtro, `emp-2` aparece con `*DEFAULT*`; con `acme`, no aparece.
+Por ahora, el tenant llega en un header de la petición, `X-Tenant-Id`, como en Contabilidad. Lo escribe quien llama.
+
+> 🆕 **El tenant, en el bus.** El bus de la petición lleva un `TenantId`, como lleva la `CorrelationId` que le pusiste en [Seguir una acción](./seguir-una-accion.md). Wolverine lo copia al sobre de todo lo que la petición invoca o envía. Y abre la sesión de cada handler con el tenant de su sobre.
+
+> 🛠️ **Inténtalo tú.** En tu `app.Use` de la correlación, lee el header `X-Tenant-Id` y, si trae algo, ponlo en `bus.TenantId`. Repite los dos registros del dolor, con `-H "X-Tenant-Id: acme"` y `-H "X-Tenant-Id: globex"`: los dos dan `202`.
+
+<details>
+<summary>👉 Una forma de hacerlo</summary>
+
+```csharp
+// Empresas.Historia/Program.cs, dentro de tu app.Use, junto a la correlación
+var tenant = contexto.Request.Headers["X-Tenant-Id"].ToString();
+if (!string.IsNullOrWhiteSpace(tenant)) bus.TenantId = tenant;   // de qué organización es la petición
+```
+
+</details>
+
+Ahora pide la empresa de globex, como globex: `curl -H "X-Tenant-Id: globex" http://localhost:5000/empresas/emp-161`. Responde `404`. El registro quedó en globex, y la lectura no: tu endpoint recibe la `IQuerySession` del contenedor, y la que registra Marten se abre sin tenant, en `*DEFAULT*`.
+
+## 🔧 Paso 3 · Las consultas, con su tenant
+
+> 🆕 **Tu propia `IQuerySession`.** `builder.Services.AddScoped<IQuerySession>(s => …)` registra la tuya; la `s` es el contenedor, al que le pides lo que necesitas. Si va después de `AgregarEmpresas`, el contenedor usa la tuya, la última registrada, y crea una por petición. `store.QuerySession(tenant)` abre una sesión que solo ve ese tenant. Los handlers no la usan: Wolverine les abre la suya con el tenant del sobre.
+
+> 🛠️ **Inténtalo tú.** Quiero esto:
+>
+> ```
+> GET /empresas/emp-161   X-Tenant-Id: globex   → 200, Vidriería Andina, Premium
+> GET /empresas/emp-160   X-Tenant-Id: globex   → 404
+> ```
+>
+> Haz que funcione: después de `builder.AgregarEmpresas(...)`, registra tu `IQuerySession`. Pídele al contenedor el `IDocumentStore` y el `IMessageContext`, y abre la sesión con el `TenantId` de ese bus.
+
+<details>
+<summary>👉 Una forma de hacerlo</summary>
+
+```csharp
+// Empresas.Historia/Program.cs, después de builder.AgregarEmpresas(...)
+builder.Services.AddScoped<IQuerySession>(s =>
+    s.GetRequiredService<IDocumentStore>().QuerySession(s.GetRequiredService<IMessageContext>().TenantId!));   // las consultas, en el tenant del bus
+```
+
+</details>
+
+Sin header, `TenantId` es `null`: el `!` solo calla al compilador, y Marten abre la sesión en `*DEFAULT*`. `SELECT tenant_id, data->>'Stream' FROM mt_doc_localizador WHERE id = '916000000';` muestra el NIT tres veces: en acme, en globex, y en `*DEFAULT*` el del Paso 1. En CosmosLens, la lista de Streams muestra el tenant de cada stream.
+
+## 💥 El default silencioso
+
+Mira otra vez `mt_streams`:
+
+```sql
+SELECT tenant_id, id FROM mt_streams WHERE id LIKE 'emp-16%' ORDER BY created;
+-- *DEFAULT* | emp-160
+-- acme      | emp-160
+-- globex    | emp-161
+```
+
+La fila de `*DEFAULT*` es el registro del Paso 1. Respondió `202`, y ninguna organización la ve: para acme, ese hecho no existe. Quien llame sin el header hace lo mismo hoy. Registra emp-162 sin `X-Tenant-Id`: `202`, y cae en `*DEFAULT*`. Un contexto que falta y que el sistema rellena solo no se nota hasta que alguien pregunta por un dato que "desapareció".
+
+## 🔧 Paso 4 · Sin tenant, falla
+
+> 🆕 **Fail-fast.** `opts.Advanced.DefaultTenantUsageEnabled = false;` apaga el tenant por defecto: abrir una sesión sin tenant lanza `DefaultTenantUsageDisabledException`, en vez de caer en `*DEFAULT*`.
+
+> 🛠️ **Inténtalo tú.** Agrega esa línea junto a las de la tenancy, reinicia, y registra emp-163 sin `X-Tenant-Id`:
+>
+> ```
+> 500   "detail": "Default tenant *DEFAULT* usage is disabled. Ensure to create a session by explicitly passing a non-default tenant in the method arg or SessionOptions."
+> ```
+>
+> Wolverine abrió la sesión del handler con el tenant del sobre, `*DEFAULT*`, y Marten lanzó antes de que corriera el handler: `SELECT count(*) FROM mt_streams WHERE id = 'emp-163';` da 0. Un `GET` sin header da el mismo `500`, desde tu `IQuerySession`.
+
+Una siembra con `store.LightweightSession()` también lanza: desde aquí, una siembra abre `store.LightweightSession("acme")`. Corre ahora tu worker con `emp-160;Premium`. Lanza la misma excepción: no corre en una petición, y nadie le dice el tenant. El archivo de Comercial tampoco lo dice.
+
+> 🆕 **`bus.InvokeForTenantAsync(tenant, comando)`.** Invoca el comando con ese tenant en el sobre, sin petición de por medio.
+
+> 🛠️ **Inténtalo tú.** Comercial manda un archivo por organización. Que el worker reciba el tenant como segundo argumento, `DirectorioDeSecretos=$HOME/secretos-empresas dotnet run -- ../cambios.csv acme`, y que invoque con él. Debe imprimir `emp-160: plan Premium`, y `curl -H "X-Tenant-Id: acme" http://localhost:5000/empresas/emp-160` debe decir `Premium`.
+
+<details>
+<summary>👉 Una forma de hacerlo</summary>
+
+```csharp
+// Empresas.Worker/Program.cs
+var tenant = args[1];   // la organización del archivo
+foreach (var linea in await File.ReadAllLinesAsync(args[0]))
+{
+    var campos = linea.Split(';');
+    await bus.InvokeForTenantAsync(tenant, new CambiarPlanDeEmpresa(campos[0], campos[1]));
+    Console.WriteLine($"{campos[0]}: plan {campos[1]}");
+}
+```
+
+</details>
+
+### El tenant viaja en el sobre
+
+Suspende emp-160 de acme: `curl -X POST http://localhost:5000/empresas/emp-160/suspender -H "X-Tenant-Id: acme"`. Facturación y Accesos contestan, y cada respuesta llega al proceso con el tenant acme:
+
+```sql
+SELECT tenant_id, type FROM mt_events WHERE stream_id = 'susp-emp-160-3' ORDER BY version;
+-- acme | suspension_solicitada
+-- acme | cobro_de_multa_confirmado
+-- acme | revocacion_de_accesos_confirmada
+-- acme | suspension_efectiva
+```
+
+El orden de las dos respuestas del medio puede cambiar. Diez segundos después corre el plazo, sin ninguna petición: tu log dice `susp-emp-160-3: el mensaje no cambia el proceso, se descarta`, y `wolverine_dead_letters` sigue sin filas de `RevisarSuspension`. Esos handlers corren fuera de tu petición: abren su sesión con el tenant del sobre.
+
+## 🔨 Rómpelo: la petición dice acme, el sobre dice globex
+
+En tu `MapPost("/empresas", ...)`, cambia `bus.InvokeAsync(cmd)` por `bus.InvokeForTenantAsync("globex", cmd)`. Registra emp-164, NIT 916400000, con `-H "X-Tenant-Id: acme"`: `202`. `SELECT tenant_id FROM mt_streams WHERE id = 'emp-164';` da `globex`. El handler corrió dentro de la petición de acme, y escribió en globex: Wolverine abrió su sesión con el tenant del sobre. La librería de la organización lo resuelve al revés: su store le pide el tenant a una pieza que mira primero la petición HTTP, y con este mismo pedido escribe en acme. Con Wolverine, gana el del sobre. Devuelve tu `InvokeAsync`.
+
+Ahora comenta `opts.Policies.AllDocumentsAreMultiTenanted();` y arranca. No arranca:
+
+```
+JasperFx.Events.Projections.InvalidProjectionException: Tenancy storage style mismatch between the events (Conjoined) and the aggregate type VistaSuspendida (Single)
+```
+
+`VistaSuspendida` guarda un documento por stream, como `EmpresaDetalle`, y el stream ya tiene tenant. Su documento tiene que llevarlo también: si no, dos `emp-1` de dos tenants caerían en el mismo documento. Descoméntala.
 
 ## El Descubrimiento
 
-Un **contexto que falta** —el tenant— es un bug traicionero: si el sistema lo **rellena con un default**, no hay error, solo datos que terminan callados en el cliente equivocado, imposibles de rastrear. La cura no es "acordarse siempre" (eso ya viste que se rompe): es **fail-fast** — hacer que la ausencia del tenant sea un error fuerte en la puerta (`DefaultTenantUsageEnabled = false`), no un default silencioso. El tenant es **dato que viaja** (del JWT a la sesión), y la tenancy conjoined aísla a los clientes en la misma base subiendo el filtro al motor — pero solo si nunca dejas que caiga en el default. Preferir un error ruidoso temprano sobre corrupción silenciosa tardía es criterio de sistemas multi-cliente, y el Application Plane lo vive con JWT en cada borde.
+Un **contexto que falta**, el tenant, es un bug traicionero: si el sistema lo rellena con un valor por defecto, no hay error, solo datos que quedan en la organización equivocada. La cura no es acordarse siempre. Es **fail-fast**: que la falta del tenant sea un error en la puerta (`DefaultTenantUsageEnabled = false`). La tenancy conjoined separa a las organizaciones en la misma base, con el tenant en la llave. El tenant viaja: el borde lo pone en el bus, el sobre lo lleva a cada handler, también a los que corren sin petición, y una consulta abre su sesión con él. Lo que no nace en una petición, como tu worker, lo dice con `InvokeForTenantAsync`.
 
-> 🌱 Ya tienes el motor nuevo corriendo entero: Marten guardando y proyectando, Wolverine entregando, el daemon al día. Con todo eso vivo, ¿cómo puedes ver el sistema respirar ahora sobre una librería cuya cocina no ves? Conectarte a la base a consultar sus tablas de solo lectura, sin instrumentar, es el próximo paso: [Observar el motor nuevo](./observar-el-motor-nuevo.md).
+> 🌱 Tu `HostConDaemon` arranca con `AgregarEmpresas`: ya corre con tenancy y con fail-fast, y no lo tocaste. Lo que no sabes es si tus tests siguen verdes, ni si alguno prueba que acme no ve lo de globex: [Probar que aísla](./probar-que-aisla.md).
 
 ## ✅ Compruébalo
 
 - [ ] Distingues **tenant** (la organización que usa la plataforma) de **`Empresa`** (un stream dentro del tenant).
-- [ ] Con `TenancyStyle.Conjoined`, un hecho escrito en `acme` lo ve `acme` y **no** `globex` — aislados en la misma base.
-- [ ] Con `DefaultTenantUsageEnabled = false`, abrir una sesión **sin** tenant lanza `DefaultTenantUsageDisabledException` en vez de caer en `*DEFAULT*`.
-- [ ] Sabes decir por qué un default silencioso es **peor** que un error, y por qué la tenancy sube el aislamiento al motor en vez de dejarlo en cada filtro que recuerdes.
+- [ ] Sin tenancy, globex recibió `409` por el NIT de acme y vio la ficha de acme.
+- [ ] Con la tenancy y sin header, el registro dio `202` y quedó en `*DEFAULT*`.
+- [ ] Con `X-Tenant-Id` en el bus y tu `IQuerySession`, acme y globex registran el mismo NIT, y cada uno ve solo su empresa.
+- [ ] Con `DefaultTenantUsageEnabled = false`, un registro sin header da `500` y no deja nada; tu worker invoca con `InvokeForTenantAsync`.
+- [ ] El proceso de emp-160, con las respuestas de Facturación y Accesos y el plazo, quedó entero en acme, y un `InvokeForTenantAsync("globex", …)` dentro de una petición de acme escribió en globex.
 
 ## 🆘 Si algo salió mal
 
-- **Escribir sin tenant no lanza:** te falta `opts.Advanced.DefaultTenantUsageEnabled = false`. Sin eso, Marten usa `*DEFAULT*` en silencio.
+- **Un registro responde `500` con `MartenSchemaException: DDL Execution … Failed!`, y el log dice `42710: constraint "fkey_mt_events_stream_id_tenant_id" … already exists`:** tu servicio sigue en la base vieja. Revisa `dotnet user-secrets list --project Empresas.Historia`.
 - **`TenancyStyle` no compila:** vive en `JasperFx.MultiTenancy`.
-- **El spike lanza `MartenSchemaException` en el primer `SaveChangesAsync`:** lo apuntaste a la base de tu servicio. Crea una base nueva para el spike y usa su cadena.
-- **Se te caen los tests/el daemon al activar el fail-fast:** es lo esperado si lo pones en el store real — todas las sesiones sin tenant lanzan. Es un spike aparte hasta que el servicio sea multi-tenant de verdad.
-- **Migrar datos existentes:** los hechos ya escritos sin tenant quedaron en `*DEFAULT*`; activar tenancy no los reparte solo — es una migración aparte.
+- **Todo da `500` con `Default tenant *DEFAULT* usage is disabled`, también con el header:** tu `app.Use` no pone `bus.TenantId`, o tu `IQuerySession` no lo lee del bus.
+- **Con el header, globex sigue sin ver su empresa:** tu `IQuerySession` va antes de `AgregarEmpresas`, y gana la de Marten.
+- **El worker lanza `IndexOutOfRangeException`:** le falta el tenant después del archivo: `dotnet run -- ../cambios.csv acme`.
+- **El worker lanza `Falta ConnectionStrings:Postgres.` o `MartenSchemaException`:** revisa `DirectorioDeSecretos` y `~/secretos-empresas/ConnectionStrings__Postgres`.
 
 ## 📓 Registra tu avance
 
-> 💭 **Reto:** ¿por qué un contexto que falta y se rellena con un default es más peligroso que uno que lanza un error? Da un ejemplo de tu dominio donde un default silencioso corrompería datos entre organizaciones, y di dónde pondrías el fail-fast.
+Deja la decisión en tu `DECISIONES.md`:
+
+> Empresas es multi-tenant con tenancy conjoined: hechos y documentos llevan su tenant, y sin tenant Marten lanza (`DefaultTenantUsageEnabled = false`). El borde pone el tenant en el bus; los handlers lo toman del sobre, y las consultas abren su sesión con él. Un proceso sin petición lo dice con `InvokeForTenantAsync`.
+
+> 💭 **Reto:** ¿por qué un tenant que falta y se rellena con un valor por defecto es más peligroso que uno que lanza un error? ¿Por qué el handler del plazo toma el tenant del sobre y no de una petición?
 
 ```bash
 git add .
-git commit -m "ES · El contexto que falta (multi-tenancy + fail-fast)" -m "<aquí TU respuesta, con tus palabras>"
+git commit -m "ES · El contexto que falta (tenancy conjoined, el tenant en el bus, fail-fast)" -m "<aquí TU respuesta, con tus palabras>"
 git push
 ```
 
 ## 🧠 En una frase
 
-Un contexto que falta —el tenant, la organización dueña de la petición— es peligroso cuando el sistema lo rellena con un default, porque manda el hecho al cliente equivocado sin error; la cura es **fail-fast** (`DefaultTenantUsageEnabled = false`, que lanza si falta) sobre una tenancy **conjoined** que aísla en la misma base subiendo el filtro al motor, con el tenant viajando desde el JWT.
+Un tenant que falta es peligroso cuando el sistema lo rellena con un valor por defecto, porque deja el hecho en la organización equivocada sin error; la cura es la tenancy **conjoined**, que separa a las organizaciones en la misma base con el tenant en la llave, más **fail-fast**, con el tenant puesto una vez en el borde y llevado por el sobre a cada handler.
 
 ---
 
 [⬅️ Volver: En vivo y serverless](./en-vivo-y-serverless.md)
 
-[➡️ Siguiente: Observar el motor nuevo](./observar-el-motor-nuevo.md)
+[➡️ Siguiente: Probar que aísla](./probar-que-aisla.md)

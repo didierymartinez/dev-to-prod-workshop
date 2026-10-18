@@ -10,7 +10,7 @@ Poder **rellenar la vista con lo que ya pasó** —cuando le cambies la forma o 
 
 Operaciones pide un dato más: junto a cada empresa suspendida, **su plan** (para saber a quién llamar primero). El plan lo tienes en la `Empresa`; solo hay que llevarlo a la vista.
 
-Le añades la columna y haces que la proyección la guarde:
+🔁 Primero deja comentada la siembra de la sección anterior: si corre otra vez, anexa sus hechos de nuevo y, de paso, escribe el plan, y el dolor no se ve. Luego le añades la columna y haces que la proyección la guarde:
 
 ```sql
 ALTER TABLE empresas_estado ADD COLUMN plan TEXT NOT NULL DEFAULT '';
@@ -23,6 +23,7 @@ Consultas las suspendidas con su plan:
 ```
 emp-2 → plan=''
 emp-4 → plan=''
+emp-5 → plan=''
 ```
 
 Vacío. La columna existe, tu código ya la escribe… pero **estas empresas no van a volver a pasar por un handler**: la vista solo se actualiza **cuando algo pasa**, y a una empresa suspendida puede no pasarle nada en meses. Su plan quedaría en blanco todo ese tiempo.
@@ -117,6 +118,7 @@ Corre `Reconstruir()` y vuelve a consultar:
 ```
 emp-2 → plan='Premium'
 emp-4 → plan='Enterprise'
+emp-5 → plan='Básico'
 ```
 
 La columna se llenó **sin que pasara nada nuevo** en el negocio: los planes salieron del diario, donde llevaban guardados desde el día en que cada empresa se registró. Y fíjate que `emp-3` **no** aparece: reconstruir no copia hechos sueltos, **vuelve a plegar** la historia de cada empresa — y la de `emp-3` termina en "reactivada", así que hoy no está suspendida.

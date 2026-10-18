@@ -23,7 +23,7 @@ emp-12: Suspendida=True Facturacion=Aplicado Accesos=Aplicado Efectiva=True
 diario: … → v8:empresa_suspendida → v9:cobro_de_multa_confirmado → v10:revocacion_de_accesos_confirmada → v11:suspension_efectiva
 ```
 
-La segunda suspensión quedó **efectiva**, y Accesos nunca cortó nada para ella: la respuesta era de la primera. El transporte entrega *al menos una vez*, como viste en [Llegó dos veces](./llego-dos-veces.md), así que una reentrega tardía va a pasar. Tu filtro de respuestas repetidas no la frena: la segunda suspensión dejó a Accesos otra vez `EnCurso`. La empresa sigue entrando, y tu sistema dice que no puede. Sin un solo error.
+La segunda suspensión quedó **efectiva**, y Accesos nunca cortó nada para ella: la respuesta era de la primera. El transporte entrega *al menos una vez* ([Llegó dos veces](./llego-dos-veces.md)), así que una reentrega tardía va a pasar. Tu filtro de respuestas repetidas no la frena: la segunda suspensión dejó a Accesos otra vez `EnCurso`. La empresa sigue entrando, y tu sistema dice que no puede, sin un solo error.
 
 Es la pregunta que se hizo el equipo de la organización: *¿hace falta un "proceso de la obligación por pagar"?* Sí, y este es el porqué.
 
@@ -31,24 +31,20 @@ Es la pregunta que se hizo el equipo de la organización: *¿hace falta un "proc
 
 > 🆕 **El proceso con dueño (*process manager*).** Un proceso que espera respuestas de varios lados se vuelve **alguien**: tiene su propio stream (una suspensión, un stream), su propio id, y es quien decide qué sigue cuando llega cada respuesta. Su id viaja en cada mensaje del proceso, de ida y de vuelta: es la **correlación**. Así una respuesta encuentra la suspensión exacta, no solo la empresa. En la obligación por pagar de la organización, esa correlación ya existe: la obligación le manda a Impuestos y a Contabilidad su propio id, `ReferenciaOrigen = "comercio-{id}"`, y ellos lo devuelven.
 
-Lo mínimo sería poner el `SuspensionId` en los mensajes y que la `Empresa` ignore las respuestas que no son de su suspensión en curso. Pero una respuesta de una suspensión anterior puede traer información real. Si esa suspensión venció sin respuesta, la respuesta dice que Accesos sí cortó: un hecho que hay que anotar, y quizá compensar. Y el estado de esa suspensión ya no existe: el `Apply(EmpresaSuspendida)` de la siguiente lo limpió. No hay dónde anotarla. Con una suspensión por stream, cada instancia conserva su estado.
+Poner el `SuspensionId` en los mensajes y que la `Empresa` ignore las respuestas de otra suspensión no alcanza. Si una suspensión anterior venció sin respuesta, su respuesta tardía dice que Accesos sí cortó: un hecho que hay que anotar, y quizá compensar. Pero el estado de esa suspensión ya no existe, porque el `Apply(EmpresaSuspendida)` de la siguiente lo limpió. Con una suspensión por stream, cada instancia conserva su estado.
 
 ### Antes de empezar · una empresa limpia
 
-Tu `emp-11` arrastra la historia de [Deshacer en tres sistemas](./deshacer-en-tres-sistemas.md). De tu `Program.cs`, quita la siembra y los pasos de esa sección, también la línea de `ConAcuerdoDePago`, y deja el host, `store` y `bus`. Siembra una empresa nueva:
+Tu `emp-11` arrastra la historia de [Deshacer en tres sistemas](./deshacer-en-tres-sistemas.md). De tu `Program.cs`, quita la siembra y los pasos de esa sección, también la línea de `ConAcuerdoDePago`, y deja el host, `store` y `bus`. Arráncalo una vez así, con solo `await Task.Delay(5000);`. Si el último 🔨 de esa sección dejó un plazo esperando en la base, vence ahora, con el `PlazoHandler` que entiende su forma: el log dice `plazo vencido para emp-11: ya resuelta`. El Paso 1 cambia esa forma.
+
+Ahora siembra una empresa nueva con tu `Sembrar`:
 
 ```csharp
 await using (var s = store.LightweightSession())
 {
-    s.Events.StartStream<Empresa>("emp-12", new EmpresaRegistrada("901200000", "Taller Oriente", "Basico"));
+    Sembrar(s, "emp-12", "901200000", "Taller Oriente", "Basico");
     await s.SaveChangesAsync();
 }
-```
-
-`StartStream` no escribe la fila del localizador, y el `SuspenderHandler` la lee. Agrégala en `psql`:
-
-```sql
-INSERT INTO localizador(nit, stream) VALUES ('901200000', 'emp-12');
 ```
 
 Después de la primera corrida, quita la siembra: volver a sembrar emp-12 lanza `ExistingStreamIdCollisionException`. Cada vez que esta sección vuelve a suspender emp-12, antes la reactiva con un `Append` directo, como en [El contrato lleva lo justo](./el-contrato-lleva-lo-justo.md). Son dos versiones más en su diario:
@@ -75,9 +71,9 @@ Las versiones y los ids de las salidas esperadas suponen que corres cada experim
 > // emp-12: Suspendida=True ProcesoAbierto=susp-emp-12-2
 > ```
 >
-> Para eso, en `Empresas.Historia`: **(1)** Crea la clase `SuspensionDeEmpresa`, con `Id`, `EmpresaId`, `Nit` y `Version`. **Muda** a ella, desde la `Empresa`, todo lo del proceso: los estados de Facturación y Accesos, `Efectiva`, `Revertida`, `Vencida`, sus `Apply` y los métodos que deciden (`ConfirmarCobroDeMulta`, `RechazarCobroDeMulta`, `ConfirmarRevocacionDeAccesos`, `ConfirmarRestitucionDeAccesos`, `RevisarPlazo`). `RevisarPlazo` pierde el `!Suspendida`: el proceso no sabe de la empresa. **(2)** El proceso nace con un hecho propio, `SuspensionSolicitada(EmpresaId, Nit, Plan)`, que deja a los dos socios `EnCurso`. La reversión se parte en dos hechos, uno por stream. En el proceso, `ProcesoRevertido(Razon)`: `RechazarCobroDeMulta` lo emite en vez de `SuspensionRevertida`. En la empresa se queda `SuspensionRevertida`, con su `Apply`, que la deja activa. **(3)** La `Empresa` se queda con lo suyo: `Suspendida`, y de qué proceso viene, `ProcesoAbierto`. Con él, quien mira la empresa llega a su suspensión en curso. Para eso `EmpresaSuspendida` gana el id del proceso: `EmpresaSuspendida(Motivo, SuspensionId)`. Cuando la empresa vuelve a estar activa, por reactivación o por reversión, `ProcesoAbierto` vuelve a `null`. **(4)** En el `SuspenderHandler`, el id es `$"susp-{cmd.EmpresaId}-{empresa.Version + 1}"`: la versión en que nace la suspensión, única para siempre. Anota `EmpresaSuspendida` en la empresa y abre el proceso con `StartStream<SuspensionDeEmpresa>(id, ...)`, en la misma sesión: los dos streams entran en una sola transacción. El plazo que ya devolvía pasa a ser del proceso: `RevisarSuspension(SuspensionId)`, con ese id. **(5)** `RespuestasHandler` y `PlazoHandler` llaman métodos que ya no están en la `Empresa`: quedan obsoletos. Bórralos; el Paso 3 los reemplaza. Los contratos V1 se quedan declarados en `Contratos`; solo se borran sus handlers.
+> Para eso, en `Empresas.Historia`: **(1)** Crea la clase `SuspensionDeEmpresa`, con `Id`, `EmpresaId`, `Nit` y `Version`, y **muda** a ella desde la `Empresa` todo lo del proceso: los estados de Facturación y Accesos, `MultaCobradaEl`, `Efectiva`, `Revertida`, `Vencida`, sus `Apply` y los métodos que deciden (`ConfirmarCobroDeMulta`, `RechazarCobroDeMulta`, `ConfirmarRevocacionDeAccesos`, `ConfirmarRestitucionDeAccesos`, `RevisarPlazo`). `RevisarPlazo` pierde el `!Suspendida`: el proceso no sabe de la empresa. **(2)** El proceso nace con un hecho propio, `SuspensionSolicitada(EmpresaId, Nit, Plan)`, que deja a los dos socios `EnCurso`. La reversión se parte en un hecho por stream: en el proceso, `ProcesoRevertido(Razon)`, que `RechazarCobroDeMulta` emite en vez de `SuspensionRevertida`; en la empresa se queda `SuspensionRevertida`, con su `Apply`, que la deja activa. Dale a `SuspensionSolicitada` y a `ProcesoRevertido` su línea en `Hechos.Registrar`. **(3)** La `Empresa` se queda con `Suspendida` y con `ProcesoAbierto`, el id de su suspensión en curso: para eso `EmpresaSuspendida` gana el id del proceso, `EmpresaSuspendida(Motivo, SuspensionId)`. Cuando la empresa vuelve a estar activa, por reactivación o por reversión, `ProcesoAbierto` vuelve a `null`. **(4)** En el `SuspenderHandler`, el id es `$"susp-{cmd.EmpresaId}-{empresa.Version + 1}"`: la versión en que nace la suspensión, única para siempre. Anota `EmpresaSuspendida` en la empresa y abre el proceso con `StartStream<SuspensionDeEmpresa>(id, ...)` en la misma sesión, para que los dos streams entren en una sola transacción. El plazo pasa a ser del proceso, `RevisarSuspension(SuspensionId)`, y conserva su `[MessageIdentity("RevisarSuspension")]`. Cambiar el campo de un mensaje que ya espera en la base rompe igual que renombrarlo: el plazo guardado trae `EmpresaId`, y el record nuevo lo lee con `SuspensionId` en `null`. Antes de cambiarlo, deja que venzan los plazos pendientes, como en *Antes de empezar*, o versiona el mensaje. **(5)** Borra `RespuestasHandler` y `PlazoHandler`: llaman métodos que ya no están en la `Empresa`, y el Paso 3 los reemplaza. Los contratos V1 se quedan declarados en `Contratos`.
 
-Los `empresa_suspendida` que ya guardaste se leen con `SuspensionId` en `null`, como viste en [La forma del hecho se congela](./la-forma-del-hecho-se-congela.md). Ese `null` es la verdad histórica: nacieron antes de que hubiera proceso. La forma se reforma; el proceso no se inventa.
+Los `empresa_suspendida` que ya guardaste se leen con `SuspensionId` en `null` ([La forma del hecho se congela](./la-forma-del-hecho-se-congela.md)): nacieron antes de que hubiera proceso, y ese `null` es la verdad histórica.
 
 <details>
 <summary>👉 Una forma de hacerlo</summary>
@@ -88,7 +84,7 @@ public record EmpresaSuspendida(string Motivo, string SuspensionId);
 
 public class Empresa
 {
-    // … Id, Nit, Nombre, Plan, DeudaPendiente, Reactivaciones, Version, como antes …
+    // … Id, Nit, Nombre, Plan, DeudaPendiente, Reactivaciones, Version y las referencias de pago con su YaRegistro, como antes …
     public bool Suspendida { get; private set; }
     public string? ProcesoAbierto { get; private set; }
 
@@ -102,7 +98,9 @@ public class Empresa
 // Empresas.Historia: el proceso, en su propio stream
 public record SuspensionSolicitada(string EmpresaId, string Nit, string Plan);
 public record ProcesoRevertido(string Razon);         // la reversión, dentro del proceso; la empresa se queda con su SuspensionRevertida
+[MessageIdentity("RevisarSuspension")]                // el nombre fijo de Deshacer en tres sistemas se queda (using Wolverine.Attributes;)
 public record RevisarSuspension(string SuspensionId); // el plazo, ahora del proceso
+// en tu Hechos.Registrar (y un Assert por hecho en el test de alias): AddEventType<SuspensionSolicitada>() y AddEventType<ProcesoRevertido>()
 
 public class SuspensionDeEmpresa
 {
@@ -112,6 +110,7 @@ public class SuspensionDeEmpresa
     public long Version { get; private set; }
     public EstadoIntegracion Facturacion { get; private set; }
     public EstadoIntegracion Accesos { get; private set; }
+    public DateOnly? MultaCobradaEl { get; private set; }
     public bool Efectiva { get; private set; }
     public bool Revertida { get; private set; }
     public bool Vencida { get; private set; }
@@ -133,11 +132,12 @@ public class SuspensionDeEmpresa
 public static async Task<(EmpresaSuspendidaV2?, DeliveryMessage<RevisarSuspension>?)> Handle(
     SuspenderEmpresa cmd, IDocumentSession session)
 {
-    var empresa = await session.Events.AggregateStreamAsync<Empresa>(cmd.EmpresaId);
-    if (empresa!.Suspendida) return (null, null);
+    var empresa = await session.Events.AggregateStreamAsync<Empresa>(cmd.EmpresaId)
+        ?? throw new InvalidOperationException($"No existe la empresa {cmd.EmpresaId}");
+    if (empresa.Suspendida) return (null, null);
 
     var suspensionId = $"susp-{cmd.EmpresaId}-{empresa.Version + 1}";
-    var nit = Localizador.NitDe(cmd.EmpresaId);
+    var nit = empresa.Nit;
     session.Events.Append(cmd.EmpresaId, new EmpresaSuspendida(cmd.Motivo, suspensionId));
     session.Events.StartStream<SuspensionDeEmpresa>(suspensionId, new SuspensionSolicitada(cmd.EmpresaId, nit, empresa.Plan));
     return (new EmpresaSuspendidaV2(nit, cmd.Motivo, empresa.Plan),
@@ -149,11 +149,11 @@ Una suspensión nueva es un stream nuevo: ya no hay estados que limpiar al empez
 
 </details>
 
-Los socios siguen como los dejó [Deshacer en tres sistemas](./deshacer-en-tres-sistemas.md), escuchando el anuncio. En el log, el plazo y las respuestas V1 salen sin nadie que las reciba (`No routes can be determined`): sus handlers los borraste. Si conservas el orden por llave de [Dos respuestas a la vez](./dos-respuestas-a-la-vez.md), las V1 llegan a su cola, y el aviso es `No known handler`.
+Los socios siguen como los dejó [Deshacer en tres sistemas](./deshacer-en-tres-sistemas.md), escuchando el anuncio. Deja vivo el programa unos segundos después de suspender (`await Task.Delay(2000);`). En el log, el plazo y las respuestas V1 salen sin nadie que las reciba (`No routes can be determined`): sus handlers los borraste. Si conservas el orden por llave de [Dos respuestas a la vez](./dos-respuestas-a-la-vez.md), las V1 llegan a su cola, y el aviso es `No known handler`.
 
 ### Paso 2 · Pedir con la correlación
 
-Hasta aquí, los socios reaccionaban al anuncio público, `EmpresaSuspendidaV2`. Pero ese anuncio es para el mundo: dice que algo pasó, no le pide nada a nadie, y no lleva el id de la suspensión. Ahora el proceso tiene dueño, y el dueño **pide**: le manda a cada socio un comando con la correlación, y cada socio contesta devolviéndola. Pedir también fija a quién espera el dueño: a quien le pidió, no a quien se haya suscrito al anuncio.
+Hasta aquí, los socios reaccionaban al anuncio público, `EmpresaSuspendidaV2`, que no le pide nada a nadie ni lleva el id de la suspensión. Ahora el dueño **pide**: le manda a cada socio un comando con la correlación, y cada socio contesta devolviéndola. Así el dueño espera a quien le pidió, no a quien se haya suscrito al anuncio.
 
 > 🛠️ **Inténtalo tú.** emp-12 quedó suspendida en el Paso 1: reactívala con el `Append` de *Antes de empezar*, y haz que suspenderla pida con la correlación:
 >
@@ -169,22 +169,29 @@ Hasta aquí, los socios reaccionaban al anuncio público, `EmpresaSuspendidaV2`.
 > // No routes can be determined for Envelope #… (Contratos.MultaCobradaV2)
 > ```
 >
-> Para eso: **(1)** Declara en `Contratos` los pedidos `CobrarMultaV1(SuspensionId, Nit, Plan)` y `RevocarAccesosV1(SuspensionId, Nit)`, y las respuestas con la correlación: `MultaCobradaV2`, `MultaRechazadaV2`, `AccesosRevocadosV2` y `AccesosRestituidosV2`, cada una con `SuspensionId` y `Nit` (y `Razon` la de rechazo). La restitución también lleva la correlación: `RestituirAccesosV2(SuspensionId, Nit)`. Son versiones nuevas porque la forma cambió; las de antes se retiran cuando no quede nadie que las use. **(2)** Facturación y Accesos dejan de escuchar `EmpresaSuspendidaV2` y atienden los pedidos, contestando con el `SuspensionId` que recibieron. Accesos vuelve a contestar, sin pausa. **(3)** El `SuspenderHandler` ahora devuelve varios mensajes: el anuncio público (para quien quiera saber), los dos pedidos y el plazo. Para devolver varios mensajes y uno programado, Wolverine trae `OutgoingMessages`: una lista a la que le haces `Add(...)` y `Delay(mensaje, tiempo)`.
+> Para eso: **(1)** Declara en `Contratos` los pedidos `CobrarMultaV1(SuspensionId, Nit, Plan)` y `RevocarAccesosV1(SuspensionId, Nit)`, y las respuestas con la correlación: `MultaCobradaV2`, `MultaRechazadaV2`, `AccesosRevocadosV2` y `AccesosRestituidosV2`, cada una con `SuspensionId` y `Nit`. La de rechazo lleva además su `Razon`, y la del cobro su `CobradaEl`, como la `V1`. La restitución también lleva la correlación: `RestituirAccesosV2(SuspensionId, Nit)`. Cada contrato nuevo lleva su `[MessageIdentity]` ([El outbox](./el-outbox.md)). Son versiones nuevas porque la forma cambió; las de antes se retiran cuando nadie las use. **(2)** Facturación y Accesos dejan de escuchar `EmpresaSuspendidaV2`: atienden los pedidos y contestan con el `SuspensionId` que recibieron. Facturación lee la fecha del cobro con su `LeerFecha`, y Accesos vuelve a contestar, sin pausa. **(3)** El `SuspenderHandler` devuelve ahora el anuncio público, los dos pedidos y el plazo. Para devolver varios mensajes y uno programado, Wolverine trae `OutgoingMessages`: una lista a la que le haces `Add(...)` y `Delay(mensaje, tiempo)`. **(4)** Tu test de [El outbox](./el-outbox.md) deja de compilar, porque el handler devuelve la lista y no la tupla. Haz que busque el anuncio con `OfType<EmpresaSuspendidaV2>().FirstOrDefault()`, que da el primer mensaje de ese tipo o `null`, y que afirme lo mismo que antes.
 
-El id es `susp-emp-12-5` porque la reactivación sumó dos versiones al diario de emp-12. Facturación cobró, y las dos respuestas salen, pero nadie las recibe todavía: su handler llega en el Paso 3. El plazo tampoco tiene handler, y se descarta. El anuncio ya no tiene suscriptores: su `No routes` es esperado, y lo vas a ver en cada suspensión.
+El id es `susp-emp-12-5` porque la reactivación sumó dos versiones al diario de emp-12. Facturación cobró, pero nadie recibe las respuestas todavía: su handler llega en el Paso 3. El plazo tampoco tiene handler, y se descarta. El anuncio ya no tiene suscriptores: su `No routes` es esperado en cada suspensión.
 
 <details>
 <summary>👉 Una forma de hacerlo</summary>
 
 ```csharp
 // Contratos: el dueño pide, con la correlación…
+[MessageIdentity("facturacion.cobrar-multa.v1")]
 public record CobrarMultaV1(string SuspensionId, string Nit, string Plan);
+[MessageIdentity("accesos.revocar-accesos.v1")]
 public record RevocarAccesosV1(string SuspensionId, string Nit);
+[MessageIdentity("accesos.restituir-accesos.v2")]
 public record RestituirAccesosV2(string SuspensionId, string Nit);
 // …y cada socio contesta devolviéndola
-public record MultaCobradaV2(string SuspensionId, string Nit);
+[MessageIdentity("facturacion.multa-cobrada.v2")]
+public record MultaCobradaV2(string SuspensionId, string Nit, DateOnly CobradaEl);   // la fecha, como en la V1
+[MessageIdentity("facturacion.multa-rechazada.v2")]
 public record MultaRechazadaV2(string SuspensionId, string Nit, string Razon);
+[MessageIdentity("accesos.accesos-revocados.v2")]
 public record AccesosRevocadosV2(string SuspensionId, string Nit);
+[MessageIdentity("accesos.accesos-restituidos.v2")]
 public record AccesosRestituidosV2(string SuspensionId, string Nit);
 ```
 
@@ -193,8 +200,10 @@ public record AccesosRestituidosV2(string SuspensionId, string Nit);
 public static object Handle(CobrarMultaV1 msg, Envelope envelope)
 {
     if (ConAcuerdoDePago.Contains(msg.Nit)) return new MultaRechazadaV2(msg.SuspensionId, msg.Nit, "tiene acuerdo de pago");
+    var cobradaEl = LeerFecha(MundoExterno.FechaDelCobro)
+        ?? throw new FechaNoParseableException(MundoExterno.FechaDelCobro);   // la fecha, leída en el borde como para la V1
     // … dedup + INSERT en multas, como siempre …
-    //   y siempre, también en una reentrega: return new MultaCobradaV2(msg.SuspensionId, msg.Nit);
+    return new MultaCobradaV2(msg.SuspensionId, msg.Nit, cobradaEl);       // siempre, también en una reentrega
 }
 ```
 
@@ -211,11 +220,12 @@ public static class SuspenderHandler
     public static async Task<OutgoingMessages> Handle(SuspenderEmpresa cmd, IDocumentSession session)
     {
         var salida = new OutgoingMessages();
-        var empresa = await session.Events.AggregateStreamAsync<Empresa>(cmd.EmpresaId);
-        if (empresa!.Suspendida) return salida;                                       // ya lo estaba: nada sale
+        var empresa = await session.Events.AggregateStreamAsync<Empresa>(cmd.EmpresaId)
+            ?? throw new InvalidOperationException($"No existe la empresa {cmd.EmpresaId}");
+        if (empresa.Suspendida) return salida;                                        // ya lo estaba: nada sale
 
         var suspensionId = $"susp-{cmd.EmpresaId}-{empresa.Version + 1}";
-        var nit = Localizador.NitDe(cmd.EmpresaId);
+        var nit = empresa.Nit;
         session.Events.Append(cmd.EmpresaId, new EmpresaSuspendida(cmd.Motivo, suspensionId));
         session.Events.StartStream<SuspensionDeEmpresa>(suspensionId, new SuspensionSolicitada(cmd.EmpresaId, nit, empresa.Plan));
 
@@ -228,9 +238,102 @@ public static class SuspenderHandler
 }
 ```
 
+```csharp
+// Empresas.Tests/SuspenderHandlerTests.cs: el anuncio, entre los mensajes que salen (arriba: using Contratos;)
+var salida = await SuspenderHandler.Handle(new SuspenderEmpresa(id, "mora"), session);
+
+var anuncio = salida.OfType<EmpresaSuspendidaV2>().FirstOrDefault();
+Assert.NotNull(anuncio);
+Assert.Equal("900555", anuncio.Nit);
+Assert.Equal("Basico", anuncio.Plan);
+Assert.Equal("mora", anuncio.Motivo);
+```
+
 </details>
 
 Agregar la correlación cuando el protocolo ya existe te costó versiones nuevas en los dos lados. Por eso va en el contrato desde el primer mensaje.
+
+> 🔨 **Rómpelo tú (cien a la vez).** Tu `SuspenderHandler` podría publicar sus mensajes él mismo, con el `IMessageBus` que Wolverine le pasa como parámetro. Y si son muchos, la tentación es lanzarlos todos a la vez, con el `Task.WhenAll` de [El swap](./el-swap-por-reconocimiento.md). Así publica sus eventos la librería común de la organización. Pruébalo con cien, en un handler de prueba:
+>
+> ```csharp
+> // Empresas.Historia: solo para el 🔨 (using Marten; using Wolverine;)
+> public record PublicarCien();
+> public record Eco(int N);
+>
+> public static class CienHandler
+> {
+>     public static async Task Handle(PublicarCien cmd, IDocumentSession session, IMessageBus bus)
+>     {
+>         Console.WriteLine($"el bus del handler es un {bus.GetType().Name}");
+>         await Task.WhenAll(Enumerable.Range(1, 100).Select(n => bus.PublishAsync(new Eco(n)).AsTask()));
+>     }
+>
+>     public static void Handle(Eco e) { }   // nadie hace nada con él: solo se cuenta
+> }
+> ```
+>
+> La sesión no se usa: está para que el handler corra como los tuyos, dentro de la transacción de Marten. `PublishAsync` devuelve un `ValueTask`, una tarea más liviana, y `AsTask()` lo convierte en la `Task` que pide `Task.WhenAll`. Desde tu `Program.cs`, llama `await bus.InvokeAsync(new PublicarCien());` y cuenta enseguida, porque Wolverine borra los sobres atendidos a los cinco minutos:
+>
+> ```
+> el bus del handler es un MessageContext
+> SELECT count(*) FROM wolverine_incoming_envelopes WHERE message_type = 'Eco';   -- 100
+> ```
+>
+> Salen los cien, sin pérdidas, sin repetidos y sin excepción (otra corrida suma cien más). Que salga bien no lo hace correcto. El `MessageContext` es el contexto de **un** mensaje: guarda los sobres que van a salir y su transacción, y no está hecho para que varias tareas lo usen a la vez. Hoy no se pisan porque cada `PublishAsync` solo anota su sobre para enviarlo al final, y termina antes de que empiece el siguiente: `Task.WhenAll` no gana nada, y nada en Wolverine promete que siga así. Varios mensajes salen por tu `OutgoingMessages`, o con un `await` detrás de otro, nunca con `Task.WhenAll` sobre el bus. Borra `CienHandler` y sus dos mensajes.
+
+### El mismo pedido, en otro sobre
+
+En [Llegó dos veces](./llego-dos-veces.md) quedó abierto un 🔨: el mismo anuncio, publicado dos veces, cobró dos multas con el dedup puesto, porque el anuncio no decía de qué suspensión era. El pedido de ahora sí lo dice: lleva el `SuspensionId`. Y un pedido también se repite en otro sobre, cuando el dueño reintenta su envío o cuando llega por dos transportes. Pruébalo con el pedido de `susp-emp-12-5`, que Facturación ya cobró en el Paso 2:
+
+```csharp
+await bus.PublishAsync(new CobrarMultaV1("susp-emp-12-5", "901200000", "Basico"));
+await bus.PublishAsync(new CobrarMultaV1("susp-emp-12-5", "901200000", "Basico"));   // el mismo pedido, otro sobre
+await Task.Delay(1000);
+// SELECT count(*) FROM multas WHERE nit = '901200000';   → dos más que antes
+```
+
+Son dos sobres con dos `envelope.Id`, y el dedup por sobre no ve que es el mismo pedido: salen dos multas. Las respuestas salen sin nadie que las reciba, como en el Paso 2.
+
+> 🛠️ **Inténtalo tú.** Haz que el mismo pedido cobre una sola vez, en los sobres que lleguen. Con los mismos dos `PublishAsync`:
+>
+> ```
+> SELECT count(*) FROM multas WHERE nit = '901200000';                → una más que antes, no dos (las de antes no tienen la llave)
+> SELECT count(*) FROM multas WHERE suspension_id = 'susp-emp-12-5';  → 1
+> ```
+>
+> Para eso: **(1)** Dale a `multas` la llave del acto: `ALTER TABLE multas ADD COLUMN suspension_id TEXT UNIQUE;`. Las multas de antes no tienen suspensión y se quedan en `null`, la verdad histórica: por eso va `UNIQUE`, que admite varios `null`, y no `PRIMARY KEY`, que no admite ninguno. Si la tabla naciera hoy, `suspension_id` sería su `PRIMARY KEY`. **(2)** En `FacturacionHandler`, el `INSERT` en `multas` lleva el `SuspensionId` y termina en `ON CONFLICT (suspension_id) DO NOTHING`, como el de `procesados`: funciona igual con `UNIQUE`. Un solo `INSERT` ya es atómico, así que la transacción de antes sobra. La respuesta sigue saliendo siempre. **(3)** Quita de este handler el dedup por `procesados`: una reentrega trae el mismo `SuspensionId`, y la llave del acto también la frena. Sin ese dedup, el handler ya no necesita el `Envelope`.
+
+<details>
+<summary>👉 Una forma de hacerlo</summary>
+
+```sql
+ALTER TABLE multas ADD COLUMN suspension_id TEXT UNIQUE;   -- las multas de antes quedan en null
+```
+
+```csharp
+// Facturacion/FacturacionHandler.cs: la llave es el acto, no el sobre
+public static object Handle(CobrarMultaV1 msg)
+{
+    if (ConAcuerdoDePago.Contains(msg.Nit)) return new MultaRechazadaV2(msg.SuspensionId, msg.Nit, "tiene acuerdo de pago");
+    var cobradaEl = LeerFecha(MundoExterno.FechaDelCobro)
+        ?? throw new FechaNoParseableException(MundoExterno.FechaDelCobro);
+
+    using var c = new NpgsqlConnection(Conexion.Cadena); c.Open();
+    using var multa = c.CreateCommand();
+    multa.CommandText = "INSERT INTO multas(suspension_id, nit, plan_al_suspender, monto) "
+                      + "VALUES(@suspension, @nit, @plan, @monto) ON CONFLICT (suspension_id) DO NOTHING";
+    multa.Parameters.AddWithValue("suspension", msg.SuspensionId);
+    multa.Parameters.AddWithValue("nit", msg.Nit);
+    multa.Parameters.AddWithValue("plan", msg.Plan);
+    multa.Parameters.AddWithValue("monto", Tarifa[msg.Plan]);
+    multa.ExecuteNonQuery();                                              // 0 filas: esa suspensión ya tenía su multa
+    return new MultaCobradaV2(msg.SuspensionId, msg.Nit, cobradaEl);      // siempre, también si ya estaba cobrada
+}
+```
+
+</details>
+
+Así se cierra el 🔨 de [Llegó dos veces](./llego-dos-veces.md): el acto repetido se reconoce por la referencia que le dio su origen, aquí el `SuspensionId` del dueño del proceso. Si el cobro fuera en una API de pagos, esa es la llave que le pasas y por la que le preguntas antes de reintentar, no el `envelope.Id`.
 
 ### Paso 3 · El dueño decide
 
@@ -243,7 +346,7 @@ Agregar la correlación cuando el protocolo ya existe te costó versiones nuevas
 > // emp-12: Suspendida=True ProcesoAbierto=susp-emp-12-8
 > ```
 >
-> Para eso, escribe un handler `static`, `ProcesoDeSuspensionHandler`, con un `Handle` por respuesta (y uno por `RevisarSuspension`). Cada uno rehidrata el proceso por el `SuspensionId` del mensaje, le pide la decisión, y la anota con la versión esperada. Como todos hacen lo mismo con distinto método, júntalos en un `Decidir(session, suspensionId, decidir)` privado que reciba la decisión como función. Su tipo es `Func<SuspensionDeEmpresa, object[]>`: como el `Action` de [El despachador](./el-despachador.md), pero devuelve algo, aquí los hechos. Cada `Handle` le pasa la suya en una lambda: `p => p.ConfirmarCobroDeMulta()`. Dos cosas más: si el proceso se revierte, anota también `SuspensionRevertida` en el stream **de la empresa**, en la misma transacción; y si pidió restituir, devuelve `RestituirAccesosV2`. Si tienes el orden por llave de [Dos respuestas a la vez](./dos-respuestas-a-la-vez.md), pásalo a las cuatro respuestas V2, con `SuspensionId` como llave: el stream que escriben ahora es el del proceso.
+> Para eso, escribe un handler `static`, `ProcesoDeSuspensionHandler`, con un `Handle` por respuesta (y uno por `RevisarSuspension`). Cada uno rehidrata el proceso por el `SuspensionId` del mensaje, le pide la decisión, y la anota con la versión esperada. Como todos hacen lo mismo con distinto método, júntalos en un `Decidir(session, suspensionId, decidir)` privado que reciba la decisión como función. Su tipo es `Func<SuspensionDeEmpresa, object[]>`: como el `Action` de [El despachador](./el-despachador.md), pero devuelve algo, aquí los hechos. Cada `Handle` le pasa la suya en una lambda: `p => p.ConfirmarCobroDeMulta(m.CobradaEl)`. Dos cosas más: si el proceso se revierte, anota también `SuspensionRevertida` en el stream **de la empresa**, en la misma transacción; y si pidió restituir, devuelve `RestituirAccesosV2`. Si tienes el orden por llave de [Dos respuestas a la vez](./dos-respuestas-a-la-vez.md), pásalo a las cuatro respuestas V2, con `SuspensionId` como llave: el stream que escriben ahora es el del proceso.
 >
 > Y prueba la escena del dolor, con esa suspensión como la primera. Pon a Accesos en silencio, como en [Deshacer en tres sistemas](./deshacer-en-tres-sistemas.md): que su handler devuelva `null`, con el retorno `AccesosRevocadosV2?`. Reactiva emp-12, suspéndela de nuevo, y entrega a mano la reentrega de la respuesta de Accesos a la primera: `await bus.InvokeAsync(new AccesosRevocadosV2("susp-emp-12-8", "901200000"));`.
 
@@ -254,7 +357,7 @@ Agregar la correlación cuando el protocolo ya existe te costó versiones nuevas
 // Empresas.Historia: el dueño del proceso. Cada respuesta va al stream de SU suspensión.
 public static class ProcesoDeSuspensionHandler
 {
-    public static Task<RestituirAccesosV2?> Handle(MultaCobradaV2 m, IDocumentSession s)       => Decidir(s, m.SuspensionId, p => p.ConfirmarCobroDeMulta());
+    public static Task<RestituirAccesosV2?> Handle(MultaCobradaV2 m, IDocumentSession s)       => Decidir(s, m.SuspensionId, p => p.ConfirmarCobroDeMulta(m.CobradaEl));
     public static Task<RestituirAccesosV2?> Handle(MultaRechazadaV2 m, IDocumentSession s)     => Decidir(s, m.SuspensionId, p => p.RechazarCobroDeMulta(m.Razon));
     public static Task<RestituirAccesosV2?> Handle(AccesosRevocadosV2 m, IDocumentSession s)   => Decidir(s, m.SuspensionId, p => p.ConfirmarRevocacionDeAccesos());
     public static Task<RestituirAccesosV2?> Handle(AccesosRestituidosV2 m, IDocumentSession s) => Decidir(s, m.SuspensionId, p => p.ConfirmarRestitucionDeAccesos());
@@ -262,10 +365,11 @@ public static class ProcesoDeSuspensionHandler
 
     static async Task<RestituirAccesosV2?> Decidir(IDocumentSession session, string suspensionId, Func<SuspensionDeEmpresa, object[]> decidir)
     {
-        var proceso = await session.Events.AggregateStreamAsync<SuspensionDeEmpresa>(suspensionId);
-        var hechos = decidir(proceso!);
+        var proceso = await session.Events.AggregateStreamAsync<SuspensionDeEmpresa>(suspensionId)
+            ?? throw new InvalidOperationException($"No existe la suspensión {suspensionId}");
+        var hechos = decidir(proceso);
         if (hechos.Length == 0) return null;                                              // nada nuevo: una reentrega, o el plazo de un proceso ya resuelto
-        session.Events.Append(suspensionId, proceso!.Version + hechos.Length, hechos);
+        session.Events.Append(suspensionId, proceso.Version + hechos.Length, hechos);
 
         if (hechos.OfType<ProcesoRevertido>().FirstOrDefault() is ProcesoRevertido revertido)
             session.Events.Append(proceso.EmpresaId, new SuspensionRevertida(revertido.Razon));   // la empresa vuelve a estar activa
@@ -311,14 +415,16 @@ public static AccesosRevocadosV2? Handle(RevocarAccesosV1 cmd) => null;
 >
 > `ProcesoAbierto` de la empresa es `susp-emp-12-11`. Los procesos de los Pasos 1 y 2, `susp-emp-12-2` y `susp-emp-12-5`, se quedan en `suspension_solicitada`: sus respuestas y sus plazos se perdieron porque nadie los escuchaba. En CosmosLens, cada suspensión es una instancia propia: en tu `procesos.json`, pon `suspension_solicitada` en `Inicia`.
 
-Hay un caso distinto: si la primera hubiera vencido sin respuesta y la de Accesos llegara de verdad tarde, sería un huérfano como el de [Deshacer en tres sistemas](./deshacer-en-tres-sistemas.md), y su dueño decidiría qué hacer, por ejemplo pedir la restitución.
-
 ### Paso 4 · Reconocer: la saga de Wolverine
 
 Lo que acabas de construir tiene nombre en Wolverine: una **saga**. Es una clase que hereda de `Saga`, se crea con un mensaje, maneja las respuestas y se marca terminada. La correlación la toma de una propiedad del mensaje, y tiene sus propios plazos (`TimeoutMessage`). Se muestra para reconocerla, no para construirla:
 
 ```csharp
+using Wolverine;                     // Saga, TimeoutMessage
 using Wolverine.Persistence.Sagas;   // [SagaIdentityFrom]
+using JasperFx.Core;                 // 5.Seconds()
+using Marten;                        // IDocumentSession
+using Contratos;                     // MultaCobradaV2, AccesosRevocadosV2
 
 public record IniciarSuspension(string SuspensionId, string EmpresaId);
 public record PlazoDeSuspension(string SuspensionId) : TimeoutMessage(5.Seconds());
@@ -350,15 +456,17 @@ public class SuspensionSaga : Saga, JasperFx.IRevisioned        // ← IRevision
 }
 ```
 
-> ⚠️ **La saga sobre Marten, sin `IRevisioned`, pierde respuestas en silencio.** Con una `Saga` simple, dos respuestas que llegan a la vez leen el mismo estado, y la segunda pisa a la primera. Queda una sola en `Respondieron`, sin excepción ni dead letter. La saga vence esperando una respuesta que sí llegó. Es tu carrera de [Dos respuestas a la vez](./dos-respuestas-a-la-vez.md), dentro de la librería. Declarar `JasperFx.IRevisioned` enciende la versión esperada en el documento de la saga, y el choque sale como `JasperFx.ConcurrencyException`. Tu política de reintento no la atrapa: atrapa `EventStreamUnexpectedMaxEventIdException`, que es hija de `JasperFx.ConcurrencyException`, y la saga lanza la base. Para la saga, reintenta la base, `opts.OnException<JasperFx.ConcurrencyException>()…`, que cubre las dos. La documentación de Wolverine dice que las sagas sobre Marten traen esa comprobación; con sesiones ligeras y una `Saga` simple, no es así.
+> ⚠️ **La saga sobre Marten, sin `IRevisioned`, pierde respuestas en silencio.** Con una `Saga` simple, dos respuestas que llegan a la vez leen el mismo estado, y la segunda pisa a la primera: queda una sola en `Respondieron`, sin excepción ni dead letter, y la saga vence esperando una respuesta que sí llegó. Es tu carrera de [Dos respuestas a la vez](./dos-respuestas-a-la-vez.md), dentro de la librería. Declarar `JasperFx.IRevisioned` enciende la versión esperada en el documento de la saga, y el choque sale como `JasperFx.ConcurrencyException`. Tu política de reintento ya la atrapa, porque la declaraste sobre `JasperFx.ConcurrencyException`; declarada sobre `EventStreamUnexpectedMaxEventIdException`, este choque caería en dead letters. La documentación de Wolverine dice que las sagas sobre Marten traen esa comprobación; con sesiones ligeras y una `Saga` simple, no es así.
 
-La saga y tu proceso hacen lo mismo, con una diferencia de fondo: **dónde vive el estado**. La saga es un **documento** de Marten: una fila con el estado de hoy en JSON, en su tabla `mt_doc_suspensionsaga`, que se sobrescribe en cada cambio y se borra al terminar. Tu proceso es un **stream**: guarda cada respuesta como un hecho, para siempre. Con el documento sabes en qué va; con el stream sabes además cómo llegó ahí, CosmosLens lo lee sin tocarte, y lo puedes proyectar. La saga te ahorra piezas: la correlación, el plazo y el cierre vienen hechos. Sirve cuando basta saber en qué va.
+La saga es un documento, y un documento se pisa igual que tu tabla `planes` de [¿Merecía event sourcing?](./merecia-event-sourcing.md): gana el último, sin señal. La cura es la misma: quien guarda dice qué versión leyó. En la saga, `IRevisioned` basta, porque Wolverine la guarda pasándole esa versión. Un documento que guardes tú con `Store` no la pasa, y el segundo que guarda pisa al primero sin choque. Ahí lo enciendes por tipo, en tu `AddMarten`, con `opts.Schema.For<T>().UseOptimisticConcurrency(true)`: el segundo `SaveChangesAsync` lanza `JasperFx.ConcurrencyException`.
 
-En la organización, la librería común no expone la saga de Wolverine. Por eso el orquestador de terceros reimplementó un proceso a mano, como documento, y tiene la misma carrera sin protección. Exponerla en la librería, con `IRevisioned` de serie, es un aporte con dueño claro.
+La saga y tu proceso hacen lo mismo, con una diferencia de fondo: **dónde vive el estado**. La saga es un **documento** de Marten: una fila con el estado de hoy en JSON, en su tabla `mt_doc_suspensionsaga`, que se sobrescribe en cada cambio y se borra al terminar. Tu proceso es un **stream**: guarda cada respuesta como un hecho. Con el documento sabes en qué va; con el stream sabes además cómo llegó ahí, CosmosLens lo lee sin tocarte, y lo puedes proyectar. La saga te ahorra piezas (la correlación, el plazo y el cierre vienen hechos) y sirve cuando basta saber en qué va.
+
+En la organización, la librería común no expone la saga, y el orquestador de terceros reimplementó un proceso a mano, como documento, con la misma carrera sin protección. Exponerla con `IRevisioned` de serie es un aporte con dueño claro. Ese orquestador paga dos cosas más. Busca el proceso por campos que no son el id, y cada respuesta recorre el JSON de toda la tabla. Y nunca borra los procesos terminados: la tabla crece sin techo. Tu proceso se busca por su id, que es el del stream. Si un socio contesta con su propio dato y no con tu id, busca por una columna con índice: en un documento, `opts.Schema.For<T>().Duplicate(x => x.Dato)` la crea. Y lo que termina necesita un tiempo de vida. La saga se borra al terminar; cuánto tiempo guarda tu stream su historia se decide por auditoría, por ley o por lo que consulte soporte. Anótalo en tu `DECISIONES.md`.
 
 ## Coreografía u orquestación
 
-Desde [Dos respuestas, ningún dueño](./dos-respuestas-ningun-dueno.md), los socios reaccionaban al anuncio, sin que nadie les pidiera nada: eso es **coreografía**. El estado del proceso lo llevaba un rastreador dentro del agregado de otro, la `Empresa`. En [Deshacer en tres sistemas](./deshacer-en-tres-sistemas.md) ya diste el primer paso de orquestación: le pediste a Accesos la restitución con un comando. Pero lo pediste sin dueño. Ahora hiciste **orquestación**: un dueño pide, espera, decide y compensa, con un stream por suspensión.
+Desde [Dos respuestas, ningún dueño](./dos-respuestas-ningun-dueno.md), los socios reaccionaban al anuncio sin que nadie les pidiera nada, y el estado del proceso lo llevaba un rastreador dentro del agregado de otro, la `Empresa`: eso es **coreografía**. Ahora hiciste **orquestación**: un dueño pide, espera, decide y compensa, con un stream por suspensión.
 
 | | Coreografía | Orquestación |
 |---|---|---|
@@ -367,38 +475,148 @@ Desde [Dos respuestas, ningún dueño](./dos-respuestas-ningun-dueno.md), los so
 | Bueno cuando | Los socios son independientes y a nadie le importa el resultado conjunto | Hay un resultado conjunto con reglas, plazos o compensaciones |
 | Lo que cuesta | Responder "¿en qué va?" exige un rastreador aparte, y nadie es dueño de "¿qué hago si uno falla?" | El dueño conoce a sus socios y sus contratos |
 
-La señal para pasar a orquestación es una pregunta: si alguien necesita saber **en qué va** el proceso, o **qué hacer si uno falla**, el proceso necesita dueño. En la obligación por pagar de la organización, el propio equipo llegó a esa conclusión. Hoy es coreografía: dos ramas en paralelo, y ninguna pieza guarda el estado. El dueño natural es la propia obligación por pagar.
+La señal para pasar a orquestación es una pregunta: si alguien necesita saber **en qué va** el proceso, o **qué hacer si uno falla**, el proceso necesita dueño. La obligación por pagar de la organización hoy es coreografía: dos ramas en paralelo, y ninguna pieza guarda el estado. Su dueño natural es la propia obligación por pagar.
 
 ## 🔨 Rómpelo: sin correlación
 
-Llegas con emp-12 suspendida: `susp-emp-12-11` espera a Accesos, que sigue en silencio, y su plazo ya venció. Haz que `ProcesoDeSuspensionHandler` busque el proceso por el NIT, con el `ProcesoAbierto` de la empresa, en vez de por el `SuspensionId` del mensaje. Esta vez no reactives ni suspendas: entrega otra vez a mano la misma reentrega, `AccesosRevocadosV2("susp-emp-12-8", "901200000")`. Vuelve el dolor: `susp-emp-12-11` queda `Accesos=Aplicado Efectiva=True`, sin que Accesos haya cortado nada para ella. Una respuesta solo sabe a qué pregunta contesta si lleva la marca de la pregunta.
+Llegas con emp-12 suspendida: `susp-emp-12-11` espera a Accesos, que sigue en silencio. Haz que `ProcesoDeSuspensionHandler` busque el proceso por el NIT, con el `ProcesoAbierto` de la empresa, en vez de por el `SuspensionId` del mensaje. Esta vez no reactives ni suspendas: entrega otra vez a mano la misma reentrega, `AccesosRevocadosV2("susp-emp-12-8", "901200000")`. Vuelve el dolor: `susp-emp-12-11` queda `Accesos=Aplicado Efectiva=True`, sin que Accesos haya cortado nada para ella. Una respuesta solo sabe a qué pregunta contesta si lleva la marca de la pregunta.
+
+## 🔨 Rómpelo: el dueño que muere · no lo saltes
+
+[Seguir una acción](./seguir-una-accion.md) parte de lo que dejas aquí: el hecho `ProcesoCerrado` y la regla `ProcesoAbierto is not null` de tu `SuspenderHandler`.
+
+Vuelve a dejar la correlación: que `ProcesoDeSuspensionHandler` busque el proceso por el `SuspensionId` del mensaje. Ahora mira qué pasa si suspender es un solo acto largo, que guarda la apertura y deja los pasos para un commit al final.
+
+Siembra una empresa nueva, `Sembrar(s, "emp-36", "903600000", "Imprenta Central", "Basico")`, y pon este bloque en tu `Program.cs`, solo para el 🔨:
+
+```csharp
+// solo para el 🔨: suspender en un solo acto, que acumula los pasos para el final
+await using (var s = store.LightweightSession())
+{
+    var empresa = await s.Events.AggregateStreamAsync<Empresa>("emp-36")
+        ?? throw new InvalidOperationException("No existe la empresa emp-36");
+    var id = $"susp-emp-36-{empresa.Version + 1}";
+    s.Events.Append("emp-36", new EmpresaSuspendida("mora", id));
+    s.Events.StartStream<SuspensionDeEmpresa>(id, new SuspensionSolicitada("emp-36", empresa.Nit, empresa.Plan));
+    await s.SaveChangesAsync();                                     // la apertura, guardada
+
+    var pasos = new List<object>();                                 // los pasos, en memoria hasta el final
+    var cobro = await bus.InvokeAsync<MultaCobradaV2>(new CobrarMultaV1(id, empresa.Nit, empresa.Plan));
+    pasos.Add(new CobroDeMultaConfirmado(cobro.CobradaEl));
+    throw new InvalidOperationException("el proceso muere aquí, antes de preguntarle a Accesos");
+    // … Accesos, SuspensionEfectiva, y al final un solo Append de los pasos con su SaveChangesAsync …
+}
+```
+
+`InvokeAsync<MultaCobradaV2>` le pide el cobro a Facturación y espera su respuesta. Como en la consulta de [El contrato lleva lo justo](./el-contrato-lleva-lo-justo.md), la respuesta vuelve a quien preguntó y no se publica: tu `ProcesoDeSuspensionHandler` nunca la ve. El `throw` es la caída, a mitad del acto. Arranca y deja que el programa muera. Quita el bloque y la siembra, y arranca otra vez con una espera de 7 segundos, lo que tardaría un plazo en vencer. Mira emp-36, sus procesos y sus multas (`SELECT suspension_id, monto FROM multas WHERE nit = '903600000';`):
+
+```
+emp-36:        Suspendida=True ProcesoAbierto=susp-emp-36-2
+susp-emp-36-2: suspension_solicitada
+multas:        susp-emp-36-2 | 50000
+```
+
+Facturación cobró, y el proceso no lo sabe: ese paso murió en memoria. Nada lo va a mover: no hay plazo que lo venza (`SELECT count(*) FROM wolverine_incoming_envelopes WHERE status = 'Scheduled';` da 0), ni respuesta en camino, y suspenderla otra vez no hace nada, porque ya lo está. En el asistente de la organización pasa lo mismo: un turno de conversación guarda su inicio y deja sus pasos para un commit final, y si muere a la mitad, su regla de un solo turno en proceso bloquea la conversación para siempre.
+
+Saca a emp-36 a mano: reactívala con el `Append` de *Antes de empezar*, con su id. La cura no la alcanza, porque nació sin plazo.
+
+Ahora la misma caída, con tu handler. Esta vez la caída va afuera del handler, que ya terminó: `Environment.Exit(1)` corta el programa en seco, con los socios todavía trabajando.
+
+```csharp
+await bus.InvokeAsync(new SuspenderEmpresa("emp-36", "mora"));
+await Task.Delay(1000);     // Facturación alcanza a contestar; Accesos sigue en silencio
+Environment.Exit(1);        // la caída
+```
+
+Arranca otra vez con la espera de 7 segundos y la consulta:
+
+```
+susp-emp-36-5: suspension_solicitada → cobro_de_multa_confirmado → suspension_vencida
+emp-36:        Suspendida=True ProcesoAbierto=susp-emp-36-5
+```
+
+Tu handler ya tiene la mitad de la cura: **un hecho por paso**. El cobro quedó en el diario porque fue su propio paso, con su propia transacción: una caída solo interrumpe el paso en curso, y el transporte lo vuelve a entregar. Y el plazo venció aunque el programa murió, porque salió con la apertura y esperaba en la base. Falta la otra mitad: el proceso terminó, y la empresa sigue atada a él. Si Accesos vuelve mañana, nadie puede reintentar.
+
+> 🛠️ **Inténtalo tú.** Haz que, al vencer, el plazo deje la empresa libre de proceso: sigue suspendida, pero se puede reintentar. Reactiva emp-36 con el `Append`, suspéndela con Accesos en silencio, y espera 7 segundos:
+>
+> ```
+> susp-emp-36-8: suspension_solicitada → cobro_de_multa_confirmado → suspension_vencida
+> emp-36:        Suspendida=True ProcesoAbierto=
+> ```
+>
+> Para eso: **(1)** En el `SuspenderHandler`, cambia `if (empresa.Suspendida)` por `if (empresa.ProcesoAbierto is not null)`: la regla es un proceso abierto a la vez, y lo dice el diario de la empresa. Una suspensión efectiva sigue bloqueando, porque su proceso la sostiene hasta que la empresa se reactiva; la vencida ya no. **(2)** Declara un hecho de la empresa, `ProcesoCerrado(SuspensionId)`, con su línea en `Hechos.Registrar` y su `Assert` en el test de alias. Su `Apply` deja `ProcesoAbierto` en `null` solo si es el suyo: si reactivas la empresa y la suspendes antes de que venza el plazo anterior, ese plazo viejo no debe soltar el proceso nuevo. **(3)** En tu `Decidir`, si los hechos traen `SuspensionVencida`, anota también `ProcesoCerrado` en el stream de la empresa, en la misma transacción, como haces con `SuspensionRevertida` en la reversión.
+
+<details>
+<summary>👉 Una forma de hacerlo</summary>
+
+```csharp
+// Empresas.Historia: la empresa se entera de que su proceso se cerró
+public record ProcesoCerrado(string SuspensionId);
+// en tu Hechos.Registrar (y un Assert en el test de alias): AddEventType<ProcesoCerrado>()
+
+// en tu Empresa
+public void Apply(ProcesoCerrado e) { if (ProcesoAbierto == e.SuspensionId) ProcesoAbierto = null; }   // solo si es el suyo
+```
+
+```csharp
+// SuspenderHandler: un proceso abierto a la vez
+if (empresa.ProcesoAbierto is not null) return salida;
+```
+
+```csharp
+// ProcesoDeSuspensionHandler, en Decidir, junto a la reversión
+if (hechos.OfType<SuspensionVencida>().Any())
+    session.Events.Append(proceso.EmpresaId, new ProcesoCerrado(suspensionId));   // venció: el proceso se cierra y suelta la empresa
+```
+
+</details>
+
+Cerrar no decide nada: solo suelta la empresa, y qué hacer con lo vencido lo sigue decidiendo alguien. Si la caída llega antes de que contesten los socios, sus pedidos también esperan en la base: Wolverine los recupera cuando nota que el programa que los tenía murió.
+
+Reintentar es una de esas decisiones. Devuélvele a Accesos su respuesta: que su handler de `RevocarAccesosV1` vuelva a devolver `AccesosRevocadosV2`. Suspende emp-36 otra vez y espera 2 segundos:
+
+```
+susp-emp-36-10: Facturacion=Aplicado Accesos=Aplicado Efectiva=True
+emp-36:         Suspendida=True ProcesoAbierto=susp-emp-36-10
+```
+
+Sin `ProcesoCerrado`, la regla no la habría dejado abrir. Es una suspensión nueva, con su id, y Facturación la cobra aparte: tu llave dice que cada suspensión es un acto. Si el negocio quiere una sola multa por mora, el acto es la mora, y la llave cambia con él.
 
 ## El Descubrimiento
 
-Un proceso que espera respuestas de varios lados es **alguien**: un *process manager*, con su propio stream y su propio id. El id viaja en cada pedido y vuelve en cada respuesta, la **correlación**, y es lo único que permite que una respuesta tardía o repetida caiga en la suspensión correcta. El dueño pide (orquestación), decide con la versión esperada, compensa y vence; la empresa vuelve a ser solo la empresa. Wolverine lo trae como **saga**, un documento que guarda el estado de hoy; tu proceso es un stream, que además guarda la historia. Y la decisión de fondo no es de herramienta: es si el proceso necesita dueño, y eso lo dice la pregunta "¿en qué va?".
+Un proceso que espera respuestas de varios lados es **alguien**: un *process manager*, con su propio stream y su propio id. El id viaja en cada pedido y vuelve en cada respuesta, la **correlación**, y es lo que permite que una respuesta tardía o repetida caiga en la suspensión correcta. También es la llave de lo que pide: una multa por `SuspensionId` aguanta cualquier sobre repetido. El dueño pide (orquestación), decide paso a paso con la versión esperada, compensa y vence, y su plazo lo cierra y suelta la empresa. Wolverine lo trae como **saga**, un documento con el estado de hoy; tu proceso es un stream, que además guarda la historia. La decisión de fondo no es de herramienta: es si el proceso necesita dueño, y eso lo dice la pregunta "¿en qué va?".
 
 > 🌱 Ahora los datos de una suspensión están repartidos en dos streams: el nombre en `emp-12`, el estado en `susp-emp-12-…`. Para un tablero de todas las suspensiones, con el nombre de cada empresa, necesitas una vista que se alimente sola de los dos. Y tu read-side quedó apagado desde el swap: las vistas que se mantienen solas, en Marten, las corre el **daemon**. Lo adoptas en [El daemon y la consistencia eventual](./el-daemon-y-la-consistencia-eventual.md).
 
 ## ✅ Compruébalo
 
-- [ ] Suspender abre un stream `susp-{empresa}-{versión}` de tipo `suspension_de_empresa`, y la empresa guarda su `ProcesoAbierto`.
-- [ ] La `Empresa` ya no tiene estados de integración, plazo ni reversión: viven en `SuspensionDeEmpresa`.
-- [ ] Facturación y Accesos atienden pedidos con `SuspensionId` y contestan devolviéndolo.
+- [ ] Suspender abre un stream `susp-{empresa}-{versión}` de tipo `suspension_de_empresa`, con los estados de integración, el plazo y la reversión; la empresa solo guarda su `ProcesoAbierto`.
+- [ ] Facturación y Accesos atienden pedidos con `SuspensionId` y contestan devolviéndolo. Los contratos nuevos llevan su `[MessageIdentity]`.
+- [ ] Tu test de suspender busca el anuncio entre los mensajes que devuelve el handler, y sigue en verde.
+- [ ] Contaste los cien sobres del `Task.WhenAll`, y sabes por qué varios mensajes salen por `OutgoingMessages` o con un `await` detrás de otro.
+- [ ] El mismo pedido, en dos sobres, cobra una sola multa: `multas` lleva la llave del acto, `suspension_id`.
 - [ ] Una respuesta tardía de una suspensión anterior cae en esa suspensión y no toca la abierta.
 - [ ] Con un rechazo, el proceso se revierte y la empresa recibe `SuspensionRevertida` en la misma transacción.
 - [ ] Sabes decir qué es una saga de Wolverine, por qué necesita `IRevisioned`, y en qué se diferencia de tu proceso como stream.
+- [ ] Sabes por qué un documento también necesita su versión, y cómo se enciende en uno que guardes tú.
 - [ ] Sabes cuándo un proceso pide orquestación en vez de coreografía.
+- [ ] El acto que deja sus pasos para el final murió a la mitad y dejó la empresa en un proceso sin plazo; con un hecho por paso y `ProcesoCerrado` al vencer, la misma caída la deja libre para reintentar.
 
 ## 🆘 Si algo salió mal
 
 - **Las respuestas no llegan al proceso y no hay ni dead letters:** Wolverine solo descubre clases cuyo nombre termina en `Handler` (o `Consumer`). `ProcesoDeSuspension` no se descubre; `ProcesoDeSuspensionHandler`, sí. Lo que nadie maneja se descarta con un aviso en el log (`No routes can be determined`).
-- **Tras el Paso 1 no compila (`"Empresa" no contiene una definición para "RevisarPlazo"`, y otros así):** quedaron `RespuestasHandler` o `PlazoHandler`, que llaman métodos que se mudaron al proceso. Bórralos: el Paso 3 los reemplaza.
 - **Suspender falla con `EventStreamUnexpectedMaxEventIdException` (`Unexpected starting version number for event stream 'emp-12', expected -1 but was -1`), aunque nadie escribió a la vez:** el id del proceso se repitió, y `StartStream` chocó con un stream que ya existe. El mensaje nombra el stream de la empresa, no el del proceso, y tu política de reintento lo repite en vano. Usa la versión en que nace la suspensión (`empresa.Version + 1`), no un id fijo ni un contador propio.
-- **La empresa no vuelve a quedar activa tras un rechazo:** el `Decidir` debe anotar `SuspensionRevertida` también en el stream de la empresa, no solo `ProcesoRevertido` en el del proceso.
 - **`OutgoingMessages` o `5.Seconds()` no compilan:** vienen de `using Wolverine;` y `using JasperFx.Core;`.
-- **Facturación sigue cobrando con el anuncio:** quedó su handler de `EmpresaSuspendidaV2`. Ahora atiende `CobrarMultaV1`; si dejas los dos, cobra dos veces.
+- **Una suspensión cobra dos multas:** quedó el handler de Facturación para `EmpresaSuspendidaV2`, junto al de `CobrarMultaV1`. Bórralo.
+- **El cobro falla con `column "suspension_id" of relation "multas" does not exist`:** esa base no tiene la columna nueva. Pásale el `ALTER TABLE` de *El mismo pedido, en otro sobre*.
+- **Tras el plazo, suspender emp-36 otra vez no abre nada:** la regla del `SuspenderHandler` debe mirar `ProcesoAbierto`, no `Suspendida`. Si `ProcesoAbierto` sigue lleno, a tu `Decidir` le falta anotar `ProcesoCerrado` en el stream de la empresa.
+- **Suspender una empresa de antes de este proceso abre uno, aunque ya estaba suspendida:** su `EmpresaSuspendida` trae `SuspensionId` en `null`, así que su `ProcesoAbierto` también. La regla nueva mira el proceso: esa empresa no tiene ninguno abierto.
 
 ## 📓 Registra tu avance
+
+Primero, deja en tu `DECISIONES.md` la decisión de hoy, con tu número:
+
+> La llave de un cobro es el acto, no el sobre: una multa por `SuspensionId`. Correlaciono por el id del proceso. Un proceso se guarda paso a paso, y su plazo lo cierra y suelta la empresa. Un proceso terminado se queda ___ meses en la base, por ___ (auditoría, ley o soporte).
 
 > 💭 **Reto:** en tu sistema, ¿qué proceso espera respuestas de varios lados? ¿Quién es hoy su dueño, y qué correlación viaja en sus mensajes? Si no tiene dueño, di qué pregunta queda sin respuesta.
 
@@ -410,7 +628,7 @@ git push
 
 ## 🧠 En una frase
 
-Un proceso que espera respuestas de varios lados es alguien: un *process manager* con su propio stream y su propio id, que viaja en cada pedido y vuelve en cada respuesta (la correlación); el dueño pide, decide, compensa y vence, la empresa vuelve a ser solo la empresa, y la saga de Wolverine es lo mismo como documento, con `IRevisioned` para no perder respuestas.
+Un proceso que espera respuestas de varios lados es alguien: un *process manager* con su propio stream y su propio id, que viaja en cada pedido y vuelve en cada respuesta (la correlación) y es la llave que hace idempotente lo que pide; el dueño pide, decide paso a paso, compensa y vence, y al vencer cierra el proceso y suelta la empresa; la empresa vuelve a ser solo la empresa, y la saga de Wolverine es lo mismo como documento, con `IRevisioned` para no perder respuestas.
 
 ---
 

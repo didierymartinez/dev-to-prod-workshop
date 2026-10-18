@@ -8,7 +8,7 @@ Responder "¿cuáles empresas están suspendidas **ahora**?" sin rejugar el diar
 
 ## 💥 El dolor: el `SELECT` que miente, y el que cuesta
 
-Operaciones quiere el listado de empresas suspendidas. Para probarlo, siembra unas cuantas con historias distintas — una activa, dos suspendidas, y una que se suspendió **pero volvió**:
+Operaciones quiere el listado de empresas suspendidas. Para probarlo, primero vacía el diario de las pruebas de Todo o nada: `docker exec empresas-db psql -U postgres -c "TRUNCATE eventos"`. Si no, el `SELECT` de abajo trae también `emp-7`. Luego siembra unas cuantas con historias distintas — una activa, dos suspendidas, y una que se suspendió **pero volvió**:
 
 ```csharp
 void sembrar(string id, Action<Empresa> hacer)
@@ -21,6 +21,8 @@ sembrar("emp-3", e => { e.Registrar("Gamma", "Básico"); e.Suspender("falta de p
 sembrar("emp-3", e => { e.RegistrarPago(500); e.Reactivar(); });   // pagó y volvió a estar activa
 sembrar("emp-4", e => { e.Registrar("Delta", "Enterprise"); e.Suspender("falta de pago"); });
 ```
+
+Corre una vez y 🔁 comenta las llamadas a `sembrar`: cada corrida vuelve a anexar sus hechos al diario.
 
 Las suspendidas de verdad son **emp-2** y **emp-4**. Ahora, el listado. Tienes Postgres delante; tu instinto es un `SELECT` — las suspendidas tendrán su hecho `empresa-suspendida`, así que:
 
@@ -83,7 +85,7 @@ Ya no rejuegas nada: lees una fila por empresa, con su estado actual listo.
 <summary>👉 Muéstrame una forma de hacerlo</summary>
 
 ```csharp
-using Npgsql;
+// (el using Npgsql; ya está en la primera línea del Program.cs)
 
 // La proyección: mantiene una vista de ESTADO ACTUAL, derivada de los hechos.
 public class Suspendidas
@@ -158,7 +160,8 @@ public class PagarDeudaHandler(EventStore store, Suspendidas vista) : ICommandHa
 Y se arman una vez, pasando la misma proyección a cada uno (la inyección de dependencias que evita este cableado a mano llega más adelante):
 
 ```csharp
-var cadena = "Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=postgres";
+var cadena = Environment.GetEnvironmentVariable("CADENA_POSTGRES")
+    ?? throw new InvalidOperationException("Falta la variable de entorno CADENA_POSTGRES.");   // la misma línea de Todo o nada
 var store  = new EventStore(cadena);
 var vista  = new Suspendidas(cadena);                    // misma base que el diario
 var suspender = new SuspenderHandler(store, vista);
@@ -178,7 +181,7 @@ vista.Listar()        →                       ← ¡vacío!
 
 La vista no miente: **está ciega**. Esas empresas se sembraron **antes** de que la vista existiera, y la siembra escribió los hechos al diario **sin llamar `Actualizar`**. La vista solo sabe de lo que pasó **desde que ella existe y a través de quien la actualiza**.
 
-Compruébalo: siembra otra empresa suspendida, esta vez **proyectando** (una línea más, la misma que hacen los handlers):
+Compruébalo: con las llamadas de arriba aún comentadas, siembra otra empresa suspendida, esta vez **proyectando** (una línea más, la misma que hacen los handlers):
 
 ```csharp
 void sembrar(string id, Action<Empresa> hacer)
@@ -193,7 +196,7 @@ sembrar("emp-5", e => { e.Registrar("Epsilon", "Básico"); e.Suspender("falta de
 vista.Listar()        → emp-5          (bien, y es un SELECT de una tabla)
 ```
 
-Ahora sí responde — y responde **rápido**, sin rejugar nada. Para que incluya también a `emp-2` y `emp-4` tendrías que **rejugar su historia** hacia la vista; por ahora, borra las dos tablas y vuelve a sembrar todo con la versión que proyecta.
+Ahora sí responde — y responde **rápido**, sin rejugar nada. Para que incluya también a `emp-2` y `emp-4` tendrías que **rejugar su historia** hacia la vista; por ahora, borra las dos tablas (`docker exec empresas-db psql -U postgres -c "DROP TABLE eventos, empresas_estado"`; tus constructores las vuelven a crear), descomenta la siembra y corre una vez con la versión que proyecta. Luego vuelve a comentarla.
 
 ## Dos formas de los mismos datos
 

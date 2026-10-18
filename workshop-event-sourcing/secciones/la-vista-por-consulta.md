@@ -8,7 +8,17 @@ Responder "¿cuánto ha pagado cada empresa?" — una pregunta que ni tu vista d
 
 ## 💥 El dolor: la respuesta vive en los hechos, no en el estado
 
-Conciliación pide un reporte: **cuánto ha pagado cada empresa, y cuántos pagos**. Tu instinto es la vista `Suspendidas`. Pero esa tabla es `empresas_estado(id, suspendida, plan)`: no tiene ni idea de pagos.
+Conciliación pide un reporte: **cuánto ha pagado cada empresa, y cuántos pagos**. Para tener qué reportar, siembra dos pagos en `emp-1` (córrelo una sola vez):
+
+```csharp
+var s1 = store.AbrirStream<Empresa>("emp-1");
+var e1 = s1.Get();
+e1.RegistrarPago(500);
+e1.RegistrarPago(300);
+s1.Append(e1);   // dos hechos pago-registrado: 800 en total
+```
+
+Tu instinto es la vista `Suspendidas`. Pero esa tabla es `empresas_estado(id, suspendida, plan)`: no tiene ni idea de pagos.
 
 Bien, entonces rehidrata cada empresa, como hacías en [La vista de lectura](./la-vista-de-lectura.md) antes de tener una vista. Rehidratas `emp-1` y miras qué te da el agregado:
 
@@ -34,7 +44,7 @@ La pregunta pide una fila por pago (para poder sumarlos, contarlos, agruparlos).
 > -- emp-1 | 800 | 2
 > ```
 >
-> Para eso: (1) crea `pagos(seq BIGINT PRIMARY KEY, empresa TEXT NOT NULL, monto INT NOT NULL)` — el `seq` del hecho de llave primaria; (2) dale su fila de checkpoint (`INSERT INTO checkpoint VALUES ('pagos', 0)`); (3) **generaliza** tus `LeerCursor`/`GuardarCursor`/`HechosDesde` de [La vista se mantiene sola](./la-vista-se-mantiene-sola.md) para que reciban el `nombre` del checkpoint y traigan también `tipo` y `datos` (los usan los dos proyectores); (4) escribe `CorrerProyectorPagos()` que, por cada hecho `pago-registrado`, deserialice el `PagoRegistrado` e inserte `(seq, stream, Monto)` con `ON CONFLICT (seq) DO NOTHING`, avanzando el cursor sobre **todos** los hechos vistos, no solo los pagos.
+> Para eso: (1) crea `pagos(seq BIGINT PRIMARY KEY, empresa TEXT NOT NULL, monto INT NOT NULL)` — el `seq` del hecho de llave primaria; (2) dale su fila de checkpoint (`INSERT INTO checkpoint VALUES ('pagos', 0)`); (3) **generaliza** tus helpers de [La vista se mantiene sola](./la-vista-se-mantiene-sola.md): `LeerCursor`/`GuardarCursor` reciben el `nombre` del checkpoint, y `HechosDesde` trae también `tipo` y `datos`; ajusta a esas firmas el `CorrerProyector()` de `Suspendidas` (los dos proyectores las usan); (4) escribe `CorrerProyectorPagos()` que, por cada hecho `pago-registrado`, deserialice el `PagoRegistrado` e inserte `(seq, stream, Monto)` con `ON CONFLICT (seq) DO NOTHING`, avanzando el cursor sobre **todos** los hechos vistos, no solo los pagos.
 
 <details>
 <summary>👉 Una forma de hacerlo</summary>

@@ -77,6 +77,7 @@ git init
 git commit --allow-empty -m "ES · El diario de una empresa" -m "<aquí TU respuesta, con tus palabras>"
 # primero crea un repo VACÍO en github.com (New repository, sin README), igual que en el taller Básico; luego enlázalo (cambia la URL por la tuya):
 git remote add origin https://github.com/TU-USUARIO/TU-REPO.git
+git branch -M main      # la rama se llama main, aunque tu git la haya creado como master
 git push -u origin main
 ```
 
