@@ -1,0 +1,44 @@
+{
+  "name": "taller-presentacion",
+  "version": "1.0.0",
+  "description": "Presentación del taller de Event Sourcing (Remotion), hecha desde la guía del facilitador (workshop-event-sourcing/taller.md)",
+  "repository": {},
+  "license": "UNLICENSED",
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24"
+  },
+  "private": true,
+  "dependencies": {
+    "@remotion/cli": "4.0.536",
+    "@remotion/google-fonts": "4.0.536",
+    "@remotion/player": "4.0.536",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.536"
+  },
+  "devDependencies": {
+    "@remotion/eslint-config-flat": "4.0.536",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@types/web": "0.0.166",
+    "esbuild": "^0.28.1",
+    "eslint": "10.12.0",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "presentar": "node presentador/servir.mjs",
+    "dev": "remotion studio --port=3456",
+    "fotos": "bash scripts/fotos.sh",
+    "render:seccion-01": "remotion render seccion-01 out/seccion-01.mp4",
+    "render:seccion-02": "remotion render seccion-02 out/seccion-02.mp4",
+    "render:seccion-03": "remotion render seccion-03 out/seccion-03.mp4",
+    "render:taller": "remotion render taller out/taller.mp4",
+    "build": "remotion bundle",
+    "upgrade": "remotion upgrade",
+    "lint": "eslint src presentador/main.tsx && tsc"
+  },
+  "allowScripts": {
+    "esbuild": false
+  }
+}
