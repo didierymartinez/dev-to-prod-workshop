@@ -2,7 +2,7 @@
 
 Las láminas que proyectas al dirigir el taller de Event Sourcing. Salen de la guía del facilitador, [`workshop-event-sourcing/taller.md`](../workshop-event-sourcing/taller.md), no de las secciones: lo que la guía te pide decir o dictar es aquí lo que el grupo ve en pantalla.
 
-Por ahora están las secciones **1 a 3**: El diario de una empresa, Los primeros hechos y Refactorizando el motor.
+Están las **70 secciones** del taller, unas 820 láminas.
 
 ## Presentar en vivo
 
@@ -37,7 +37,7 @@ La presentación es para que el grupo se guíe mientras trabaja, no la guía pas
 | 🔨 Rómpelo | igual que un reto | **Rómpelo** |
 | 🧠 Lo que te llevas | la idea, los nombres que aprendieron, la línea de `DECISIONES.md`, el commit con la pregunta de su reflexión y lo que viene | **Cierra con**, los «Nombra:» y el **Puente** |
 
-Una pantalla de reto tiene que caber entera: hasta 3 pasos cortos, hasta 2 tips y un solo bloque de código. Si se pasa por poco, se reduce sola hasta el 88 %; si ni así cabe, `npm run fotos` avisa con `[taller] … no cabe`, y son dos retos.
+Una pantalla de reto tiene que caber entera: hasta 3 pasos cortos, hasta 2 tips y un solo bloque de código. Si se pasa por poco (también el problema, el código y lo que te llevas), se reduce sola hasta el 88 %; si ni así cabe, `npm run fotos` avisa con `[taller] … no cabe`, y son dos retos.
 
 **Cada instrucción se entiende sola**, porque el grupo no lee la sección: dice qué se hace, dónde va (qué archivo, arriba o al final) y para qué. Nada de «restaura el `.bak`» sin haber dicho qué es ese archivo, ni «el que te muestro» sin mostrarlo.
 
@@ -47,7 +47,7 @@ Terminología: *replay* se dice **rehidratar**, nunca «rejugar».
 
 ```bash
 npm run dev                   # Remotion Studio en http://localhost:3456
-npm run fotos                 # una foto de cada lámina, en out/fotos/
+npm run fotos                 # una foto de cada lámina, en out/fotos/ (npm run fotos -- 12 15: solo esas)
 npm run render:seccion-01     # la sección 1 como video, en out/
 npm run render:taller         # todas las secciones en un solo video
 ```

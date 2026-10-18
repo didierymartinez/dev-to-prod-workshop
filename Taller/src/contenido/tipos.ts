@@ -60,6 +60,13 @@ export type Bloque = Comun &
     | { k: "tabla"; columnas: string[]; filas: string[][] }
     | { k: "diario"; items: string[]; porItem?: boolean }
     | { k: "clases"; cajas: Caja[]; flecha?: string }
+    | { k: "codigo"; lenguaje: "csharp" | "bash" | "sql"; lineas: string[] }
+    | {
+        k: "terminal";
+        comando?: string;
+        salida: string[];
+        tono?: "ok" | "error";
+      }
   );
 
 /** Lo que aparece en la columna de tips de un reto. */
@@ -96,7 +103,7 @@ export type Lamina =
       pasos: string[];
       logro: Logro;
       tips?: Tip[];
-      ejemplo?: { lenguaje: "csharp" | "bash"; lineas: string[] };
+      ejemplo?: { lenguaje: "csharp" | "bash" | "sql"; lineas: string[] };
     }
   | {
       tipo: "codigo";
@@ -105,7 +112,7 @@ export type Lamina =
       titulo: string;
       piezas: {
         etiqueta: string;
-        lenguaje: "csharp" | "bash";
+        lenguaje: "csharp" | "bash" | "sql";
         lineas: string[];
       }[];
       /** Lo que hacen después de copiarlo. */

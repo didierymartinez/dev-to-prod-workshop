@@ -14,7 +14,14 @@ import type { LaminaUbicada } from "../tiempos";
 import { Ajustar } from "./Ajustar";
 import { InicioDeGolpes, useAparece } from "./aparecer";
 import { VistaDeBloque } from "./bloques";
-import { Codigo, Nota, Rotulo, Tarjeta, VistaDeTerminal } from "./piezas";
+import {
+  ConIcono,
+  Codigo,
+  Nota,
+  Rotulo,
+  Tarjeta,
+  VistaDeTerminal,
+} from "./piezas";
 import { Rico } from "./Rico";
 
 const LADO = 110; // margen a los costados
@@ -130,7 +137,7 @@ const Encabezado: React.FC<{
       <div
         style={{ fontSize: compacto ? 30 : 32, fontWeight: 700, color: acento }}
       >
-        {texto}
+        <ConIcono texto={texto} />
       </div>
       {titulo ? (
         <div
@@ -192,10 +199,16 @@ const Portada: React.FC<{ seccion: Seccion; paraQue: string }> = ({
         </div>
         <div
           style={{
-            fontSize: 120,
+            // los títulos largos bajan de tamaño para no pasar de dos líneas
+            fontSize:
+              seccion.titulo.length > 44
+                ? 80
+                : seccion.titulo.length > 28
+                  ? 96
+                  : 120,
             fontWeight: 800,
             color: color.texto,
-            lineHeight: 1.04,
+            lineHeight: 1.06,
           }}
         >
           {seccion.titulo}
@@ -211,7 +224,7 @@ const Portada: React.FC<{ seccion: Seccion; paraQue: string }> = ({
         }}
       >
         <div style={{ fontSize: 34, color: a, fontWeight: 700 }}>
-          🎯 Para qué
+          <ConIcono texto="🎯 Para qué" />
         </div>
         <div style={{ fontSize: 54, color: color.texto, lineHeight: 1.3 }}>
           <Rico texto={paraQue} acento={a} />
@@ -228,8 +241,21 @@ const Planteamiento: React.FC<{
   golpes: number[];
 }> = ({ l, golpes }) => {
   const a = acentos.planteamiento;
+  // ancho para código y terminal: a dos columnas, el de su columna
+  const ancho = (i: number) =>
+    !l.dosColumnas
+      ? ANCHO
+      : l.bloques[i].lado === "der"
+        ? Math.round((ANCHO - 90) / 1.85)
+        : Math.round(((ANCHO - 90) * 0.85) / 1.85);
   const bloque = (i: number) => (
-    <VistaDeBloque key={i} b={l.bloques[i]} golpe={golpes[i]} acento={a} />
+    <VistaDeBloque
+      key={i}
+      b={l.bloques[i]}
+      golpe={golpes[i]}
+      acento={a}
+      ancho={ancho(i)}
+    />
   );
   const indices = l.bloques.map((_, i) => i);
   return (
@@ -239,44 +265,34 @@ const Planteamiento: React.FC<{
         titulo={l.titulo}
         acento={a}
       />
-      {l.dosColumnas ? (
-        <div
-          style={{ flex: 1, display: "flex", gap: 90, alignItems: "center" }}
-        >
-          <div
-            style={{
-              flex: 0.85,
-              display: "flex",
-              flexDirection: "column",
-              gap: 34,
-            }}
-          >
-            {indices.filter((i) => l.bloques[i].lado !== "der").map(bloque)}
+      <Ajustar gap={34} nombre={l.titulo ?? "El problema"} centrar>
+        {l.dosColumnas ? (
+          <div style={{ display: "flex", gap: 90, alignItems: "center" }}>
+            <div
+              style={{
+                flex: 0.85,
+                display: "flex",
+                flexDirection: "column",
+                gap: 34,
+              }}
+            >
+              {indices.filter((i) => l.bloques[i].lado !== "der").map(bloque)}
+            </div>
+            <div
+              style={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                gap: 34,
+              }}
+            >
+              {indices.filter((i) => l.bloques[i].lado === "der").map(bloque)}
+            </div>
           </div>
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              gap: 34,
-            }}
-          >
-            {indices.filter((i) => l.bloques[i].lado === "der").map(bloque)}
-          </div>
-        </div>
-      ) : (
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            gap: 34,
-          }}
-        >
-          {indices.map(bloque)}
-        </div>
-      )}
+        ) : (
+          indices.map(bloque)
+        )}
+      </Ajustar>
     </Area>
   );
 };
@@ -430,7 +446,7 @@ const VistaDeTip: React.FC<{ tip: Tip; acento: string }> = ({
               ...sinLigaduras,
               color: tono.nuevo,
               fontWeight: 700,
-              whiteSpace: "pre",
+              whiteSpace: "pre-wrap",
             }}
           >
             {tip.idioma}
@@ -535,7 +551,11 @@ const Reto: React.FC<{
         </div>
       ) : null}
       {items?.length ? (
-        <div style={{ flex: "none", width: terminal ? 620 : undefined }}>
+        <div
+          style={
+            terminal ? { flex: "none", width: 620 } : { flex: 1, minWidth: 0 }
+          }
+        >
           <Comprobaciones items={items} acento={a} />
         </div>
       ) : null}
@@ -557,7 +577,9 @@ const Reto: React.FC<{
             paddingLeft: 24,
           }}
         >
-          <span style={{ color: a, fontWeight: 800 }}>🎯 Tu tarea: </span>
+          <span style={{ color: a, fontWeight: 800 }}>
+            <ConIcono texto="🎯 Tu tarea:" />{" "}
+          </span>
           <Rico texto={l.tarea} acento={a} />
         </div>
         <div style={{ display: "flex", gap: 24, alignItems: "stretch" }}>
@@ -616,38 +638,33 @@ const PantallaDeCodigo: React.FC<{
   return (
     <Area gap={28}>
       <Encabezado etiqueta={etiqueta[l.de]} titulo={l.titulo} acento={a} />
-      <div
-        style={{
-          ...st,
-          flex: 1,
-          minHeight: 0,
-          display: "flex",
-          flexDirection: "column",
-          gap: 24,
-        }}
-      >
-        {l.piezas.map((x) => (
-          <div
-            key={x.etiqueta}
-            style={{ display: "flex", flexDirection: "column", gap: 12 }}
-          >
-            <div style={{ fontSize: 30, color: color.texto, lineHeight: 1.3 }}>
-              <Rico texto={x.etiqueta} acento={a} />
+      <div style={{ ...st, flex: 1, minHeight: 0, display: "flex" }}>
+        <Ajustar gap={24} nombre={l.titulo}>
+          {l.piezas.map((x) => (
+            <div
+              key={x.etiqueta}
+              style={{ display: "flex", flexDirection: "column", gap: 12 }}
+            >
+              <div
+                style={{ fontSize: 30, color: color.texto, lineHeight: 1.3 }}
+              >
+                <Rico texto={x.etiqueta} acento={a} />
+              </div>
+              <Codigo
+                lineas={x.lineas}
+                lenguaje={x.lenguaje}
+                ancho={ANCHO}
+                base={30}
+                interlineado={1.45}
+              />
             </div>
-            <Codigo
-              lineas={x.lineas}
-              lenguaje={x.lenguaje}
-              ancho={ANCHO}
-              base={30}
-              interlineado={1.45}
-            />
-          </div>
-        ))}
-        {l.luego ? (
-          <div style={{ fontSize: 32, color: a, fontWeight: 700 }}>
-            → <Rico texto={l.luego} acento={a} />
-          </div>
-        ) : null}
+          ))}
+          {l.luego ? (
+            <div style={{ fontSize: 32, color: a, fontWeight: 700 }}>
+              → <Rico texto={l.luego} acento={a} />
+            </div>
+          ) : null}
+        </Ajustar>
       </div>
     </Area>
   );
@@ -669,147 +686,163 @@ const Aprendizaje: React.FC<{
   return (
     <Area gap={34}>
       <Encabezado etiqueta={etiqueta.aprendizaje} acento={a} />
-      <div style={{ flex: 1, minHeight: 0, display: "flex", gap: 50 }}>
-        <div
-          style={{
-            ...st0,
-            flex: 1.2,
-            display: "flex",
-            flexDirection: "column",
-            gap: 34,
-          }}
-        >
+      <Ajustar gap={0} nombre="Lo que te llevas">
+        <div style={{ display: "flex", gap: 50 }}>
           <div
             style={{
-              fontSize: 50,
-              fontWeight: 700,
-              lineHeight: 1.25,
-              color: color.texto,
+              ...st0,
+              flex: 1.2,
+              display: "flex",
+              flexDirection: "column",
+              gap: 34,
             }}
           >
-            <Rico texto={l.idea} acento={a} />
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            {l.puntos.map((p) => (
-              <div
-                key={p.termino}
-                style={{ display: "flex", flexDirection: "column", gap: 2 }}
-              >
+            <div
+              style={{
+                fontSize: 50,
+                fontWeight: 700,
+                lineHeight: 1.25,
+                color: color.texto,
+              }}
+            >
+              <Rico texto={l.idea} acento={a} />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              {l.puntos.map((p) => (
                 <div
-                  style={{ fontSize: 38, fontWeight: 800, color: tono.nuevo }}
+                  key={p.termino}
+                  style={{ display: "flex", flexDirection: "column", gap: 2 }}
                 >
-                  {p.termino}
-                </div>
-                <div
-                  style={{ fontSize: 32, color: color.texto, lineHeight: 1.3 }}
-                >
-                  <Rico texto={p.definicion} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div
-          style={{
-            ...st1,
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            gap: 24,
-          }}
-        >
-          <Tarjeta estilo={{ borderColor: `${a}55` }}>
-            <Rotulo texto="📓 CIERRA LA SECCIÓN" acento={a} />
-            {l.decision ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={rotuloTenue}>En tu DECISIONES.md:</div>
-                <div
-                  style={{
-                    fontSize: 32,
-                    color: color.texto,
-                    fontStyle: "italic",
-                    lineHeight: 1.32,
-                    borderLeft: `5px solid ${a}`,
-                    paddingLeft: 20,
-                  }}
-                >
-                  «<Rico texto={l.decision} />»
-                </div>
-              </div>
-            ) : null}
-            {l.commit ? (
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: 12 }}
-              >
-                <div style={rotuloTenue}>Commit y push:</div>
-                <div
-                  style={{
-                    alignSelf: "flex-start",
-                    fontFamily: fuente.mono,
-                    fontSize: 32,
-                    color: tono.piensa,
-                    background: color.codigo,
-                    borderRadius: 12,
-                    padding: "10px 20px",
-                  }}
-                >
-                  {l.commit.mensaje}
-                </div>
-                <div style={{ ...rotuloTenue, marginTop: 6 }}>
-                  💭 Tu reflexión, en el segundo -m:
-                </div>
-                {l.commit.preguntas.map((q) => (
                   <div
-                    key={q}
+                    style={{ fontSize: 38, fontWeight: 800, color: tono.nuevo }}
+                  >
+                    {p.termino}
+                  </div>
+                  <div
                     style={{
-                      fontSize: 33,
+                      fontSize: 32,
                       color: color.texto,
                       lineHeight: 1.3,
                     }}
                   >
-                    <Rico texto={q} acento={a} />
+                    <Rico texto={p.definicion} />
                   </div>
-                ))}
-              </div>
-            ) : null}
-            {l.guardar ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={rotuloTenue}>Una pregunta para guardar:</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div
+            style={{
+              ...st1,
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              gap: 24,
+            }}
+          >
+            <Tarjeta estilo={{ borderColor: `${a}55` }}>
+              <Rotulo texto="📓 CIERRA LA SECCIÓN" acento={a} />
+              {l.decision ? (
                 <div
-                  style={{ fontSize: 34, color: color.texto, lineHeight: 1.32 }}
+                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
                 >
-                  <Rico texto={l.guardar} acento={a} />
+                  <div style={rotuloTenue}>En tu DECISIONES.md:</div>
+                  <div
+                    style={{
+                      fontSize: 32,
+                      color: color.texto,
+                      fontStyle: "italic",
+                      lineHeight: 1.32,
+                      borderLeft: `5px solid ${a}`,
+                      paddingLeft: 20,
+                    }}
+                  >
+                    «<Rico texto={l.decision} />»
+                  </div>
+                </div>
+              ) : null}
+              {l.commit ? (
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 12 }}
+                >
+                  <div style={rotuloTenue}>Commit y push:</div>
+                  <div
+                    style={{
+                      alignSelf: "flex-start",
+                      fontFamily: fuente.mono,
+                      fontSize: 32,
+                      color: tono.piensa,
+                      background: color.codigo,
+                      borderRadius: 12,
+                      padding: "10px 20px",
+                    }}
+                  >
+                    {l.commit.mensaje}
+                  </div>
+                  <div style={{ ...rotuloTenue, marginTop: 6 }}>
+                    <ConIcono texto="💭 Tu reflexión, en el segundo -m:" />
+                  </div>
+                  {l.commit.preguntas.map((q) => (
+                    <div
+                      key={q}
+                      style={{
+                        fontSize: 33,
+                        color: color.texto,
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      <Rico texto={q} acento={a} />
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {l.guardar ? (
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                >
+                  <div style={rotuloTenue}>Una pregunta para guardar:</div>
+                  <div
+                    style={{
+                      fontSize: 34,
+                      color: color.texto,
+                      lineHeight: 1.32,
+                    }}
+                  >
+                    <Rico texto={l.guardar} acento={a} />
+                  </div>
+                </div>
+              ) : null}
+            </Tarjeta>
+            {l.siguiente ? (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                  padding: "0 6px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 28,
+                    fontWeight: 700,
+                    color: acentos.portada,
+                  }}
+                >
+                  <ConIcono
+                    texto={`🌱 Lo que viene · ${l.siguiente.seccion}`}
+                  />
+                </div>
+                <div
+                  style={{ fontSize: 30, color: color.tenue, lineHeight: 1.3 }}
+                >
+                  <Rico texto={l.siguiente.texto} />
                 </div>
               </div>
             ) : null}
-          </Tarjeta>
-          {l.siguiente ? (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 6,
-                padding: "0 6px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 28,
-                  fontWeight: 700,
-                  color: acentos.portada,
-                }}
-              >
-                🌱 Lo que viene · {l.siguiente.seccion}
-              </div>
-              <div
-                style={{ fontSize: 30, color: color.tenue, lineHeight: 1.3 }}
-              >
-                <Rico texto={l.siguiente.texto} />
-              </div>
-            </div>
-          ) : null}
+          </div>
         </div>
-      </div>
+      </Ajustar>
     </Area>
   );
 };

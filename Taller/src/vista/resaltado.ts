@@ -14,7 +14,8 @@ const CLAVES_CS = new Set([
 ]);
 const CLAVES_SQL = new Set(["UPDATE", "SET", "SELECT", "FROM", "WHERE", "INSERT", "INTO", "VALUES", "DELETE"]);
 
-const RE = /(\/\/[^\n]*)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|(\b\d+(?:\.\d+)?\b)|([A-Za-z_]\w*)|(\s+)|([^\w\s])/g;
+// números con separador (50_000) y palabras con tilde (públicos) cuentan enteros
+const RE = /(\/\/[^\n]*)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|(\d[\d_]*(?:\.\d+)?)|([\p{L}_][\p{L}\p{N}_]*)|(\s+)|([^\p{L}\p{N}_\s])/gu;
 
 // bash: el comando en turquesa, las opciones (-m, --allow-empty) en naranja,
 // lo que va entre comillas en amarillo y los <huecos> en violeta.

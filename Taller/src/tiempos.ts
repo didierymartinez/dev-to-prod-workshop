@@ -24,7 +24,15 @@ const textoDeBloque = (b: Bloque): string[] => {
     case "tabla":
       return [[...b.columnas, ...b.filas.flat()].join(" ")];
     case "clases":
-      return [b.cajas.map((c) => `${c.nombre} ${c.filas.map((f) => f.texto).join(" ")}`).join(" ")];
+      return [
+        b.cajas
+          .map((c) => `${c.nombre} ${c.filas.map((f) => f.texto).join(" ")}`)
+          .join(" "),
+      ];
+    case "codigo":
+      return [b.lineas.join(" ")];
+    case "terminal":
+      return [`${b.comando ?? ""} ${b.salida.join(" ")}`];
   }
 };
 
@@ -40,23 +48,55 @@ const pausaDeLectura = (texto: string, min = 60, max = 240): number =>
   Math.min(max, Math.max(min, Math.round(30 + texto.length * 2)));
 
 /** Texto que se lee en cada golpe: sirve para calcular la pausa del video. */
-const textosPorGolpe = (l: Lamina): { textos: string[]; golpeDeBloque: number[] } => {
+const textosPorGolpe = (
+  l: Lamina,
+): { textos: string[]; golpeDeBloque: number[] } => {
   switch (l.tipo) {
     case "portada":
       return { textos: [l.paraQue], golpeDeBloque: [] };
     case "reto":
     case "rompelo":
       return {
-        textos: [[l.titulo, l.tarea, ...l.pasos, ...(l.logro.items ?? []), ...(l.tips ?? []).map((t) => (t.k === "nuevo" ? t.explicacion : t.k === "lista" ? t.items.join(" ") : t.texto))].join(" ")],
+        textos: [
+          [
+            l.titulo,
+            l.tarea,
+            ...l.pasos,
+            ...(l.logro.items ?? []),
+            ...(l.tips ?? []).map((t) =>
+              t.k === "nuevo"
+                ? t.explicacion
+                : t.k === "lista"
+                  ? t.items.join(" ")
+                  : t.texto,
+            ),
+          ].join(" "),
+        ],
         golpeDeBloque: [],
       };
     case "codigo":
-      return { textos: [[l.titulo, ...l.piezas.flatMap((x) => [x.etiqueta, ...x.lineas]), l.luego ?? ""].join(" ")], golpeDeBloque: [] };
+      return {
+        textos: [
+          [
+            l.titulo,
+            ...l.piezas.flatMap((x) => [x.etiqueta, ...x.lineas]),
+            l.luego ?? "",
+          ].join(" "),
+        ],
+        golpeDeBloque: [],
+      };
     case "aprendizaje":
       return {
         textos: [
-          [l.idea, ...l.puntos.map((p) => `${p.termino} ${p.definicion}`)].join(" "),
-          [l.decision ?? "", ...(l.commit?.preguntas ?? []), l.guardar ?? "", l.siguiente?.texto ?? ""].join(" "),
+          [l.idea, ...l.puntos.map((p) => `${p.termino} ${p.definicion}`)].join(
+            " ",
+          ),
+          [
+            l.decision ?? "",
+            ...(l.commit?.preguntas ?? []),
+            l.guardar ?? "",
+            l.siguiente?.texto ?? "",
+          ].join(" "),
         ],
         golpeDeBloque: [],
       };
@@ -79,13 +119,16 @@ const textosPorGolpe = (l: Lamina): { textos: string[]; golpeDeBloque: number[] 
 
 export const planDeLamina = (l: Lamina): PlanDeLamina => {
   const { textos, golpeDeBloque } = textosPorGolpe(l);
-  const trabajo = l.tipo === "reto" || l.tipo === "rompelo" || l.tipo === "codigo";
+  const trabajo =
+    l.tipo === "reto" || l.tipo === "rompelo" || l.tipo === "codigo";
   const inicios: number[] = [];
   let t = 0;
   for (const texto of textos) {
     inicios.push(t);
     // En una pantalla de trabajo el video se queda más: es lo que el grupo mira mientras hace.
-    t += ENTRADA + (trabajo ? pausaDeLectura(texto, 150, 300) : pausaDeLectura(texto));
+    t +=
+      ENTRADA +
+      (trabajo ? pausaDeLectura(texto, 150, 300) : pausaDeLectura(texto));
   }
   return { golpeDeBloque, inicios, duracion: t };
 };
@@ -116,7 +159,10 @@ export const ubicar = (secciones: Seccion[]): LaminaUbicada[] => {
         lamina,
         indiceEnSeccion: i,
         totalEnSeccion: seccion.laminas.length,
-        reto: lamina.tipo === "reto" ? { numero: reto, total: totalRetos } : undefined,
+        reto:
+          lamina.tipo === "reto"
+            ? { numero: reto, total: totalRetos }
+            : undefined,
         desde,
         plan,
       });
