@@ -69,6 +69,44 @@ export const seccion04: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Un dueño para la historia",
+      piezas: [
+        {
+          etiqueta: "**Al final** del `Program.cs`: el envoltorio",
+          lenguaje: "csharp",
+          lineas: [
+            "// 🟢 primer intento: un envoltorio solo para Empresa, dueño de su historia",
+            "public class EventStreamDeEmpresa",
+            "{",
+            "    private readonly List<object> _historia = new();   // suya, escondida, nace vacía",
+            "",
+            "    public void Append(object hecho) => _historia.Add(hecho);   // ANOTAR un hecho nuevo",
+            "",
+            "    public Empresa Get()                                        // LEER: rehidratar",
+            "    {",
+            "        var empresa = new Empresa();",
+            "        empresa.Load(_historia);   // reproduce los hechos anotados",
+            "        return empresa;",
+            "    }",
+            "}",
+          ],
+        },
+        {
+          etiqueta: "En tu `Empresa`, el constructor ya no recibe la historia",
+          lenguaje: "csharp",
+          lineas: [
+            "public class Empresa : AggregateRoot",
+            "{",
+            "    // … propiedades y el switch Aplicar de «Refactorizando el motor», sin cambios …",
+            "    public Empresa() { }   // sin parámetros: el envoltorio la crea vacía y la rehidrata",
+            "}",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "codigo",
       de: "reto",
       titulo: "De Empresa a <T>",
@@ -117,6 +155,26 @@ export const seccion04: Seccion = {
           "Ya no queda `EventStreamDeEmpresa` ni ningún `new List<object>{ … }`.",
         ],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Anota y lee",
+      piezas: [
+        {
+          etiqueta: "**Arriba** en el `Program.cs`, en vez de la lista suelta",
+          lenguaje: "csharp",
+          lineas: [
+            "var stream = new EventStream<Empresa>();",
+            'stream.Append(new EmpresaRegistrada("Constructora Andes", "Básico"));   // anota',
+            'stream.Append(new PlanCambiado("Premium"));                            // anota',
+            "",
+            "var empresa = stream.Get();   // lee: crea y rehidrata",
+            'Console.WriteLine($"{empresa.Nombre}: plan {empresa.Plan}");',
+          ],
+        },
+      ],
+      nota: "Quien consume ya no sabe cómo se guarda ni cómo se rehidrata: `Append` para anotar, `.Get()` para recibir la `Empresa`.",
     },
     {
       tipo: "reto",

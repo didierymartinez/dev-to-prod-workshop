@@ -88,6 +88,45 @@ export const seccion60: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Cinco preguntas al esquema",
+      piezas: [
+        {
+          etiqueta: "En tu sesión de solo lectura: las preguntas (1) y (2)",
+          lenguaje: "sql",
+          lineas: [
+            '-- 1) streams por longitud: los que más crecen (candidatos a "crece sin techo")',
+            "SELECT tenant_id, id, version FROM mt_streams ORDER BY version DESC LIMIT 10;",
+            "--   arriba, los susp-…: el proceso de cada suspensión junta sus respuestas; tus empresas tienen todavía menos hechos",
+            "",
+            "-- 2) rezago del daemon: el frente del diario menos el progreso de tu proyección",
+            "SELECT (SELECT max(seq_id) FROM mt_events) AS frente,",
+            "       last_seq_id AS proyeccion,",
+            "       (SELECT max(seq_id) FROM mt_events) - last_seq_id AS rezago",
+            "FROM mt_event_progression WHERE name = 'VistaSuspendida:All';",
+            "--   frente | proyeccion | rezago   (rezago 0 si el daemon alcanzó, > 0 si va atrás)",
+          ],
+        },
+        {
+          etiqueta: "Las preguntas (3), (4) y (5)",
+          lenguaje: "sql",
+          lineas: [
+            "-- 3) flujo de hechos por tipo (el alias que fija tu Hechos.Registrar: empresa_suspendida, empresa_registrada)",
+            "SELECT type, count(*) FROM mt_events GROUP BY type ORDER BY count(*) DESC;",
+            "--   tombstone no es tuyo: Marten lo escribe cuando una escritura de hechos falla después de reservar su número, para no dejar huecos en seq_id",
+            "",
+            "-- 4) qué falló: mensajes apartados por Wolverine, como los CobrarElMes de los meses que fallaron",
+            "SELECT id, message_type, exception_message FROM wolverine_dead_letters ORDER BY sent_at DESC;",
+            "",
+            "-- 5) ¿hay próxima vuelta? con tu servicio arriba, la de cobro-mensual va unos segundos adelante",
+            "SELECT schedule_name, next_occurrence FROM wolverine_recurring_messages;",
+          ],
+        },
+      ],
+      nota: "La (2) es el rezago que tu `Rezago` calcula con la API de Marten, leído directo.",
+    },
+    {
       tipo: "reto",
       titulo: "La lista por estado",
       tarea:
@@ -169,6 +208,37 @@ export const seccion60: Seccion = {
           "WHERE d.tenant_id = 'acme' AND d.estado = 'efectiva';",
         ],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Declara el índice y mide después",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Historia/Configuracion.cs`, en el `AddMarten` de tu `AgregarEmpresas`",
+          lenguaje: "csharp",
+          lineas: [
+            "opts.Schema.For<Tablero>().Duplicate(t => t.Estado);   // la búsqueda por estado, con su índice",
+          ],
+        },
+        {
+          etiqueta: "Después, en la misma sesión de solo lectura",
+          lenguaje: "sql",
+          lineas: [
+            "-- después (en la misma sesión): el índice existe…",
+            "SELECT indexname FROM pg_indexes WHERE tablename = 'mt_doc_tablero';",
+            "--  pkey_mt_doc_tablero_tenant_id_id",
+            "--  mt_doc_tablero_idx_estado",
+            "",
+            "-- …y la consulta por la columna lo puede usar",
+            "EXPLAIN (COSTS OFF) SELECT d.data FROM mt_doc_tablero AS d WHERE d.tenant_id = 'acme' AND d.estado = 'efectiva';",
+            "--  Index Scan using mt_doc_tablero_idx_estado on mt_doc_tablero d",
+            "--    Index Cond: ((estado)::text = 'efectiva'::text)",
+            "--    Filter: ((tenant_id)::text = 'acme'::text)",
+          ],
+        },
+      ],
+      nota: "Tu `Where` no cambió: cambió la configuración, y con ella la SQL que Marten manda.",
     },
     {
       tipo: "rompelo",

@@ -115,6 +115,38 @@ export const seccion56: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Un test con dos tenants",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Tests/DosTenantsTests.cs`: dos organizaciones, el mismo NIT",
+          lenguaje: "csharp",
+          lineas: [
+            "using Marten;",
+            "",
+            '[Collection("daemon")]',
+            "public class DosTenantsTests(HostConDaemon daemon) : IAsyncLifetime",
+            "{",
+            "    public Task InitializeAsync() => daemon.Host.ResetAllMartenDataAsync();",
+            "    public Task DisposeAsync() => Task.CompletedTask;",
+            "",
+            "    [Fact]",
+            "    public async Task Globex_registra_el_NIT_de_acme_y_solo_ve_su_empresa()",
+            "    {",
+            '        await daemon.Bus.InvokeForTenantAsync("acme", new RegistrarEmpresa("emp-165", "916500000", "Vidriería Andina", "Basico"));',
+            '        await daemon.Bus.InvokeForTenantAsync("globex", new RegistrarEmpresa("emp-166", "916500000", "Vidriería Andina", "Premium"));   // el mismo NIT, otro tenant',
+            "",
+            '        await using var q = daemon.Store.QuerySession("globex");',
+            '        Assert.Equal("emp-166", (await q.LoadAsync<Localizador>("916500000"))?.Stream);   // el NIT lleva a la empresa de globex',
+            '        Assert.Null(await q.Events.FetchStreamStateAsync("emp-165"));                     // los hechos de acme no existen para globex',
+            "    }",
+            "}",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "Con la fuga, y sin ella",
       tarea:

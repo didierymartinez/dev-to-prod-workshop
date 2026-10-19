@@ -162,6 +162,30 @@ export const seccion32: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El handler que devuelve",
+      piezas: [
+        {
+          etiqueta: "En `Empresas.Historia`, con `using Marten;`: `Handle` por convención, la sesión llega inyectada",
+          lenguaje: "csharp",
+          lineas: [
+            "public static class SuspenderHandler",
+            "{",
+            "    public static async Task<Contratos.EmpresaSuspendidaV1> Handle(SuspenderEmpresa cmd, IDocumentSession session)",
+            "    {",
+            "        var empresa = await session.Events.AggregateStreamAsync<Empresa>(cmd.EmpresaId)",
+            '            ?? throw new InvalidOperationException($"No existe la empresa {cmd.EmpresaId}");   // el NIT lo sabe la empresa',
+            "        session.Events.Append(cmd.EmpresaId, new EmpresaSuspendida(cmd.Motivo));            // el hecho",
+            "        return new Contratos.EmpresaSuspendidaV1(empresa.Nit, cmd.Motivo);   // cascading: al outbox, en la transacción del hecho",
+            "    }",
+            "}",
+          ],
+        },
+      ],
+      nota: "Rehidrata la empresa solo para leer su NIT. Pedirle la decisión a la empresa es `FetchForWriting`, y llega en el capstone.",
+    },
+    {
       tipo: "reto",
       titulo: "Facturación escucha",
       tarea:
@@ -234,6 +258,61 @@ export const seccion32: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El anuncio, en un test (1 de 2)",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Tests/SuspenderHandlerTests.cs`: su propio store, contra la base de pruebas",
+          lenguaje: "csharp",
+          lineas: [
+            "using JasperFx.Events;   // StreamIdentity",
+            "using Marten;",
+            "using Npgsql;            // NpgsqlConnectionStringBuilder",
+            "",
+            "public class SuspenderHandlerTests",
+            "{",
+            "    [Fact]",
+            "    public async Task Suspender_anuncia_el_nit_de_la_empresa_y_el_motivo()",
+            "    {",
+            '        var cadena = Environment.GetEnvironmentVariable("CADENA_POSTGRES")',
+            '            ?? throw new InvalidOperationException("Falta la variable de entorno CADENA_POSTGRES.");',
+            '        var pruebas = new NpgsqlConnectionStringBuilder(cadena) { Database = "empresas_tests" }.ConnectionString;',
+            "        await using var store = DocumentStore.For(opts =>",
+            "        {",
+            "            opts.Connection(pruebas);   // la base de pruebas, no la de tu servicio",
+            "            opts.Events.StreamIdentity = StreamIdentity.AsString;",
+            "            Hechos.Registrar(opts);",
+            "        });",
+          ],
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El anuncio, en un test (2 de 2)",
+      piezas: [
+        {
+          etiqueta: "Sigue, dentro del test: siembra, llama al handler y afirma",
+          lenguaje: "csharp",
+          lineas: [
+            '        var id = $"emp-test-{Guid.NewGuid()}";   // un stream nuevo en cada corrida',
+            "        await using var session = store.LightweightSession();",
+            '        session.Events.StartStream<Empresa>(id, new EmpresaRegistrada("900555", "Prueba", "Basico"));',
+            "        await session.SaveChangesAsync();",
+            "",
+            '        var anuncio = await SuspenderHandler.Handle(new SuspenderEmpresa(id, "mora"), session);',
+            "",
+            '        Assert.Equal("900555", anuncio.Nit);',
+            '        Assert.Equal("mora", anuncio.Motivo);',
+            "    }",
+            "}",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "El nombre del mensaje",
       tarea:
@@ -261,6 +340,26 @@ export const seccion32: Seccion = {
         lenguaje: "csharp",
         lineas: ['[MessageIdentity("empresas.empresa-suspendida.v1")]'],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El nombre del mensaje",
+      piezas: [
+        {
+          etiqueta: "`Contratos/Contratos.cs`",
+          lenguaje: "csharp",
+          lineas: [
+            "using Wolverine.Attributes;   // MessageIdentity",
+            "",
+            "namespace Contratos;",
+            "",
+            '[MessageIdentity("empresas.empresa-suspendida.v1")]   // el nombre en la cola: no cambia aunque la clase cambie',
+            "public record EmpresaSuspendidaV1(string Nit, string Motivo);",
+          ],
+        },
+      ],
+      nota: "Con él, mover un contrato de carpeta o de namespace deja de romper a quien lo escucha.",
     },
     {
       tipo: "rompelo",

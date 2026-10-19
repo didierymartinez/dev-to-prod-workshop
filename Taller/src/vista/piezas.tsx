@@ -40,7 +40,10 @@ export const Codigo: React.FC<{
         ...sinLigaduras,
         fontSize: letra,
         lineHeight: interlineado,
-        whiteSpace: "pre",
+        // si una línea no cabe ni con la letra mínima, sigue en el renglón de abajo
+        whiteSpace: "pre-wrap",
+        overflowWrap: "anywhere",
+        minWidth: 0,
       }}
     >
       {lineas.map((l, i) => (

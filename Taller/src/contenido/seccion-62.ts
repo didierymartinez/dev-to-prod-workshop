@@ -127,6 +127,25 @@ export const seccion62: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "La empresa se relee entera",
+      piezas: [
+        {
+          etiqueta:
+            "En tu `Empresa` (`using System.Text.Json.Serialization;`): lo que el documento necesita para releerse. Tus `Apply` no cambian.",
+          lenguaje: "csharp",
+          lineas: [
+            "[JsonInclude] public string Id { get; private set; }",
+            "public long Version { get; private set; }   // la llena la línea de Metadata",
+            '[JsonInclude] public string Nit { get; private set; } = "";',
+            "// … el mismo [JsonInclude] en Nombre, Plan, Suspendida, DeudaPendiente, Reactivaciones y ProcesoAbierto …",
+            "[JsonInclude] private HashSet<string> _referenciasDePago = new();   // sin readonly: al releer, se vuelve a llenar",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "El snapshot Inline",
       tarea:
@@ -204,6 +223,22 @@ export const seccion62: Seccion = {
           '  -H "Idempotency-Key: BANCO-90001" -H "Authorization: Bearer $ACME"',
         ],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Decidir desde el snapshot",
+      piezas: [
+        {
+          etiqueta:
+            "En cada handler que decide sobre la `Empresa`: la misma carga, por el camino que lee el snapshot",
+          lenguaje: "csharp",
+          lineas: [
+            "var empresa = await session.Events.FetchLatest<Empresa>(cmd.EmpresaId)",
+            '    ?? throw new InvalidOperationException($"No existe la empresa {cmd.EmpresaId}");',
+          ],
+        },
+      ],
     },
     {
       tipo: "rompelo",

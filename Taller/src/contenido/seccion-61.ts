@@ -57,6 +57,38 @@ export const seccion61: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El rezago, dentro del servicio",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Historia/RezagoDelDaemon.cs`: la consulta (2), ahora dentro del servicio",
+          lenguaje: "csharp",
+          lineas: [
+            "using Microsoft.Extensions.Diagnostics.HealthChecks;   // IHealthCheck, HealthCheckResult",
+            "using Npgsql;",
+            "",
+            "public class RezagoDelDaemon(string cadena, long umbral) : IHealthCheck",
+            "{",
+            "    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct = default)",
+            "    {",
+            "        await using var c = new NpgsqlConnection(cadena);",
+            "        await c.OpenAsync(ct);",
+            "        await using var q = c.CreateCommand();",
+            '        q.CommandText = "SELECT (SELECT coalesce(max(seq_id), 0) FROM mt_events)"',
+            "                      + \" - coalesce((SELECT last_seq_id FROM mt_event_progression WHERE name = 'VistaSuspendida:All'), 0)\";",
+            "        var rezago = (long)(await q.ExecuteScalarAsync(ct))!;",
+            "",
+            "        return rezago > umbral",
+            '            ? HealthCheckResult.Degraded($"VistaSuspendida va {rezago} hechos atrás (umbral: {umbral})")',
+            '            : HealthCheckResult.Healthy($"rezago: {rezago}");',
+            "    }",
+            "}",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "Regístralo y publícalo",
       tarea:

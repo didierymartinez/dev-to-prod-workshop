@@ -75,12 +75,13 @@ const textosPorGolpe = (
         golpeDeBloque: [],
       };
     case "codigo":
+    case "solucion":
       return {
         textos: [
           [
             l.titulo,
             ...l.piezas.flatMap((x) => [x.etiqueta, ...x.lineas]),
-            l.luego ?? "",
+            (l.tipo === "codigo" ? l.luego : l.nota) ?? "",
           ].join(" "),
         ],
         golpeDeBloque: [],
@@ -120,7 +121,10 @@ const textosPorGolpe = (
 export const planDeLamina = (l: Lamina): PlanDeLamina => {
   const { textos, golpeDeBloque } = textosPorGolpe(l);
   const trabajo =
-    l.tipo === "reto" || l.tipo === "rompelo" || l.tipo === "codigo";
+    l.tipo === "reto" ||
+    l.tipo === "rompelo" ||
+    l.tipo === "codigo" ||
+    l.tipo === "solucion";
   const inicios: number[] = [];
   let t = 0;
   for (const texto of textos) {
@@ -159,8 +163,10 @@ export const ubicar = (secciones: Seccion[]): LaminaUbicada[] => {
         lamina,
         indiceEnSeccion: i,
         totalEnSeccion: seccion.laminas.length,
+        // la solución lleva el número del reto que resuelve
         reto:
-          lamina.tipo === "reto"
+          lamina.tipo === "reto" ||
+          (lamina.tipo === "solucion" && lamina.de === "reto")
             ? { numero: reto, total: totalRetos }
             : undefined,
         desde,

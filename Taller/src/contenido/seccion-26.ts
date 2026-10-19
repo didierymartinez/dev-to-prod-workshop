@@ -94,6 +94,43 @@ export const seccion26: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El upcaster",
+      piezas: [
+        {
+          etiqueta: "En `PostgresEventStore.GetEvents`, dentro del `while (r.Read())`",
+          lenguaje: "csharp",
+          lineas: [
+            "var tipo = r.GetString(1);",
+            "var json = r.GetString(2);",
+            'object hecho = tipo == "empresa-registrada"',
+            "    ? Upcast(json)                                        // reconcilia la forma vieja",
+            "    : JsonSerializer.Deserialize(json, _porNombre[tipo])!;  // los demás tipos, igual que siempre",
+            "sobres.Add(new EventoAlmacenado(r.GetInt32(0), hecho));",
+          ],
+        },
+        {
+          etiqueta: "En `PostgresEventStore`: el `Upcast`",
+          lenguaje: "csharp",
+          lineas: [
+            "static EmpresaRegistrada Upcast(string json)",
+            "{",
+            "    using var doc = JsonDocument.Parse(json);",
+            "    var raiz = doc.RootElement;",
+            '    if (raiz.TryGetProperty("Nit", out _))                   // ya es la forma de hoy',
+            "        return JsonSerializer.Deserialize<EmpresaRegistrada>(json)!;",
+            "",
+            "    return new EmpresaRegistrada(                             // forma vieja → forma de hoy",
+            '        Nit: "SIN-NIT-LEGADO",                               // no se inventa: se marca para corregir',
+            '        Nombre: raiz.GetProperty("Nombre").GetString()!,',
+            '        Plan:   raiz.GetProperty("Plan").GetString()!);',
+            "}",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "El upcaster, en un test",
       tarea:
@@ -206,6 +243,35 @@ export const seccion26: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Una base de pruebas",
+      piezas: [
+        {
+          etiqueta: "En `Empresas.Tests/PostgresFixture.cs`: la clase, con su `Cadena` y su constructor",
+          lenguaje: "csharp",
+          lineas: [
+            "using Npgsql;",
+            "",
+            '// Una sola instancia para toda la colección "postgres": conoce la base de pruebas y crea sus tablas.',
+            "public class PostgresFixture",
+            "{",
+            "    public string Cadena { get; }",
+            "",
+            "    public PostgresFixture()",
+            "    {",
+            '        var cadena = Environment.GetEnvironmentVariable("CADENA_POSTGRES")',
+            '            ?? throw new InvalidOperationException("Falta la variable de entorno CADENA_POSTGRES.");',
+            '        Cadena = new NpgsqlConnectionStringBuilder(cadena) { Database = "empresas_tests" }.ConnectionString;',
+            "",
+            "        new PostgresEventStore(Cadena);   // su constructor crea `eventos` si falta",
+            '        Ejecutar("CREATE TABLE IF NOT EXISTS localizador(nit TEXT PRIMARY KEY, stream TEXT NOT NULL)");',
+            "    }",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "Vaciar y declarar la colección",
       tarea:
@@ -231,6 +297,37 @@ export const seccion26: Seccion = {
           "public class ColeccionPostgres : ICollectionFixture<PostgresFixture> { }",
         ],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Vaciar y declarar la colección",
+      piezas: [
+        {
+          etiqueta: "Sigue, dentro de `PostgresFixture`: correr SQL y vaciar la base",
+          lenguaje: "csharp",
+          lineas: [
+            "    public void Ejecutar(string sql)",
+            "    {",
+            "        using var c = new NpgsqlConnection(Cadena); c.Open();",
+            "        using var cmd = c.CreateCommand();",
+            "        cmd.CommandText = sql;",
+            "        cmd.ExecuteNonQuery();",
+            "    }",
+            "",
+            '    public void Limpiar() => Ejecutar("TRUNCATE eventos, localizador");   // la base, en un estado conocido',
+            "}",
+          ],
+        },
+        {
+          etiqueta: "**Al final** del archivo: la colección",
+          lenguaje: "csharp",
+          lineas: [
+            '[CollectionDefinition("postgres")]',
+            "public class ColeccionPostgres : ICollectionFixture<PostgresFixture> { }",
+          ],
+        },
+      ],
     },
     {
       tipo: "reto",
@@ -264,6 +361,38 @@ export const seccion26: Seccion = {
           "}",
         ],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El test, en la colección",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Tests/LaFormaDelHecho.cs`, entero",
+          lenguaje: "csharp",
+          lineas: [
+            '[Collection("postgres")]',
+            "public class LaFormaDelHecho(PostgresFixture db) : IAsyncLifetime",
+            "{",
+            "    public Task InitializeAsync() { db.Limpiar(); return Task.CompletedTask; }   // antes de CADA test",
+            "    public Task DisposeAsync() => Task.CompletedTask;",
+            "",
+            "    [Fact]",
+            "    public void Un_registro_sin_Nit_se_lee_marcado()",
+            "    {",
+            '        db.Ejecutar("INSERT INTO eventos(stream, version, tipo, datos) VALUES " +',
+            '            "(\'emp-legado\', 1, \'empresa-registrada\', \'{\\"Nombre\\":\\"Acme\\",\\"Plan\\":\\"Premium\\"}\'::jsonb)");',
+            "",
+            '        var hechos = new PostgresEventStore(db.Cadena).GetEvents("emp-legado");',
+            "",
+            "        var registrada = (EmpresaRegistrada)hechos[0].EventData;",
+            '        Assert.Equal("SIN-NIT-LEGADO", registrada.Nit);',
+            "    }",
+            "}",
+          ],
+        },
+      ],
+      nota: "El `using Npgsql;` del test ya no hace falta: la conexión vive en el fixture.",
     },
     {
       tipo: "rompelo",
@@ -380,6 +509,29 @@ export const seccion26: Seccion = {
           '    Assert.Throws<ArgumentException>(() => new Empresa().Registrar("", "Acme", "Premium"));',
         ],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "La regla vive en el verbo",
+      piezas: [
+        {
+          etiqueta: "El hecho, otra vez con primitivos",
+          lenguaje: "csharp",
+          lineas: [
+            "public record EmpresaRegistrada(string Nit, string Nombre, string Plan);   // primitivos: se lee siempre",
+          ],
+        },
+        {
+          etiqueta: "En `Empresa`: el `Nit` valida al decidir",
+          lenguaje: "csharp",
+          lineas: [
+            "public void Registrar(string nit, string nombre, string plan) =>",
+            "    Emitir(new EmpresaRegistrada(new Nit(nit).Valor, nombre, plan));      // la regla, al decidir",
+          ],
+        },
+      ],
+      nota: "Un NIT vacío nuevo ya no entra: `Registrar` lanza antes de emitir. Un hecho viejo con el NIT vacío se sigue leyendo.",
     },
     {
       tipo: "aprendizaje",

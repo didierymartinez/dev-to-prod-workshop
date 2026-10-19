@@ -631,22 +631,47 @@ const Reto: React.FC<{
 // ── Código para copiar ────────────────────────────────────────────────────
 
 const PantallaDeCodigo: React.FC<{
-  l: Extract<Lamina, { tipo: "codigo" }>;
-}> = ({ l }) => {
-  const a = acentos[l.de];
+  l: Extract<Lamina, { tipo: "codigo" | "solucion" }>;
+  reto?: { numero: number; total: number };
+}> = ({ l, reto }) => {
+  const solucion = l.tipo === "solucion";
+  // la solución va en verde y dice de qué reto es; el código para copiar, del color de su reto
+  const a = solucion ? acentos.solucion : acentos[l.de];
+  const de =
+    l.de === "rompelo"
+      ? "del 🔨"
+      : reto && reto.total > 1
+        ? `· Reto ${reto.numero} de ${reto.total}`
+        : "";
+  const rotulo = solucion
+    ? `${etiqueta.solucion} ${de}`.trim()
+    : etiqueta[l.de];
   const st = useAparece(0, 24, 4);
   return (
-    <Area gap={28}>
-      <Encabezado etiqueta={etiqueta[l.de]} titulo={l.titulo} acento={a} />
+    <Area gap={solucion ? 18 : 28} ajustada={solucion}>
+      <Encabezado
+        etiqueta={rotulo}
+        titulo={l.titulo}
+        acento={a}
+        compacto={solucion}
+      />
       <div style={{ ...st, flex: 1, minHeight: 0, display: "flex" }}>
-        <Ajustar gap={24} nombre={l.titulo}>
+        <Ajustar
+          gap={solucion ? 16 : 24}
+          nombre={l.titulo}
+          minimo={solucion ? 0.8 : 0.88}
+        >
           {l.piezas.map((x) => (
             <div
               key={x.etiqueta}
-              style={{ display: "flex", flexDirection: "column", gap: 12 }}
+              style={{ display: "flex", flexDirection: "column", gap: 10 }}
             >
               <div
-                style={{ fontSize: 30, color: color.texto, lineHeight: 1.3 }}
+                style={{
+                  fontSize: solucion ? 28 : 30,
+                  color: color.texto,
+                  lineHeight: 1.3,
+                }}
               >
                 <Rico texto={x.etiqueta} acento={a} />
               </div>
@@ -654,14 +679,19 @@ const PantallaDeCodigo: React.FC<{
                 lineas={x.lineas}
                 lenguaje={x.lenguaje}
                 ancho={ANCHO}
-                base={30}
-                interlineado={1.45}
+                base={solucion ? 26 : 30}
+                interlineado={solucion ? 1.35 : 1.45}
               />
             </div>
           ))}
-          {l.luego ? (
+          {l.tipo === "codigo" && l.luego ? (
             <div style={{ fontSize: 32, color: a, fontWeight: 700 }}>
               → <Rico texto={l.luego} acento={a} />
+            </div>
+          ) : null}
+          {l.tipo === "solucion" && l.nota ? (
+            <div style={{ fontSize: 30, color: color.texto, lineHeight: 1.32 }}>
+              <Rico texto={l.nota} acento={a} />
             </div>
           ) : null}
         </Ajustar>
@@ -865,7 +895,9 @@ export const LaminaVista: React.FC<{ u: LaminaUbicada }> = ({ u }) => {
         {l.tipo === "reto" || l.tipo === "rompelo" ? (
           <Reto l={l} reto={u.reto} />
         ) : null}
-        {l.tipo === "codigo" ? <PantallaDeCodigo l={l} /> : null}
+        {l.tipo === "codigo" || l.tipo === "solucion" ? (
+          <PantallaDeCodigo l={l} reto={u.reto} />
+        ) : null}
         {l.tipo === "aprendizaje" ? <Aprendizaje l={l} /> : null}
         <Pie
           seccion={u.seccion}

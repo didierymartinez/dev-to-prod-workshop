@@ -149,6 +149,30 @@ export const seccion12: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Afirma el hecho",
+      piezas: [
+        {
+          etiqueta: "En `SuspensionTests`, el segundo test",
+          lenguaje: "csharp",
+          lineas: [
+            "[Fact]",
+            "public void Suspender_emite_el_hecho()",
+            "{",
+            "    var empresa = new Empresa();",
+            '    empresa.Load(new object[] { new EmpresaRegistrada("Andes", "Básico") });',
+            "",
+            '    empresa.Suspender("falta de pago");',
+            "",
+            "    Assert.Contains(empresa.SinConfirmar, h => h is EmpresaSuspendida);",
+            "}",
+          ],
+        },
+      ],
+      nota: "Con el sabotaje puesto, este test se pone **rojo**: `SinConfirmar` está vacío. Con `Emitir` restaurado, **verde**.",
+    },
+    {
       tipo: "rompelo",
       titulo: "El huérfano, con un test",
       tarea:
@@ -168,6 +192,36 @@ export const seccion12: Seccion = {
             "Extra: borra `if (Suspendida) return;` de `Suspender`. Todo sigue verde: ningún test suspende dos veces. Ese test es tu siguiente reto.",
         },
       ],
+    },
+    {
+      tipo: "solucion",
+      de: "rompelo",
+      titulo: "El huérfano, con un test",
+      piezas: [
+        {
+          etiqueta: "En `SuspensionTests`: la reactivación, en el dado",
+          lenguaje: "csharp",
+          lineas: [
+            "[Fact]",
+            "public void Suspender_tras_reactivar_emite_el_hecho()",
+            "{",
+            "    var empresa = new Empresa();",
+            "    empresa.Load(new object[]",
+            "    {",
+            '        new EmpresaRegistrada("Andes", "Básico"),',
+            '        new EmpresaSuspendida("falta de pago"),',
+            "        new PagoRegistrado(500),",
+            "        new EmpresaReactivada(),                   // dado: ya volvió a estar activa",
+            "    });",
+            "",
+            '    empresa.Suspender("incumplimiento de contrato");',
+            "",
+            "    Assert.Contains(empresa.SinConfirmar, h => h is EmpresaSuspendida);",
+            "}",
+          ],
+        },
+      ],
+      nota: "Cada hecho merece al menos un test que lo tenga en el **dado**, con una decisión que dependa de él.",
     },
     {
       tipo: "aprendizaje",

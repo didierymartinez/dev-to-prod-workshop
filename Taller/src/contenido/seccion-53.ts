@@ -131,6 +131,22 @@ export const seccion53: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Notificaciones no crea nada",
+      piezas: [
+        {
+          etiqueta: "`Notificaciones/Program.cs`, en su `AddWolverine`",
+          lenguaje: "csharp",
+          lineas: [
+            "opts.UseRabbitMq();                                                   // la topología la crea la infraestructura",
+            'opts.ListenToRabbitQueue("notificaciones.plane");                     // todavía mal escrita',
+          ],
+        },
+      ],
+      nota: "Notificaciones termina al arrancar, y su log dice qué cola falta.",
+    },
+    {
       tipo: "codigo",
       de: "reto",
       titulo: "Varios correos a la vez, y una caída",

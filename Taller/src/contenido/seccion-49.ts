@@ -90,6 +90,26 @@ export const seccion49: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El descarte deja su línea",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Historia/Handlers.cs` (con `using Microsoft.Extensions.Logging;`)",
+          lenguaje: "csharp",
+          lineas: [
+            "public static async Task Handle(RegistrarPago cmd, IDocumentSession session, ILogger logger)",
+            "    // … como antes, hasta la referencia repetida:",
+            "    if (empresa.YaRegistro(cmd.Referencia))",
+            "    {",
+            '        logger.LogWarning("Pago {Referencia} de {EmpresaId} ya registrado: se descarta", cmd.Referencia, cmd.EmpresaId);',
+            "        return;",
+            "    }",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "Los otros descartes",
       tarea:
@@ -111,6 +131,47 @@ export const seccion49: Seccion = {
           "    suspensionId);",
         ],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Los otros descartes",
+      piezas: [
+        {
+          etiqueta: "En `SuspenderHandler`, con `ILogger logger` al final de sus parámetros",
+          lenguaje: "csharp",
+          lineas: [
+            "if (empresa.ProcesoAbierto is not null)",
+            "{",
+            '    logger.LogInformation("{EmpresaId} ya tiene un proceso abierto: no se abre otro", cmd.EmpresaId);',
+            "    return salida;",
+            "}",
+          ],
+        },
+        {
+          etiqueta: "`Empresas.Historia/ProcesoDeSuspensionHandler.cs` (con el mismo `using`): cada `Handle` recibe el logger y se lo pasa a `Decidir`",
+          lenguaje: "csharp",
+          lineas: [
+            "public static Task<RestituirAccesosV2?> Handle(MultaCobradaV2 m, IDocumentSession s, ILogger log) => Decidir(s, log, m.SuspensionId, p => p.ConfirmarCobroDeMulta(m.CobradaEl));",
+            "// … igual en los otros cuatro …",
+            "static async Task<RestituirAccesosV2?> Decidir(IDocumentSession session, ILogger log, string suspensionId, Func<SuspensionDeEmpresa, object[]> decidir)",
+            "    // … como antes, hasta los hechos:",
+            "    if (hechos.Length == 0)",
+            "    {",
+            '        log.LogInformation("{SuspensionId}: el mensaje no cambia el proceso, se descarta", suspensionId);',
+            "        return null;",
+            "    }",
+          ],
+        },
+        {
+          etiqueta: "`Empresas.Tests/SuspenderHandlerTests.cs` (con `using Microsoft.Extensions.Logging.Abstractions;`)",
+          lenguaje: "csharp",
+          lineas: [
+            'var salida = await SuspenderHandler.Handle(new SuspenderEmpresa(id, "mora"), session, plazos, NullLogger.Instance);',
+          ],
+        },
+      ],
+      nota: "`Logging:LogLevel:<categoría>` cambia el nivel de una sola categoría.",
     },
     {
       tipo: "codigo",

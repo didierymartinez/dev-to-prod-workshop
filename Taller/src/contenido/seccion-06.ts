@@ -84,6 +84,35 @@ export const seccion06: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Un secretario para la empresa",
+      piezas: [
+        {
+          etiqueta: "**Al final** del `Program.cs`: el handler",
+          lenguaje: "csharp",
+          lineas: [
+            "public class EmpresaCommandHandlers(EventStream<Empresa> stream)",
+            "{",
+            "    public void CambiarPlan(string nuevoPlan)",
+            "    {",
+            "        var empresa = stream.Get();                       // 1. cargar (rehidratar)",
+            "        stream.Append(empresa.CambiarPlan(nuevoPlan));     // 2+3. actuar y guardar",
+            "    }",
+            "",
+            "    public void Suspender(string motivo)",
+            "    {",
+            "        var empresa = stream.Get();",
+            "        var hecho   = empresa.Suspender(motivo);",
+            "        if (hecho is not null) stream.Append(hecho);       // null = ya suspendida → no guardamos",
+            "    }",
+            "}",
+          ],
+        },
+      ],
+      nota: "El `if (hecho is not null)` respeta la idempotencia: la regla la pone la `Empresa`; el handler solo la **obedece**.",
+    },
+    {
       tipo: "reto",
       titulo: "Un handler por comando",
       tarea:
@@ -99,6 +128,34 @@ export const seccion06: Seccion = {
       tips: [
         { k: "piensa", texto: "¿Quién eligió qué clase crear?" },
       ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Un handler por comando",
+      piezas: [
+        {
+          etiqueta: "**Al final** del `Program.cs`, en vez de `EmpresaCommandHandlers`",
+          lenguaje: "csharp",
+          lineas: [
+            "public class CambiarPlanHandler(EventStream<Empresa> stream)",
+            "{",
+            "    public void Handle(string nuevoPlan) =>",
+            "        stream.Append(stream.Get().CambiarPlan(nuevoPlan));",
+            "}",
+            "",
+            "public class SuspenderHandler(EventStream<Empresa> stream)",
+            "{",
+            "    public void Handle(string motivo)",
+            "    {",
+            "        var hecho = stream.Get().Suspender(motivo);",
+            "        if (hecho is not null) stream.Append(hecho);",
+            "    }",
+            "}",
+          ],
+        },
+      ],
+      nota: "Para ejecutar uno, **tú** eliges la clase y la llamas a mano: `new SuspenderHandler(stream).Handle(\"falta de pago\");`",
     },
     {
       tipo: "aprendizaje",

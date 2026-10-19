@@ -193,6 +193,42 @@ export const seccion29: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El consumidor solo ve el contrato",
+      piezas: [
+        {
+          etiqueta: "`Facturacion/Consumidor.cs`: deserializa el CONTRATO; nunca vio tu `EmpresaSuspendida`",
+          lenguaje: "csharp",
+          lineas: [
+            "using Contratos;",
+            "using System.Text.Json;",
+            "public static class Consumidor",
+            "{",
+            "    public static string Recibir(string mensaje)",
+            "    {",
+            "        var e = JsonSerializer.Deserialize<EmpresaSuspendidaV1>(mensaje)!;",
+            '        return $"Facturación: suspender NIT {e.Nit} ({e.Motivo})";',
+            "    }",
+            "}",
+          ],
+        },
+        {
+          etiqueta: "En `PostgresEventStore`: `EntregarPendientes` ya no conoce al consumidor, recibe un callback",
+          lenguaje: "csharp",
+          lineas: [
+            "public int EntregarPendientes(Action<string> publicar) { /* …lee pendientes; por cada uno: publicar(mensaje); marca entregado… */ }",
+          ],
+        },
+        {
+          etiqueta: "En el `Program.cs` de `Empresas.Historia`, la composición raíz",
+          lenguaje: "csharp",
+          lineas: ["store.EntregarPendientes(mensaje => Consumidor.Recibir(mensaje));"],
+        },
+      ],
+      nota: "Ese `Action<string> publicar` es una **costura**: el día que facturación viva en otra máquina, ahí sale el mensaje a viajar.",
+    },
+    {
       tipo: "rompelo",
       titulo: "El límite es de compilación",
       tarea:

@@ -112,6 +112,34 @@ export const seccion57: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El tenant sale del token",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Historia/Program.cs`, **antes** de `var app = builder.Build();`",
+          lenguaje: "csharp",
+          lineas: [
+            "builder.Services.AddAuthentication().AddJwtBearer();   // valida el token con lo que escribió user-jwts",
+          ],
+        },
+        {
+          etiqueta: "**Después** de `app.UseExceptionHandler(...)`",
+          lenguaje: "csharp",
+          lineas: [
+            "app.UseAuthentication();   // valida el token y llena contexto.User",
+            "app.Use(async (contexto, siguiente) =>",
+            "{",
+            "    // … la correlación, como estaba",
+            '    var tenant = contexto.User.FindFirst("tenant")?.Value;   // del token firmado; el header ya no cuenta',
+            "    if (tenant is not null) bus.TenantId = tenant;",
+            "    // … el OnStarting y el await siguiente(), como estaban",
+            "});",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "Un token falsificado",
       tarea:
@@ -280,6 +308,57 @@ export const seccion57: Seccion = {
           "        : _porTenant.GetOrAdd(tenant!, _ => Channel.CreateUnbounded<SuspensionEfectivaV1>());",
         ],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Un canal por tenant (1 de 2)",
+      piezas: [
+        {
+          etiqueta:
+            "`Empresas.Historia/EnVivo.cs`, con `using System.Collections.Concurrent; using JasperFx.MultiTenancy; using Wolverine;`",
+          lenguaje: "csharp",
+          lineas: [
+            "public static class EnVivo",
+            "{",
+            "    static readonly ConcurrentDictionary<string, Channel<SuspensionEfectivaV1>> _porTenant = new();",
+            "",
+            "    public static Channel<SuspensionEfectivaV1> De(string? tenant) =>",
+            "        tenant.IsDefaultTenant()",
+            '            ? throw new InvalidOperationException("Un aviso sin tenant no va a nadie.")   // ni a todos',
+            "            : _porTenant.GetOrAdd(tenant!, _ => Channel.CreateUnbounded<SuspensionEfectivaV1>());",
+            "}",
+            "",
+            "public static class EnVivoHandler",
+            "{",
+            "    public static void Handle(SuspensionEfectivaV1 aviso, IMessageContext mensaje) => EnVivo.De(mensaje.TenantId).Writer.TryWrite(aviso);",
+            "}",
+          ],
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Un canal por tenant (2 de 2)",
+      piezas: [
+        {
+          etiqueta:
+            "`Program.cs`: el tenant de la pantalla sale del token; la política garantiza que el claim viene",
+          lenguaje: "csharp",
+          lineas: [
+            'app.MapGet("/suspensiones/en-vivo", (ClaimsPrincipal usuario, CancellationToken ct) =>',
+            '    TypedResults.ServerSentEvents(Leer(usuario.FindFirst("tenant")!.Value, ct), eventType: SuspensionEfectivaV1.Tipo));',
+            "",
+            "static async IAsyncEnumerable<SuspensionEfectivaV1> Leer(string tenant, [EnumeratorCancellation] CancellationToken ct)",
+            "{",
+            "    await foreach (var aviso in EnVivo.De(tenant).Reader.ReadAllAsync(ct))",
+            "        yield return aviso;",
+            "}",
+          ],
+        },
+      ],
+      nota: "Un aviso sin tenant queda en `wolverine_dead_letters`: a la vista, en vez de perderse o de llegar a todos.",
     },
     {
       tipo: "reto",

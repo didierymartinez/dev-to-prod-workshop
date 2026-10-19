@@ -123,6 +123,55 @@ export const seccion59: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Cada escritura, con su tenant (1 de 2)",
+      piezas: [
+        {
+          etiqueta: "`Facturacion/Planes.cs`: el tenant, en la llave de la réplica",
+          lenguaje: "csharp",
+          lineas: [
+            "public static void Guardar(IConfiguration config, string tenant, string nit, string plan, long version)",
+            "{",
+            "    // … como estaba, con el tenant en la fila y en el conflicto",
+            '    cmd.CommandText = "INSERT INTO plan_de_empresa(tenant, nit, plan, version) VALUES(@tenant, @nit, @plan, @version) " +',
+            '        "ON CONFLICT (tenant, nit) DO UPDATE SET plan = EXCLUDED.plan, version = EXCLUDED.version WHERE plan_de_empresa.version < EXCLUDED.version";',
+            '    cmd.Parameters.AddWithValue("tenant", tenant);',
+            "    // …",
+            "}",
+            '// en De: var tenant = Organizacion.De(bus); "… WHERE tenant = @tenant AND nit = @nit"; y al final, Guardar(config, tenant, r.Nit, r.Plan, r.Version)',
+          ],
+        },
+        {
+          etiqueta: "`PlanesHandler`: el tenant, del sobre",
+          lenguaje: "csharp",
+          lineas: [
+            "public static class PlanesHandler",
+            "{",
+            "    public static void Handle(PlanDeEmpresaV1 msg, IConfiguration config, IMessageBus bus) =>",
+            "        Planes.Guardar(config, Organizacion.De(bus), msg.Nit, msg.Plan, msg.Version);   // el tenant, del sobre",
+            "}",
+          ],
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Cada escritura, con su tenant (2 de 2)",
+      piezas: [
+        {
+          etiqueta:
+            "`Facturacion/FacturacionHandler.cs`: `Handle(CobrarMultaV1 msg, IConfiguration config, IMessageBus bus)`, como estaba, con el tenant en la fila y en el conflicto",
+          lenguaje: "csharp",
+          lineas: [
+            'multa.CommandText = "INSERT INTO multas(tenant, suspension_id, nit, plan_al_suspender, monto) VALUES(@tenant, @suspension, @nit, @plan, @monto) ON CONFLICT (tenant, suspension_id) DO NOTHING";',
+            'multa.Parameters.AddWithValue("tenant", Organizacion.De(bus));   // el tenant, del sobre',
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "Una fila por organización",
       tarea:
@@ -237,6 +286,34 @@ export const seccion59: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El log dice el tenant",
+      piezas: [
+        {
+          etiqueta: "En `CobroDelMesHandler`",
+          lenguaje: "csharp",
+          lineas: [
+            'log.LogInformation("Mes {Periodo} de {Tenant}: cobrado", periodo, bus.TenantId);',
+          ],
+        },
+        {
+          etiqueta: "`Facturacion/FacturacionHandler.cs` (con `using Microsoft.Extensions.Logging;`)",
+          lenguaje: "csharp",
+          lineas: [
+            "public static class MensualidadHandler",
+            "{",
+            "    public static void Handle(CobrarMensualidad cmd, IMessageBus bus, ILogger log)",
+            "    {",
+            '        MundoExterno.Recibidos.Add($"Mensualidad {cmd.Nit}: {cmd.Plan}");',
+            '        log.LogInformation("Mensualidad {Nit} de {Tenant}: {Plan}", cmd.Nit, bus.TenantId, cmd.Plan);   // lo cobrado, a la vista',
+            "    }",
+            "}",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "planteamiento",
       titulo: "Globex dice «cobrado», y no paga",
       bloques: [
@@ -286,6 +363,34 @@ export const seccion59: Seccion = {
           '      PRIMARY KEY (tenant, nit, periodo));"; done',
         ],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "La reserva, con su tenant",
+      piezas: [
+        {
+          etiqueta: "`Facturacion/CobroDelMes.cs`, en `CobroDelMesHandler`",
+          lenguaje: "csharp",
+          lineas: [
+            "var tenant = Organizacion.De(bus);",
+            "foreach (var nit in Planes.Nits(config, tenant))",
+            "    await ProcesoMensual.Correr(bus, config, nit, periodo);",
+            'log.LogInformation("Mes {Periodo} de {Tenant}: cobrado", periodo, tenant);',
+            '// y en Facturacion/Planes.cs: Nits(IConfiguration config, string tenant), con "… WHERE tenant = @tenant ORDER BY nit"',
+          ],
+        },
+        {
+          etiqueta: "`Facturacion/ProcesoMensual.cs`, en `Correr`",
+          lenguaje: "csharp",
+          lineas: [
+            "var tenant = Organizacion.De(bus);",
+            "// …",
+            'reserva.CommandText = "INSERT INTO mensualidades(tenant, nit, periodo) VALUES(@tenant, @nit, @periodo) ON CONFLICT (tenant, nit, periodo) DO NOTHING";',
+            'reserva.Parameters.AddWithValue("tenant", tenant);',
+          ],
+        },
+      ],
     },
     {
       tipo: "rompelo",

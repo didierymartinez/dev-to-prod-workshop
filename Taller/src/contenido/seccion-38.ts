@@ -102,6 +102,36 @@ export const seccion38: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Facturación dice que no",
+      piezas: [
+        {
+          etiqueta: "En `Contratos`",
+          lenguaje: "csharp",
+          lineas: [
+            "// Contratos",
+            '[MessageIdentity("facturacion.multa-rechazada.v1")]',
+            "public record MultaRechazadaV1(string Nit, string Razon);",
+          ],
+        },
+        {
+          etiqueta: "En tu `FacturacionHandler`",
+          lenguaje: "csharp",
+          lineas: [
+            "// Facturacion/FacturacionHandler.cs: la regla es de Facturación",
+            "public static HashSet<string> ConAcuerdoDePago { get; } = new();",
+            "",
+            "public static object Handle(EmpresaSuspendidaV2 msg, Envelope envelope)",
+            "{",
+            '    if (ConAcuerdoDePago.Contains(msg.Nit)) return new MultaRechazadaV1(msg.Nit, "tiene acuerdo de pago");',
+            "    // … el cobro de siempre: dedup + INSERT en multas, y devuelve MultaCobradaV1, también en una reentrega …",
+            "}",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "Empresas revierte",
       tarea:
@@ -123,6 +153,67 @@ export const seccion38: Seccion = {
         lenguaje: "csharp",
         lineas: ['FacturacionHandler.ConAcuerdoDePago.Add("901100000");', ...suspender11],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Empresas revierte (1 de 2)",
+      piezas: [
+        {
+          etiqueta: "En `Empresas.Historia`: los hechos, su registro y el `enum`",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Historia: los hechos nuevos",
+            "public record CobroDeMultaRechazado(string Razon);",
+            "public record SuspensionRevertida(string Razon);",
+            "",
+            "// en tu Hechos.Registrar (y un Assert por hecho en el test de alias)",
+            "opts.Events.AddEventType<CobroDeMultaRechazado>();",
+            "opts.Events.AddEventType<SuspensionRevertida>();",
+            "",
+            "public enum EstadoIntegracion { SinSolicitar, EnCurso, Aplicado, Rechazado }",
+          ],
+        },
+        {
+          etiqueta: "En tu `Empresa`",
+          lenguaje: "csharp",
+          lineas: [
+            "// en tu Empresa",
+            "public bool Revertida { get; private set; }",
+            "",
+            "public void Apply(CobroDeMultaRechazado e) { Facturacion = EstadoIntegracion.Rechazado; }",
+            "public void Apply(SuspensionRevertida e)   { Suspendida = false; Revertida = true; }",
+            "// y en tu Apply(EmpresaSuspendida), al empezar una suspensión nueva: Revertida = false;",
+            "",
+            "public object[] RechazarCobroDeMulta(string razon)",
+            "{",
+            "    if (Facturacion != EstadoIntegracion.EnCurso) return [];   // reentrega, o nadie lo pidió",
+            "    return [new CobroDeMultaRechazado(razon), new SuspensionRevertida(razon)];",
+            "}",
+          ],
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Empresas revierte (2 de 2)",
+      piezas: [
+        {
+          etiqueta: "En tu `RespuestasHandler`",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Historia, en RespuestasHandler",
+            "public static async Task Handle(MultaRechazadaV1 msg, IDocumentSession session)",
+            "{",
+            "    var id = await Localizador.StreamDe(session, msg.Nit);",
+            "    var empresa = await session.Events.AggregateStreamAsync<Empresa>(id)",
+            '        ?? throw new InvalidOperationException($"No existe la empresa {id}");',
+            "    Anotar(session, id, empresa, empresa.RechazarCobroDeMulta(msg.Razon));",
+            "}",
+          ],
+        },
+      ],
     },
     {
       tipo: "rompelo",
@@ -180,6 +271,37 @@ export const seccion38: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Lo pasajero se reintenta",
+      piezas: [
+        {
+          etiqueta: "Dentro de `AddWolverine`, en tu `Program.cs`",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Historia/Program.cs, en AddWolverine, junto a la política del choque",
+            "opts.OnException<TimeoutException>()   // lo pasajero se reintenta; si no se recupera, va a dead letters",
+            "    .RetryWithCooldown(50.Milliseconds(), 100.Milliseconds(), 250.Milliseconds());",
+          ],
+        },
+        {
+          etiqueta: "En tu `FacturacionHandler`, sin el `try/catch`",
+          lenguaje: "csharp",
+          lineas: [
+            "// Facturacion/FacturacionHandler.cs",
+            "public static int Timeouts { get; set; }   // la pasarela simulada: cuántas veces seguidas no contesta",
+            "",
+            "public static object Handle(EmpresaSuspendidaV2 msg, Envelope envelope)",
+            "{",
+            '    if (ConAcuerdoDePago.Contains(msg.Nit)) return new MultaRechazadaV1(msg.Nit, "tiene acuerdo de pago");   // el único no',
+            '    if (Timeouts > 0) { Timeouts--; throw new TimeoutException("la pasarela de pagos no contestó"); }   // sale del handler',
+            "    // … el cobro de siempre …",
+            "}",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "rompelo",
       titulo: "Un no sin razón",
       tarea:
@@ -230,6 +352,47 @@ export const seccion38: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El comando de restituir",
+      piezas: [
+        {
+          etiqueta: "En `Contratos`",
+          lenguaje: "csharp",
+          lineas: [
+            "// Contratos",
+            '[MessageIdentity("accesos.restituir-accesos.v1")]',
+            "public record RestituirAccesosV1(string Nit);",
+            '[MessageIdentity("accesos.accesos-restituidos.v1")]',
+            "public record AccesosRestituidosV1(string Nit);",
+          ],
+        },
+        {
+          etiqueta: "En `Accesos/AccesosHandler.cs`",
+          lenguaje: "csharp",
+          lineas: [
+            "// Accesos/AccesosHandler.cs",
+            "public static AccesosRestituidosV1 Handle(RestituirAccesosV1 msg) => new(msg.Nit);   // restituye los accesos y lo confirma",
+          ],
+        },
+        {
+          etiqueta: "En `Empresas.Historia`: los hechos, su registro y el `enum`",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Historia",
+            "public record RestitucionDeAccesosSolicitada();",
+            "public record RestitucionDeAccesosConfirmada();",
+            "",
+            "// en tu Hechos.Registrar (y un Assert por hecho en el test de alias)",
+            "opts.Events.AddEventType<RestitucionDeAccesosSolicitada>();",
+            "opts.Events.AddEventType<RestitucionDeAccesosConfirmada>();",
+            "",
+            "public enum EstadoIntegracion { SinSolicitar, EnCurso, Aplicado, Rechazado, Restituyendo, Restituido }",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "Pedir la restitución",
       tarea:
@@ -246,6 +409,97 @@ export const seccion38: Seccion = {
           salida: ["emp-11: Facturacion=Rechazado Accesos=Restituido Revertida=True"],
         },
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Pedir la restitución (1 de 3)",
+      piezas: [
+        {
+          etiqueta: "En tu `FacturacionHandler`",
+          lenguaje: "csharp",
+          lineas: [
+            "// Facturacion/FacturacionHandler.cs: el rechazo, con su pausa (para el huérfano, quítala)",
+            "public static async Task<object> Handle(EmpresaSuspendidaV2 msg, Envelope envelope)",
+            "{",
+            "    if (ConAcuerdoDePago.Contains(msg.Nit))",
+            "    {",
+            "        await Task.Delay(800);   // revisar el acuerdo toma su tiempo",
+            '        return new MultaRechazadaV1(msg.Nit, "tiene acuerdo de pago");',
+            "    }",
+            "    // … el cobro de siempre: dedup + INSERT en multas, y devuelve MultaCobradaV1, también en una reentrega …",
+            "}",
+          ],
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Pedir la restitución (2 de 3)",
+      piezas: [
+        {
+          etiqueta: "En tu `Empresa`",
+          lenguaje: "csharp",
+          lineas: [
+            "// en tu Empresa",
+            "public void Apply(RestitucionDeAccesosSolicitada e) { Accesos = EstadoIntegracion.Restituyendo; }",
+            "public void Apply(RestitucionDeAccesosConfirmada e) { Accesos = EstadoIntegracion.Restituido; }",
+            "",
+            "public object[] RechazarCobroDeMulta(string razon)",
+            "{",
+            "    if (Facturacion != EstadoIntegracion.EnCurso) return [];",
+            "    var hechos = new List<object> { new CobroDeMultaRechazado(razon), new SuspensionRevertida(razon) };",
+            "    if (Accesos == EstadoIntegracion.Aplicado) hechos.Add(new RestitucionDeAccesosSolicitada());   // ya cortó: hay que restituir",
+            "    return hechos.ToArray();",
+            "}",
+          ],
+        },
+        {
+          etiqueta: "Y, también en tu `Empresa`, la confirmación",
+          lenguaje: "csharp",
+          lineas: [
+            "public object[] ConfirmarRestitucionDeAccesos() =>",
+            "    Accesos == EstadoIntegracion.Restituyendo ? [new RestitucionDeAccesosConfirmada()] : [];",
+          ],
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Pedir la restitución (3 de 3)",
+      piezas: [
+        {
+          etiqueta: "En tu `RespuestasHandler`: el rechazo pide la restitución",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Historia, en RespuestasHandler: el que decide pedir la restitución, la envía",
+            "public static async Task<RestituirAccesosV1?> Handle(MultaRechazadaV1 msg, IDocumentSession session)",
+            "{",
+            "    var id = await Localizador.StreamDe(session, msg.Nit);",
+            "    var empresa = await session.Events.AggregateStreamAsync<Empresa>(id)",
+            '        ?? throw new InvalidOperationException($"No existe la empresa {id}");',
+            "    var hechos = empresa.RechazarCobroDeMulta(msg.Razon);",
+            "    Anotar(session, id, empresa, hechos);",
+            "    return hechos.OfType<RestitucionDeAccesosSolicitada>().Any() ? new RestituirAccesosV1(msg.Nit) : null;",
+            "}",
+          ],
+        },
+        {
+          etiqueta: "Y el handler de la confirmación",
+          lenguaje: "csharp",
+          lineas: [
+            "public static async Task Handle(AccesosRestituidosV1 msg, IDocumentSession session)",
+            "{",
+            "    var id = await Localizador.StreamDe(session, msg.Nit);",
+            "    var empresa = await session.Events.AggregateStreamAsync<Empresa>(id)",
+            '        ?? throw new InvalidOperationException($"No existe la empresa {id}");',
+            "    Anotar(session, id, empresa, empresa.ConfirmarRestitucionDeAccesos());",
+            "}",
+          ],
+        },
+      ],
     },
     {
       tipo: "reto",
@@ -265,6 +519,43 @@ export const seccion38: Seccion = {
         },
         items: ["La misma salida, en los dos órdenes."],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El huérfano",
+      piezas: [
+        {
+          etiqueta: "En tu `Empresa`",
+          lenguaje: "csharp",
+          lineas: [
+            "public object[] ConfirmarRevocacionDeAccesos()",
+            "{",
+            "    if (Accesos != EstadoIntegracion.EnCurso) return [];",
+            "    if (Revertida) return [new RevocacionDeAccesosConfirmada(), new RestitucionDeAccesosSolicitada()];   // el huérfano: llegó tarde",
+            "    return Facturacion == EstadoIntegracion.Aplicado",
+            "        ? [new RevocacionDeAccesosConfirmada(), new SuspensionEfectiva()]",
+            "        : [new RevocacionDeAccesosConfirmada()];",
+            "}",
+          ],
+        },
+        {
+          etiqueta: "En tu `RespuestasHandler`",
+          lenguaje: "csharp",
+          lineas: [
+            "public static async Task<RestituirAccesosV1?> Handle(AccesosRevocadosV1 msg, IDocumentSession session)",
+            "{",
+            "    var id = await Localizador.StreamDe(session, msg.Nit);",
+            "    var empresa = await session.Events.AggregateStreamAsync<Empresa>(id)",
+            '        ?? throw new InvalidOperationException($"No existe la empresa {id}");',
+            "    var hechos = empresa.ConfirmarRevocacionDeAccesos();",
+            "    Anotar(session, id, empresa, hechos);",
+            "    return hechos.OfType<RestitucionDeAccesosSolicitada>().Any() ? new RestituirAccesosV1(msg.Nit) : null;",
+            "}",
+          ],
+        },
+      ],
+      nota: "El hecho de la solicitud y el comando a Accesos salen en la **misma** transacción, por el outbox: o se pidió y se anotó, o ninguna de las dos.",
     },
     {
       tipo: "codigo",
@@ -338,6 +629,25 @@ export const seccion38: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El socio que calla",
+      piezas: [
+        {
+          etiqueta: "En `Empresas.Historia`",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Historia",
+            '[MessageIdentity("RevisarSuspension")]   // espera en la base: su nombre es un contrato (using Wolverine.Attributes;)',
+            "public record RevisarSuspension(string EmpresaId);",
+            "public record SuspensionVencida(string Faltan);",
+            "// en tu Hechos.Registrar (y un Assert por hecho en el test de alias): opts.Events.AddEventType<SuspensionVencida>();   (RevisarSuspension es un mensaje, no un hecho)",
+            '// y en el test de alias, el nombre del plazo: Assert.Equal("RevisarSuspension", typeof(RevisarSuspension).ToMessageTypeName());',
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "Suspender programa el plazo",
       tarea:
@@ -353,6 +663,38 @@ export const seccion38: Seccion = {
           k: "nuevo",
           idioma: "(a, b)",
           explicacion: "una tupla junta dos valores en uno. Wolverine publica cada uno que no sea `null`.",
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Suspender programa el plazo",
+      piezas: [
+        {
+          etiqueta: "Tu `SuspenderHandler`",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Historia: suspender anuncia y programa el plazo, en la misma transacción",
+            "public static async Task<(EmpresaSuspendidaV2?, DeliveryMessage<RevisarSuspension>?)> Handle(",
+            "    SuspenderEmpresa cmd, IDocumentSession session)",
+            "{",
+            "    var empresa = await session.Events.AggregateStreamAsync<Empresa>(cmd.EmpresaId)",
+            '        ?? throw new InvalidOperationException($"No existe la empresa {cmd.EmpresaId}");',
+            "    if (empresa.Suspendida) return (null, null);",
+            "    session.Events.Append(cmd.EmpresaId, new EmpresaSuspendida(cmd.Motivo));",
+            "    return (new EmpresaSuspendidaV2(empresa.Nit, cmd.Motivo, empresa.Plan),",
+            "            new RevisarSuspension(cmd.EmpresaId).DelayedFor(TimeSpan.FromSeconds(5)));",
+            "}",
+          ],
+        },
+        {
+          etiqueta: "En `Empresas.Tests/SuspenderHandlerTests.cs`",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Tests/SuspenderHandlerTests.cs: el anuncio sale de la tupla; los Assert quedan igual",
+            'var (anuncio, _) = await SuspenderHandler.Handle(new SuspenderEmpresa(id, "mora"), session);',
+          ],
         },
       ],
     },
@@ -374,6 +716,57 @@ export const seccion38: Seccion = {
         },
         items: ["emp-11 queda `Vencida=True`."],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El plazo vence (1 de 2)",
+      piezas: [
+        {
+          etiqueta: "En tu `Empresa`",
+          lenguaje: "csharp",
+          lineas: [
+            "// en tu Empresa",
+            "public bool Vencida { get; private set; }",
+            "public void Apply(SuspensionVencida e) { Vencida = true; }",
+            "// y en tu Apply(EmpresaSuspendida), al empezar una suspensión nueva: Vencida = false;",
+            "",
+            "public object[] RevisarPlazo()",
+            "{",
+            "    if (Efectiva || Revertida || !Suspendida) return [];   // ya se resolvió: el plazo no tiene nada que hacer",
+            "    var faltan = new List<string>();",
+            '    if (Facturacion == EstadoIntegracion.EnCurso) faltan.Add("Facturacion");',
+            '    if (Accesos == EstadoIntegracion.EnCurso) faltan.Add("Accesos");',
+            '    return [new SuspensionVencida(string.Join(",", faltan))];',
+            "}",
+          ],
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El plazo vence (2 de 2)",
+      piezas: [
+        {
+          etiqueta: "`PlazoHandler`, en `Empresas.Historia`",
+          lenguaje: "csharp",
+          lineas: [
+            "public static class PlazoHandler",
+            "{",
+            "    public static async Task Handle(RevisarSuspension r, IDocumentSession session)",
+            "    {",
+            "        var empresa = await session.Events.AggregateStreamAsync<Empresa>(r.EmpresaId)",
+            '            ?? throw new InvalidOperationException($"No existe la empresa {r.EmpresaId}");',
+            "        var hechos = empresa.RevisarPlazo();",
+            '        Console.WriteLine($"plazo vencido para {r.EmpresaId}: {(hechos.Length == 0 ? "ya resuelta" : "VENCIDA")}");',
+            "        if (hechos.Length > 0) session.Events.Append(r.EmpresaId, empresa.Version + hechos.Length, hechos);",
+            "    }",
+            "}",
+          ],
+        },
+      ],
+      nota: "Vencer no es fallar: `SuspensionVencida` no deshace nada, deja en el diario que el plazo se cumplió sin respuesta.",
     },
     {
       tipo: "rompelo",

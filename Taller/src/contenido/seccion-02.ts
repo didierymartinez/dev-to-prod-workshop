@@ -106,6 +106,56 @@ export const seccion02: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Calcula el estado leyendo el diario (1 de 2)",
+      piezas: [
+        {
+          etiqueta: "**Arriba** en el `Program.cs`: la historia, en orden",
+          lenguaje: "csharp",
+          lineas: [
+            "var historia = new List<object>",
+            "{",
+            '    new EmpresaRegistrada("Constructora Andes", "Básico"),',
+            '    new PlanCambiado("Premium"),',
+            '    new EmpresaSuspendida("falta de pago"),',
+            "    new EmpresaReactivada(),",
+            '    new EmpresaSuspendida("incumplimiento de contrato"),',
+            "};",
+          ],
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Calcula el estado leyendo el diario (2 de 2)",
+      piezas: [
+        {
+          etiqueta:
+            "Debajo: las variables, el recorrido y la línea que imprime",
+          lenguaje: "csharp",
+          lineas: [
+            'string nombre = "";',
+            'string plan = "";',
+            "bool suspendida = false;",
+            "int reactivaciones = 0;",
+            "",
+            "foreach (var hecho in historia)",
+            "{",
+            "    if (hecho is EmpresaRegistrada r) { nombre = r.Nombre; plan = r.Plan; }",
+            "    if (hecho is PlanCambiado p)      { plan = p.NuevoPlan; }",
+            "    if (hecho is EmpresaSuspendida)   { suspendida = true; }",
+            "    if (hecho is EmpresaReactivada)   { suspendida = false; reactivaciones++; }",
+            "}",
+            "",
+            'Console.WriteLine($"{nombre}: plan {plan}, {(suspendida ? "suspendida" : "activa")}, reactivada {reactivaciones} vez/veces");',
+          ],
+        },
+      ],
+      nota: "Ninguna respuesta estaba guardada: todo sale de **rehidratar** los hechos.",
+    },
+    {
       tipo: "reto",
       titulo: "Una clase dueña de la empresa",
       tarea:
@@ -128,6 +178,45 @@ export const seccion02: Seccion = {
           idioma: "{ get; private set; }",
           explicacion:
             "se lee desde afuera; se escribe solo dentro de la clase.",
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Una clase dueña de la empresa",
+      piezas: [
+        {
+          etiqueta: "**Al final** del `Program.cs`: la clase",
+          lenguaje: "csharp",
+          lineas: [
+            "public class Empresa",
+            "{",
+            '    public string Nombre { get; private set; } = "";',
+            '    public string Plan   { get; private set; } = "";',
+            "    public bool   Suspendida    { get; private set; }",
+            "    public int    Reactivaciones { get; private set; }",
+            "",
+            "    public Empresa(IEnumerable<object> historia)",
+            "    {",
+            "        foreach (var hecho in historia)",
+            "        {",
+            "            if (hecho is EmpresaRegistrada r) { Nombre = r.Nombre; Plan = r.Plan; }",
+            "            if (hecho is PlanCambiado p)      { Plan = p.NuevoPlan; }",
+            "            if (hecho is EmpresaSuspendida)   { Suspendida = true; }",
+            "            if (hecho is EmpresaReactivada)   { Suspendida = false; Reactivaciones++; }",
+            "        }",
+            "    }",
+            "}",
+          ],
+        },
+        {
+          etiqueta: "**Arriba**, en vez de las variables sueltas",
+          lenguaje: "csharp",
+          lineas: [
+            "var empresa = new Empresa(historia);",
+            'Console.WriteLine($"{empresa.Nombre}: plan {empresa.Plan}, {(empresa.Suspendida ? "suspendida" : "activa")}, reactivada {empresa.Reactivaciones} vez/veces");',
+          ],
         },
       ],
     },

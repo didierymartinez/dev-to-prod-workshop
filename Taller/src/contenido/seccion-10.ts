@@ -51,6 +51,34 @@ export const seccion10: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "La deuda",
+      piezas: [
+        {
+          etiqueta: "**Al final** del `Program.cs`: el hecho nuevo",
+          lenguaje: "csharp",
+          lineas: ["public record PagoRegistrado(int Monto);"],
+        },
+        {
+          etiqueta: "En `Empresa`: la propiedad",
+          lenguaje: "csharp",
+          lineas: [
+            "// En Empresa (los decide siguen DEVOLVIENDO el hecho):",
+            "public bool DeudaPendiente { get; private set; }",
+          ],
+        },
+        {
+          etiqueta: "Dentro del `switch` de `Aplicar`",
+          lenguaje: "csharp",
+          lineas: [
+            "case EmpresaSuspendida: Suspendida = true; DeudaPendiente = true; break;",
+            "case PagoRegistrado:    DeudaPendiente = false; break;",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "Pagar, y la regla de reactivar",
       tarea:
@@ -61,6 +89,35 @@ export const seccion10: Seccion = {
         "**Al final**, el comando: `public record PagarDeuda(string EmpresaId, int Monto);`",
       ],
       logro: { items: ["Compila."] },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Pagar, y la regla de reactivar",
+      piezas: [
+        {
+          etiqueta: "En `Empresa`: el verbo de pagar y la regla",
+          lenguaje: "csharp",
+          lineas: [
+            "public PagoRegistrado RegistrarPago(int monto) => new(monto);",
+            "",
+            "public EmpresaReactivada Reactivar()",
+            "{",
+            "    if (DeudaPendiente)",
+            '        throw new ReglaDeNegocioException("No puedes reactivar con deuda pendiente.");',
+            "    return new();",
+            "}",
+          ],
+        },
+        {
+          etiqueta: "**Al final** del `Program.cs`: el comando",
+          lenguaje: "csharp",
+          lineas: [
+            "// El comando (con EmpresaId, como los otros):",
+            "public record PagarDeuda(string EmpresaId, int Monto);",
+          ],
+        },
+      ],
     },
     {
       tipo: "codigo",

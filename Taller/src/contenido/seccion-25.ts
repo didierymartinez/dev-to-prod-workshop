@@ -204,6 +204,30 @@ export const seccion25: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Inactivar es un hecho del grupo",
+      piezas: [
+        {
+          etiqueta: "El hecho nuevo",
+          lenguaje: "csharp",
+          lineas: [
+            "public record RamaInactivada(string Raiz, IReadOnlyList<string> Empresas);   // va al stream del grupo",
+          ],
+        },
+        {
+          etiqueta: "En `GrupoEmpresarial`: el verbo, y `Rama` ahora privada",
+          lenguaje: "csharp",
+          lineas: [
+            "public void InactivarRama(string raiz) => Emitir(new RamaInactivada(raiz, Rama(raiz)));",
+            "",
+            "private List<string> Rama(string raiz) { /* el mismo cuerpo de antes */ }",
+          ],
+        },
+      ],
+      nota: "El reintento carga el grupo que ya tiene a `emp-d`, así que su rama la incluye.",
+    },
+    {
       tipo: "reto",
       titulo: "Bajo una matriz inactiva no entra nadie",
       tarea:
@@ -232,6 +256,34 @@ export const seccion25: Seccion = {
           "}",
         ],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Bajo una matriz inactiva no entra nadie",
+      piezas: [
+        {
+          etiqueta: "En `GrupoEmpresarial`, el conjunto de inactivas",
+          lenguaje: "csharp",
+          lineas: ["private readonly HashSet<string> _inactivas = new();"],
+        },
+        {
+          etiqueta: "En su `Aplicar`, un `case` más",
+          lenguaje: "csharp",
+          lineas: [
+            "case RamaInactivada r: foreach (var e in r.Empresas) _inactivas.Add(e); break;",
+          ],
+        },
+        {
+          etiqueta: "Al inicio de `AsignarMatriz`",
+          lenguaje: "csharp",
+          lineas: [
+            "if (_inactivas.Contains(matriz))",
+            '    throw new ReglaDeNegocioException($"{matriz} está inactiva: no recibe filiales.");',
+          ],
+        },
+      ],
+      nota: "Ahora una filial nueva o trasladada valida el estado de su matriz, y el reintento de la carrera también se rechaza.",
     },
     {
       tipo: "rompelo",

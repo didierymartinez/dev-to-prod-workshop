@@ -128,6 +128,27 @@ export const seccion70: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El GET devuelve la versión",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Historia/Program.cs`, junto a tus endpoints",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Historia/Program.cs, junto a tus endpoints: la versión que vio el usuario sale en el ETag",
+            "app.MapGet(\"/empresas/{id}/plan\", async (string id, IQuerySession s, HttpResponse res) =>",
+            "{",
+            "    var e = await s.Events.AggregateStreamAsync<Empresa>(id);",
+            "    if (e is null) return Results.NotFound();",
+            "    res.Headers.ETag = $\"\\\"{e.Version}\\\"\";",
+            "    return Results.Ok(new { e.Id, e.Nombre, e.Plan });",
+            "});",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "Cargar con la versión vista",
       tarea:
@@ -152,6 +173,27 @@ export const seccion70: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Cargar con la versión vista",
+      piezas: [
+        {
+          etiqueta: "En `MartenUnitOfWork`, junto a tu `Cargar(id)`",
+          lenguaje: "csharp",
+          lineas: [
+            "// en MartenUnitOfWork: la misma carga, con la versión que vio el usuario",
+            "public async Task<T> Cargar<T>(string id, long versionVista) where T : AggregateRoot",
+            "{",
+            "    var stream = await _s.Events.FetchForWriting<T>(id, versionVista);   // la versión esperada es la del usuario",
+            "    var agg = stream.Aggregate ?? throw new AgregadoNoEncontradoException(id);",
+            "    _cargados.Add((agg, () => stream.AppendMany(agg.SinConfirmar.ToArray())));",
+            "    return agg;",
+            "}",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "El PUT trae la versión",
       tarea:
@@ -171,6 +213,45 @@ export const seccion70: Seccion = {
             "`MapPut`, como `MapPost` y `MapGet`",
             "`Results.NoContent()`: 204",
             "`Results.StatusCode(...)` con `StatusCodes.Status412PreconditionFailed` o `Status428PreconditionRequired`",
+          ],
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El PUT trae la versión",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Historia/Dominio.cs`, junto a tus comandos",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Historia/Dominio.cs, junto a tus comandos",
+            "public record CambioDePlan(string Plan);   // el cuerpo del PUT",
+          ],
+        },
+        {
+          etiqueta: "`Empresas.Historia/Program.cs`, junto a tu `MapGet`",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Historia/Program.cs, junto a tu MapGet: la versión vuelve en el If-Match, hasta la escritura",
+            "app.MapPut(\"/empresas/{id}/plan\", async (string id, CambioDePlan cambio, HttpRequest req, IDocumentSession s) =>",
+            "{",
+            "    if (!long.TryParse(req.Headers.IfMatch.ToString().Trim('\"'), out var versionVista))",
+            "        return Results.StatusCode(StatusCodes.Status428PreconditionRequired);   // sin If-Match no sabes sobre qué versión decidió",
+            "    var uow = new MartenUnitOfWork(s);",
+            "    try",
+            "    {",
+            "        var e = await uow.Cargar<Empresa>(id, versionVista);",
+            "        e.CambiarPlan(cambio.Plan);",
+            "        await uow.CommitAsync();",
+            "        return Results.NoContent();",
+            "    }",
+            "    catch (JasperFx.ConcurrencyException)",
+            "    {",
+            "        return Results.StatusCode(StatusCodes.Status412PreconditionFailed);   // la empresa cambió desde que el usuario la vio",
+            "    }",
+            "});",
           ],
         },
       ],
@@ -206,6 +287,30 @@ export const seccion70: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "La sesión que escribe",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Historia/Program.cs`, junto a tu `IQuerySession`",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Historia/Program.cs, junto a tu IQuerySession: la sesión que escribe, en el tenant del bus",
+            "builder.Services.AddScoped<IDocumentSession>(s =>",
+            "    s.GetRequiredService<IDocumentStore>().LightweightSession(s.GetRequiredService<IMessageContext>().TenantId!));",
+          ],
+        },
+        {
+          etiqueta: "En tu `StatusCodeSelector`, **arriba**: antes del 409",
+          lenguaje: "csharp",
+          lineas: [
+            "// la primera línea de tu StatusCodeSelector, antes del 409",
+            "ex is AgregadoNoEncontradoException ? StatusCodes.Status404NotFound :   // la puerta de Cargar: ese stream no existe",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "El PUT anuncia",
       tarea:
@@ -220,6 +325,23 @@ export const seccion70: Seccion = {
           k: "piensa",
           texto:
             "`e.Version + 1` es la versión que tendrá el stream con el cambio nuevo.",
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El PUT anuncia",
+      piezas: [
+        {
+          etiqueta: "En tu `MapPut`, con `IMessageBus bus` en sus parámetros",
+          lenguaje: "csharp",
+          lineas: [
+            "// en tu MapPut, con IMessageBus bus en sus parámetros: el anuncio, antes del commit",
+            "        e.CambiarPlan(cambio.Plan);",
+            "        await bus.PublishAsync(new PlanDeEmpresaV1(e.Nit, e.Plan, e.Version + 1));   // la versión que tendrá el stream",
+            "        await uow.CommitAsync();                                                     // el hecho y su anuncio, juntos",
+          ],
         },
       ],
     },
@@ -266,6 +388,23 @@ export const seccion70: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El anuncio, en el outbox",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Historia/Program.cs`: tu `IDocumentSession`, ahora en el outbox",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Historia/Program.cs: la sesión del endpoint, en el outbox y en el tenant del bus (using Wolverine.Marten.Publishing;)",
+            "builder.Services.AddScoped<IDocumentSession>(s =>",
+            "    s.GetRequiredService<OutboxedSessionFactory>().OpenSession(s.GetRequiredService<IMessageContext>()));",
+          ],
+        },
+      ],
+      nota: "Si el `SaveChangesAsync` choca, el anuncio se descarta con la transacción, y el PUT responde 412.",
+    },
+    {
       tipo: "reto",
       titulo: "Los tests de la pantalla",
       tarea:
@@ -294,6 +433,85 @@ export const seccion70: Seccion = {
         {
           k: "nota",
           texto: "En PowerShell: `$env:ACME = Get-Content ~/acme.jwt`.",
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Los tests de la pantalla (1 de 3)",
+      piezas: [
+        {
+          etiqueta: "En `ConcurrenciaTests`, dentro de la clase: el cliente y el 412",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Tests/ConcurrenciaTests.cs, dentro de la clase, junto a tu test de dos escritores",
+            "// (arriba, using System.Net; using System.Net.Http.Headers; using System.Net.Http.Json;)",
+            "HttpClient Cliente()   // el host en memoria, con el token de acme",
+            "{",
+            "    var http = app.CreateClient();",
+            "    http.DefaultRequestHeaders.Authorization = new(\"Bearer\", Environment.GetEnvironmentVariable(\"ACME\"));",
+            "    return http;",
+            "}",
+            "",
+            "[Fact]",
+            "public async Task El_PUT_sobre_una_version_vieja_responde_412()",
+            "{",
+            "    var http = Cliente();",
+            "    var id = $\"emp-{Guid.NewGuid():N}\";",
+            "    await Alta(http, id, $\"nit-{Guid.NewGuid():N}\");                            // nace en la versión 1",
+            "    var etag = (await http.GetAsync($\"/empresas/{id}/plan\")).Headers.ETag!;   // lo que vio el usuario: \"1\"",
+            "    Assert.Equal(HttpStatusCode.NoContent, (await CambiarPlan(http, id, etag, \"Premium\")).StatusCode);",
+            "    Assert.Equal(HttpStatusCode.PreconditionFailed, (await CambiarPlan(http, id, etag, \"Enterprise\")).StatusCode);   // la misma versión, ya vieja",
+            "}",
+          ],
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Los tests de la pantalla (2 de 3)",
+      piezas: [
+        {
+          etiqueta: "Sigue dentro de la clase: el 404 y el 409",
+          lenguaje: "csharp",
+          lineas: [
+            "[Fact]",
+            "public async Task El_PUT_sobre_una_empresa_que_no_existe_responde_404() =>   // \"0\": la versión de un stream que no existe",
+            "    Assert.Equal(HttpStatusCode.NotFound, (await CambiarPlan(Cliente(), \"emp-nadie\", new EntityTagHeaderValue(\"\\\"0\\\"\"), \"Premium\")).StatusCode);",
+            "",
+            "[Fact]",
+            "public async Task El_NIT_repetido_responde_409()   // con un 500, la pantalla reintentaría",
+            "{",
+            "    var http = Cliente();",
+            "    var nit = $\"nit-{Guid.NewGuid():N}\";",
+            "    Assert.Equal(HttpStatusCode.Accepted, (await Alta(http, $\"emp-{Guid.NewGuid():N}\", nit)).StatusCode);",
+            "    Assert.Equal(HttpStatusCode.Conflict, (await Alta(http, $\"emp-{Guid.NewGuid():N}\", nit)).StatusCode);   // el mismo NIT, otra empresa",
+            "}",
+          ],
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Los tests de la pantalla (3 de 3)",
+      piezas: [
+        {
+          etiqueta: "Y los dos métodos que se repiten: el alta y el PUT",
+          lenguaje: "csharp",
+          lineas: [
+            "static Task<HttpResponseMessage> Alta(HttpClient http, string id, string nit) =>",
+            "    http.PostAsync(\"/empresas\", JsonContent.Create(new RegistrarEmpresa(id, nit, \"Andes\", \"Basico\")));",
+            "",
+            "static Task<HttpResponseMessage> CambiarPlan(HttpClient http, string id, EntityTagHeaderValue etag, string plan)",
+            "{",
+            "    var put = new HttpRequestMessage(HttpMethod.Put, $\"/empresas/{id}/plan\") { Content = JsonContent.Create(new CambioDePlan(plan)) };",
+            "    put.Headers.IfMatch.Add(etag);",
+            "    return http.SendAsync(put);",
+            "}",
+          ],
         },
       ],
     },
