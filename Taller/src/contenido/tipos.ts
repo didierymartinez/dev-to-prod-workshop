@@ -8,6 +8,8 @@
 //                    frase, los pasos que la detallan, cómo saben que lo lograron, tips y ejemplo.
 //   rompelo        → igual que un reto, para el 🔨.
 //   codigo         → el código que deben copiar, a todo lo ancho (dentro de un reto o un 🔨).
+//   solucion       → "👉 Una forma de hacerlo": cómo queda el resultado del reto anterior,
+//                    sacado del <details> de la sección. Va justo después de su reto.
 //   aprendizaje    → lo que se llevan y el commit de cierre.
 //
 // En los textos, `así` se ve como código y **así** en negrita.
@@ -19,6 +21,7 @@ export type TipoLamina =
   | "reto"
   | "rompelo"
   | "codigo"
+  | "solucion"
   | "aprendizaje";
 
 type Comun = {
@@ -117,6 +120,21 @@ export type Lamina =
       }[];
       /** Lo que hacen después de copiarlo. */
       luego?: string;
+    }
+  | {
+      tipo: "solucion";
+      /** El reto o 🔨 que resuelve (va justo después de él). */
+      de: "reto" | "rompelo";
+      /** El título del reto que resuelve. */
+      titulo: string;
+      /** El código del resultado, por partes: cada una dice dónde va. */
+      piezas: {
+        etiqueta: string;
+        lenguaje: "csharp" | "bash" | "sql";
+        lineas: string[];
+      }[];
+      /** Una línea que explica la solución (opcional). */
+      nota?: string;
     }
   | {
       tipo: "aprendizaje";

@@ -24,6 +24,7 @@ export const acento: Record<TipoLamina, string> = {
   reto: "#4ECDC4",
   rompelo: "#FF8B6B",
   codigo: "#4ECDC4",
+  solucion: "#6BCB77",
   aprendizaje: "#7AA2F7",
 };
 
@@ -33,6 +34,7 @@ export const etiqueta: Record<TipoLamina, string> = {
   reto: "🛠️ Reto",
   rompelo: "🔨 Rómpelo",
   codigo: "🛠️ Código",
+  solucion: "👉 Una forma de hacerlo",
   aprendizaje: "🧠 Lo que te llevas",
 };
 

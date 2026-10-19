@@ -270,6 +270,47 @@ export const seccion52: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Las credenciales, en una clase",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Historia/CredencialesDelBroker.cs`: la sección \"Broker\" de la configuración",
+          lenguaje: "csharp",
+          lineas: [
+            "using System.ComponentModel.DataAnnotations;",
+            "",
+            "public class CredencialesDelBroker",
+            "{",
+            '    [Required(ErrorMessage = "Falta Broker:Host.")] public string Host { get; set; } = "";',
+            '    [Required(ErrorMessage = "Falta Broker:Usuario.")] public string Usuario { get; set; } = "";',
+            '    [Required(ErrorMessage = "Falta Broker:Clave.")] public string Clave { get; set; } = "";',
+            "}",
+          ],
+        },
+        {
+          etiqueta: "`Empresas.Historia/Configuracion.cs`, junto a tu `PlazosDeSuspension`",
+          lenguaje: "csharp",
+          lineas: [
+            "builder.Services.AddOptions<CredencialesDelBroker>()",
+            '    .BindConfiguration("Broker")',
+            "    .ValidateDataAnnotations()   // los [Required]",
+            "    .ValidateOnStart();          // al arrancar, antes de conectarse",
+            'var broker = builder.Configuration.GetSection("Broker").Get<CredencialesDelBroker>() ?? new CredencialesDelBroker();',
+          ],
+        },
+        {
+          etiqueta: "En tu `AddWolverine`",
+          lenguaje: "csharp",
+          lineas: [
+            "opts.UseRabbitMq(f => { f.HostName = broker.Host; f.UserName = broker.Usuario; f.Password = broker.Clave; })",
+            "    // … y tu .AutoProvision().BindExchange(…), como estaban",
+          ],
+        },
+      ],
+      nota: "Las tres van juntas a la conexión, y una clase las lee juntas, por nombre: sus marcas dicen cuál falta.",
+    },
+    {
       tipo: "reto",
       titulo: "Los tests, sin broker",
       tarea:

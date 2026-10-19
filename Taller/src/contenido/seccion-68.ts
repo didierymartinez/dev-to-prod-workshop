@@ -137,6 +137,22 @@ export const seccion68: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Lo que la unidad ya rastrea",
+      piezas: [
+        {
+          etiqueta: "**Al empezar** `Cargar`, en `MartenUnitOfWork`",
+          lenguaje: "csharp",
+          lineas: [
+            "// al empezar Cargar, en MartenUnitOfWork: lo registrado o cargado en esta unidad, primero",
+            "if (_nuevos.Concat(_modificados).FirstOrDefault(a => a.Id == id) is T ya) return ya;",
+          ],
+        },
+      ],
+      nota: "El segundo aviso recibe la misma empresa que el primero, ya con su pago: la guarda lo frena.",
+    },
+    {
       tipo: "reto",
       titulo: "Un aviso de nadie",
       tarea:
@@ -202,6 +218,58 @@ export const seccion68: Seccion = {
           'await Assert.ThrowsAsync<AgregadoNoEncontradoException>(() => bus.InvokeForTenantAsync("acme", nadie));',
         ],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "La puerta (1 de 2)",
+      piezas: [
+        {
+          etiqueta: "En `Empresas.Historia`, suelta, junto a tus otras excepciones",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Historia, suelta, junto a tus otras excepciones",
+            "public class AgregadoNoEncontradoException(string id) : Exception($\"No existe el stream {id}\");",
+          ],
+        },
+        {
+          etiqueta: "`Cargar` entero, en `MartenUnitOfWork`",
+          lenguaje: "csharp",
+          lineas: [
+            "// en MartenUnitOfWork: lo que ya rastrea, primero; si el stream no existe, falla aquí",
+            "public async Task<T> Cargar<T>(string id) where T : AggregateRoot",
+            "{",
+            "    if (_nuevos.Concat(_modificados).FirstOrDefault(a => a.Id == id) is T ya) return ya;",
+            "    var a = await _s.Events.FetchLatest<T>(id) ?? throw new AgregadoNoEncontradoException(id);",
+            "    _modificados.Add(a);",
+            "    return a;",
+            "}",
+          ],
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "La puerta (2 de 2)",
+      piezas: [
+        {
+          etiqueta: "En `LaPlantillaEnElHandler`: el test de `emp-nadie`",
+          lenguaje: "csharp",
+          lineas: [
+            "// en LaPlantillaEnElHandler",
+            "[Fact]",
+            "public async Task Cargar_un_stream_que_no_existe_falla_con_su_nombre()",
+            "{",
+            "    using var scope = app.Services.CreateScope();",
+            "    var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();",
+            "    var nadie = new RegistrarExtracto([new RegistrarPago(\"emp-nadie\", \"BANCO-0044\", 50_000)]);   // un aviso de una empresa que no existe",
+            "    await Assert.ThrowsAsync<AgregadoNoEncontradoException>(() => bus.InvokeForTenantAsync(\"acme\", nadie));",
+            "}",
+          ],
+        },
+      ],
+      nota: "Tu política de reintento no la toca: solo reintenta el choque de concurrencia y el timeout.",
     },
     {
       tipo: "rompelo",

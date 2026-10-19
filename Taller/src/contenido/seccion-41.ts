@@ -93,6 +93,52 @@ export const seccion41: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Una vista que entra con el hecho (1 de 2)",
+      piezas: [
+        {
+          etiqueta: "En `Empresas.Historia`: el read model y su proyección",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Historia: el read model que contesta el plan",
+            "using Marten.Events.Aggregation;    // SingleStreamProjection",
+            "",
+            "public class EmpresaDetalle",
+            "{",
+            '    public string Id { get; set; } = "";',
+            '    public string Plan { get; set; } = "";',
+            "    public long Version { get; set; }   // la llena Marten al leer, desde mt_version",
+            "}",
+            "",
+            "public partial class EmpresaDetalleProjection : SingleStreamProjection<EmpresaDetalle, string>",
+            "{",
+            "    public void Apply(EmpresaRegistrada e, EmpresaDetalle d) => d.Plan = e.Plan;",
+            "    public void Apply(PlanCambiado e, EmpresaDetalle d)      => d.Plan = e.NuevoPlan;",
+            "}",
+          ],
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Una vista que entra con el hecho (2 de 2)",
+      piezas: [
+        {
+          etiqueta: "Dentro de `AddMarten`, en tu `Program.cs`",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Historia/Program.cs, dentro de AddMarten",
+            "opts.Projections.Add<SuspendidasProjection>(ProjectionLifecycle.Async);",
+            "opts.Projections.Add<EmpresaDetalleProjection>(ProjectionLifecycle.Inline);             // nuevo",
+            "opts.Schema.For<EmpresaDetalle>().Metadata(m => m.Revision.MapTo(d => d.Version));     // nuevo",
+          ],
+        },
+      ],
+      nota: "Un `Append` directo no le trae la versión a la vista `Inline`: la línea de `Metadata` la copia de `mt_version`.",
+    },
+    {
       tipo: "reto",
       titulo: "Contestar desde la vista",
       tarea:
@@ -121,6 +167,24 @@ export const seccion41: Seccion = {
           'Console.WriteLine($"Plan de 906100000: {plan.Plan} (versión {plan.Version})");',
         ],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Contestar desde la vista",
+      piezas: [
+        {
+          etiqueta: "En tu `ConsultarPlanHandler`, en vez de rehidratar",
+          lenguaje: "csharp",
+          lineas: [
+            "// ConsultarPlanHandler: la respuesta sale de la vista, no del agregado",
+            "var detalle = await session.LoadAsync<EmpresaDetalle>(await Localizador.StreamDe(session, q.Nit))",
+            '    ?? throw new InvalidOperationException($"No existe la empresa del NIT {q.Nit}");',
+            "return new PlanActualV1(q.Nit, detalle.Plan, detalle.Version);",
+          ],
+        },
+      ],
+      nota: "Sale el plan nuevo al instante: el documento entró con el hecho, y el daemon no lo corre.",
     },
     {
       tipo: "reto",
@@ -253,9 +317,9 @@ export const seccion41: Seccion = {
       tarea:
         "**No lo saltes**: la sección siguiente usa emp-64. Apaga el daemon y registra una empresa.",
       pasos: [
-        "En `Program.cs`, comenta `.AddAsyncDaemon(DaemonMode.Solo);` y pon su `;` al final de `.IntegrateWithWolverine()`. En lugar del bloque anterior, el de abajo.",
-        "Corre y mira la primera línea del log al arrancar.",
-        "Descomenta `AddAsyncDaemon`, quita el `;` de `.IntegrateWithWolverine()`, quita el registro de emp-64 y corre otra vez.",
+        "En `Program.cs`, comenta `.AddAsyncDaemon(DaemonMode.Solo);` (el `;` pasa a `.IntegrateWithWolverine()`) y pon el bloque de abajo en lugar del anterior.",
+        "Corre y mira la primera línea del log.",
+        "Devuelve `AddAsyncDaemon`, quita el registro de emp-64 y corre otra vez.",
       ],
       logro: {
         terminal: {
@@ -264,8 +328,7 @@ export const seccion41: Seccion = {
           salida: ["EmpresaDetalle: Basico   VistaSuspendida: (no existe)"],
         },
         items: [
-          "Solo un `Warning: The async daemon is disabled`.",
-          "Con el daemon de vuelta, la vista dice `Basico`.",
+          "Solo un `Warning: The async daemon is disabled`. Con el daemon de vuelta, la vista dice `Basico`.",
         ],
       },
       ejemplo: {

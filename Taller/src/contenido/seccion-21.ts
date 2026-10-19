@@ -141,6 +141,32 @@ export const seccion21: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "La versión, en el WHERE",
+      piezas: [
+        {
+          etiqueta: "En `psql`, A y B: cada `UPDATE` exige la versión que leyó",
+          lenguaje: "sql",
+          lineas: [
+            "UPDATE planes SET precio = 160000, version = version + 1 WHERE codigo = 'premium' AND version = 3;   -- en A: UPDATE 1",
+            "UPDATE planes SET precio = 140000, version = version + 1 WHERE codigo = 'premium' AND version = 3;   -- en B: UPDATE 0",
+          ],
+        },
+        {
+          etiqueta: "Desde C#, `ExecuteNonQuery()` devuelve ese mismo conteo, y `@v` es la versión leída",
+          lenguaje: "csharp",
+          lineas: [
+            'cmd.CommandText = "UPDATE planes SET precio = @p, version = version + 1 WHERE codigo = @c AND version = @v";',
+            "// … los tres parámetros, con AddWithValue como siempre",
+            "if (cmd.ExecuteNonQuery() == 0)",
+            "    throw new ConcurrencyException($\"El plan '{codigo}' cambió desde que lo leíste: recarga y reintenta.\");",
+          ],
+        },
+      ],
+      nota: "`UPDATE 0` es el conflicto: ninguna fila tenía la versión que B leyó.",
+    },
+    {
       tipo: "rompelo",
       titulo: "Una sola verdad",
       tarea:

@@ -114,6 +114,33 @@ export const seccion48: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El conflicto es un 409",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Historia/Program.cs`, junto a tus otros servicios",
+          lenguaje: "csharp",
+          lineas: ["builder.Services.AddProblemDetails();"],
+        },
+        {
+          etiqueta: "Después de `var app = builder.Build();`",
+          lenguaje: "csharp",
+          lineas: [
+            "app.UseExceptionHandler(new ExceptionHandlerOptions",
+            "{",
+            "    StatusCodeSelector = ex =>",
+            "        ex is JasperFx.DocumentAlreadyExistsException                   // el NIT ya está en el localizador",
+            "        || ex is Marten.Exceptions.ExistingStreamIdCollisionException   // el id ya tiene su stream",
+            "            ? StatusCodes.Status409Conflict",
+            "            : StatusCodes.Status500InternalServerError,                 // lo demás es una falla del servidor",
+            "});",
+          ],
+        },
+      ],
+      nota: "El stack sigue en el log, en la línea `fail: Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware[1]`.",
+    },
+    {
       tipo: "reto",
       titulo: "El otro conflicto",
       tarea:
@@ -275,6 +302,33 @@ export const seccion48: Seccion = {
           "    string? Plan, string? Motivo, int? Monto);",
         ],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "La historia tiene su contrato",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Historia/Program.cs`, en lugar de tu endpoint crudo",
+          lenguaje: "csharp",
+          lineas: [
+            'app.MapGet("/empresas/{id}/historia", async (string id, IQuerySession session) =>',
+            "{",
+            "    var hechos = await session.Events.FetchStreamAsync(id);",
+            "    if (hechos.Count == 0) return Results.NotFound();",
+            "    return Results.Ok(hechos.Select(e => e.Data switch",
+            "    {",
+            "        EmpresaRegistrada h => new HechoDeLaHistoria(e.Version, e.EventTypeName, e.Timestamp, h.Plan, null, null),",
+            "        PlanCambiado h      => new HechoDeLaHistoria(e.Version, e.EventTypeName, e.Timestamp, h.NuevoPlan, null, null),",
+            "        EmpresaSuspendida h => new HechoDeLaHistoria(e.Version, e.EventTypeName, e.Timestamp, null, h.Motivo, null),",
+            "        PagoRecibido h      => new HechoDeLaHistoria(e.Version, e.EventTypeName, e.Timestamp, null, null, h.Monto),",
+            "        _                   => new HechoDeLaHistoria(e.Version, e.EventTypeName, e.Timestamp, null, null, null),",
+            "    }));",
+            "});",
+          ],
+        },
+      ],
+      nota: "Cada rama devuelve el mismo tipo, tu `HechoDeLaHistoria`: tu contrato, escrito en una línea.",
     },
     {
       tipo: "reto",

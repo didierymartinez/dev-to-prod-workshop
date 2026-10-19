@@ -89,6 +89,48 @@ export const seccion45: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El plazo, en un archivo",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Historia/PlazosDeSuspension.cs`",
+          lenguaje: "csharp",
+          lineas: [
+            '// Empresas.Historia/PlazosDeSuspension.cs: la sección "Suspension" de la configuración',
+            "public class PlazosDeSuspension",
+            "{",
+            "    public int PlazoEnSegundos { get; set; }",
+            "}",
+          ],
+        },
+        {
+          etiqueta: "`Program.cs`, después de `var builder = WebApplication.CreateBuilder(args);`",
+          lenguaje: "csharp",
+          lineas: [
+            'builder.Services.AddOptions<PlazosDeSuspension>().BindConfiguration("Suspension");',
+          ],
+        },
+        {
+          etiqueta: "`Empresas.Historia/Handlers.cs` (con `using Microsoft.Extensions.Options;`)",
+          lenguaje: "csharp",
+          lineas: [
+            "public static async Task<OutgoingMessages> Handle(SuspenderEmpresa cmd, IDocumentSession session, IOptions<PlazosDeSuspension> plazos)",
+            "    // … igual que antes, hasta el plazo:",
+            "    salida.Delay(new RevisarSuspension(suspensionId), TimeSpan.FromSeconds(plazos.Value.PlazoEnSegundos));",
+          ],
+        },
+        {
+          etiqueta: "`Empresas.Tests/SuspenderHandlerTests.cs` (con `using Microsoft.Extensions.Options;`)",
+          lenguaje: "csharp",
+          lineas: [
+            "var plazos = Options.Create(new PlazosDeSuspension { PlazoEnSegundos = 5 });",
+            'var salida = await SuspenderHandler.Handle(new SuspenderEmpresa(id, "mora"), session, plazos);',
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "La variable gana",
       tarea: "Cambia el plazo sin tocar el archivo ni el código.",
@@ -271,6 +313,37 @@ export const seccion45: Seccion = {
           "Tus tests todavía leen `CADENA_POSTGRES`: en la terminal de `dotnet test`, fíjala.",
         ],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "rompelo",
+      titulo: "El socio que lee por su cuenta",
+      piezas: [
+        {
+          etiqueta: "`Facturacion/Conexion.cs` (con `using Microsoft.Extensions.Configuration;`)",
+          lenguaje: "csharp",
+          lineas: [
+            "public static class Conexion",
+            "{",
+            "    public static string Cadena(IConfiguration config)",
+            "    {",
+            '        var cadena = config.GetConnectionString("Postgres");',
+            '        return string.IsNullOrWhiteSpace(cadena) ? throw new InvalidOperationException("Falta ConnectionStrings:Postgres.") : cadena;',
+            "    }",
+            "}",
+          ],
+        },
+        {
+          etiqueta: "`Facturacion/FacturacionHandler.cs` (con el mismo `using`): un parámetro más, y la cadena desde él",
+          lenguaje: "csharp",
+          lineas: [
+            "public static object Handle(CobrarMultaV1 msg, IConfiguration config)",
+            "    // …",
+            "    using var c = new NpgsqlConnection(Conexion.Cadena(config)); c.Open();",
+          ],
+        },
+      ],
+      nota: "Cada `Conexion.Cadena` que quede deja de compilar, y el compilador te los lista. `PlanesHandler` también recibe `IConfiguration config`.",
     },
     {
       tipo: "aprendizaje",

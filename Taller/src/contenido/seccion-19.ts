@@ -66,6 +66,26 @@ export const seccion19: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Mide el rezago",
+      piezas: [
+        {
+          etiqueta: "En el código suelto, junto a `LeerCursor()`",
+          lenguaje: "csharp",
+          lineas: [
+            "long Rezago()",
+            "{",
+            "    long frente = FrenteDelDiario();   // SELECT COALESCE(MAX(seq), 0) FROM eventos",
+            "    long leido  = LeerCursor();        // el de la sección pasada: SELECT ultimo_seq FROM checkpoint WHERE nombre='empresas_estado'",
+            "    return frente - leido;",
+            "}",
+          ],
+        },
+      ],
+      nota: "`FrenteDelDiario()` es un `SELECT` de una línea, con el mismo patrón Npgsql que ya usas.",
+    },
+    {
       tipo: "rompelo",
       titulo: "Decidir leyendo la vista",
       tarea:

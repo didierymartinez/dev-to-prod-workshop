@@ -122,6 +122,57 @@ export const seccion43: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "La regla de identidad (1 de 2)",
+      piezas: [
+        {
+          etiqueta: "En `Empresas.Historia`: el read model",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Historia: el read model, una fila por empresa",
+            "public class Tablero",
+            "{",
+            '    public string Id { get; set; } = "";          // el id de la empresa',
+            '    public string Nombre { get; set; } = "";',
+            '    public string Plan { get; set; } = "";',
+            "    public string? Suspension { get; set; }        // el id del proceso vigente",
+            '    public string Facturacion { get; set; } = "-";',
+            '    public string Accesos { get; set; } = "-";',
+            '    public string Estado { get; set; } = "activa";',
+            "}",
+          ],
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "La regla de identidad (2 de 2)",
+      piezas: [
+        {
+          etiqueta: "La proyección, con su regla en el constructor",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Historia: la proyección que escucha a los dos streams",
+            "using JasperFx.Events;              // IEvent",
+            "using Marten.Events.Projections;    // MultiStreamProjection",
+            "",
+            "public partial class TableroProjection : MultiStreamProjection<Tablero, string>",
+            "{",
+            "    public TableroProjection()",
+            "    {",
+            "        // a qué tablero va cada hecho: los de la empresa, al suyo; los de un proceso, al de su empresa",
+            '        Identity<IEvent>(e => e.StreamKey!.StartsWith("susp-") ? EmpresaDe(e.StreamKey!) : e.StreamKey!);',
+            "    }",
+            "",
+            "    static string EmpresaDe(string suspensionId) =>",
+            "        suspensionId[\"susp-\".Length..suspensionId.LastIndexOf('-')];   // susp-emp-13-2 → emp-13",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "Un Apply por hecho",
       tarea:
@@ -139,6 +190,53 @@ export const seccion43: Seccion = {
           '    { if (e.StreamKey == t.Suspension) t.Facturacion = "Aplicado"; }',
         ],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Un Apply por hecho (1 de 2)",
+      piezas: [
+        {
+          etiqueta: "En `TableroProjection`: los de la empresa y el que abre la suspensión",
+          lenguaje: "csharp",
+          lineas: [
+            "    // del stream de la empresa",
+            "    public void Apply(EmpresaRegistrada e, Tablero t) { t.Nombre = e.Nombre; t.Plan = e.Plan; }",
+            "    public void Apply(PlanCambiado e, Tablero t)      { t.Plan = e.NuevoPlan; }",
+            '    public void Apply(EmpresaReactivada e, Tablero t) { t.Estado = "activa"; }',
+            "",
+            "    // del stream del proceso: SuspensionSolicitada fija cuál es la suspensión vigente…",
+            "    public void Apply(IEvent<SuspensionSolicitada> e, Tablero t)",
+            "    {",
+            '        t.Suspension = e.StreamKey; t.Facturacion = "EnCurso"; t.Accesos = "EnCurso"; t.Estado = "esperando";',
+            "    }",
+          ],
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Un Apply por hecho (2 de 2)",
+      piezas: [
+        {
+          etiqueta: "Y los del proceso, con la guarda",
+          lenguaje: "csharp",
+          lineas: [
+            "    // …y los demás solo cuentan si vienen de ella: la correlación",
+            '    public void Apply(IEvent<CobroDeMultaConfirmado> e, Tablero t)         { if (e.StreamKey == t.Suspension) t.Facturacion = "Aplicado"; }',
+            '    public void Apply(IEvent<CobroDeMultaRechazado> e, Tablero t)          { if (e.StreamKey == t.Suspension) t.Facturacion = "Rechazado"; }',
+            '    public void Apply(IEvent<RevocacionDeAccesosConfirmada> e, Tablero t)  { if (e.StreamKey == t.Suspension) t.Accesos = "Aplicado"; }',
+            '    public void Apply(IEvent<RestitucionDeAccesosSolicitada> e, Tablero t) { if (e.StreamKey == t.Suspension) t.Accesos = "Restituyendo"; }',
+            '    public void Apply(IEvent<RestitucionDeAccesosConfirmada> e, Tablero t) { if (e.StreamKey == t.Suspension) t.Accesos = "Restituido"; }',
+            '    public void Apply(IEvent<SuspensionEfectiva> e, Tablero t)             { if (e.StreamKey == t.Suspension) t.Estado = "efectiva"; }',
+            '    public void Apply(IEvent<ProcesoRevertido> e, Tablero t)               { if (e.StreamKey == t.Suspension) t.Estado = "revertida"; }',
+            '    public void Apply(IEvent<SuspensionVencida> e, Tablero t)              { if (e.StreamKey == t.Suspension) t.Estado = "vencida"; }',
+            "}",
+          ],
+        },
+      ],
+      nota: "Los hechos que no tienen `Apply` ni le llegan: Marten solo le entrega a la proyección los tipos que maneja.",
     },
     {
       tipo: "reto",
@@ -171,6 +269,24 @@ export const seccion43: Seccion = {
           '            $"fact={t.Facturacion} acc={t.Accesos} estado={t.Estado}");',
         ],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El tablero, al día",
+      piezas: [
+        {
+          etiqueta: "Dentro de `AddMarten`, en tu `Program.cs`",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Historia/Program.cs, dentro de AddMarten",
+            "opts.Projections.Add<SuspendidasProjection>(ProjectionLifecycle.Async);       // Async: solo la mira soporte; sin AddAsyncDaemon no avanza, y no avisa",
+            "opts.Projections.Add<EmpresaDetalleProjection>(ProjectionLifecycle.Inline);   // Inline: Facturación cobra con su respuesta; en Async cobra el plan viejo",
+            "opts.Projections.Add<TableroProjection>(ProjectionLifecycle.Async);           // nuevo · Async: la pantalla de soporte tolera ir un instante atrás",
+            "opts.Schema.For<EmpresaDetalle>().Metadata(m => m.Revision.MapTo(d => d.Version));",
+          ],
+        },
+      ],
     },
     {
       tipo: "reto",

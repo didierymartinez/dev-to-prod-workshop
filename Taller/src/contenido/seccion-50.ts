@@ -184,6 +184,59 @@ export const seccion50: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Una sola función (1 de 2)",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Historia/Configuracion.cs`: lo que todo host de Empresas comparte",
+          lenguaje: "csharp",
+          lineas: [
+            "// (los using que necesita lo que mudaste: JasperFx.Core, JasperFx.Events, Marten, Wolverine, …)",
+            "public static class Configuracion",
+            "{",
+            "    public static void AgregarEmpresas(this IHostApplicationBuilder builder)",
+            "    {",
+            '        builder.Configuration.AddKeyPerFile(builder.Configuration["DirectorioDeSecretos"] ?? "/run/secrets", optional: true);',
+            '        var cadena = builder.Configuration.GetConnectionString("Postgres");',
+            '        if (string.IsNullOrWhiteSpace(cadena)) throw new InvalidOperationException("Falta ConnectionStrings:Postgres.");',
+            "        builder.Services.AddOptions<PlazosDeSuspension>()",
+            "            // … como lo tenías, hasta .ValidateOnStart();",
+          ],
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Una sola función (2 de 2)",
+      piezas: [
+        {
+          etiqueta: "Sigue dentro de `AgregarEmpresas`",
+          lenguaje: "csharp",
+          lineas: [
+            "        builder.Services.AddMarten(opts =>",
+            "        {",
+            "            // … tu AddMarten entero: la cadena, StreamIdentity, CorrelationIdEnabled, Hechos.Registrar,",
+            "            //   las tres proyecciones con su porqué y la línea de Metadata",
+            "        })",
+            "        .UseLightweightSessions()",
+            "        .IntegrateWithWolverine()",
+            "        .AddAsyncDaemon(DaemonMode.Solo);",
+            "",
+            "        builder.Services.AddWolverine(opts =>",
+            "        {",
+            "            // … tu AddWolverine entero, y además:",
+            "            opts.Discovery.IncludeAssembly(typeof(Configuracion).Assembly);   // tus handlers, también si arranca otro proyecto",
+            "        });",
+            "    }",
+            "}",
+          ],
+        },
+      ],
+      nota: "En el `Program.cs` de tu servicio queda `builder.AgregarEmpresas();` en lugar de todo lo que mudaste.",
+    },
+    {
       tipo: "reto",
       titulo: "El worker, con la función",
       tarea:
@@ -244,6 +297,30 @@ export const seccion50: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El daemon, en una sola copia",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Historia/Configuracion.cs`",
+          lenguaje: "csharp",
+          lineas: [
+            "public static void AgregarEmpresas(this IHostApplicationBuilder builder, DaemonMode daemon)",
+            "    // … como antes, y al final de la cadena de AddMarten:",
+            "    .AddAsyncDaemon(daemon);   // cada host dice si corre el daemon",
+          ],
+        },
+        {
+          etiqueta: "Y cada host dice su papel al llamar",
+          lenguaje: "csharp",
+          lineas: [
+            "builder.AgregarEmpresas(DaemonMode.HotCold);    // el servicio: el daemon, en una de sus copias",
+            "builder.AgregarEmpresas(DaemonMode.Disabled);   // el worker: corre un rato y termina",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "El worker de ayer",
       tarea:
@@ -290,6 +367,31 @@ export const seccion50: Seccion = {
             "dice si Marten puede crear y cambiar tablas. Con `None` no las toca: si no coinciden, falla.",
         },
       ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Las tablas tienen dueño",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Historia/Configuracion.cs` (con `using JasperFx;` para `AutoCreate`)",
+          lenguaje: "csharp",
+          lineas: [
+            "public static void AgregarEmpresas(this IHostApplicationBuilder builder, DaemonMode daemon, AutoCreate esquema)",
+            "    // … y en tu AddMarten:",
+            "    opts.AutoCreateSchemaObjects = esquema;   // solo el dueño crea y cambia tablas",
+          ],
+        },
+        {
+          etiqueta: "Y en los dos `Program.cs`",
+          lenguaje: "csharp",
+          lineas: [
+            "builder.AgregarEmpresas(DaemonMode.HotCold, AutoCreate.CreateOrUpdate);   // el servicio: el único dueño de las tablas",
+            "builder.AgregarEmpresas(DaemonMode.Disabled, AutoCreate.None);            // el worker de ayer: 42883 … mt_quick_append_events … does not exist",
+          ],
+        },
+      ],
+      nota: "`mt_quick_append_events` es la función de Postgres con que Marten agrega hechos, y la del worker de ayer ya no existe.",
     },
     {
       tipo: "aprendizaje",

@@ -99,6 +99,36 @@ export const seccion47: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El rezago, en un header",
+      piezas: [
+        {
+          etiqueta: "La ficha, en `Program.cs`",
+          lenguaje: "csharp",
+          lineas: [
+            'app.MapGet("/empresas/{id}", async (string id, IQuerySession session, IDocumentStore store, HttpResponse respuesta) =>',
+            "{",
+            '    respuesta.Headers["X-Rezago"] = (await Rezago(store, "Tablero:All")).ToString();   // antes de responder, en las tres salidas',
+            "    // … la ficha, el diario y el 404, como antes …",
+            "});",
+          ],
+        },
+        {
+          etiqueta: "El listado",
+          lenguaje: "csharp",
+          lineas: [
+            'app.MapGet("/empresas/suspendidas", async (IQuerySession session, IDocumentStore store, HttpResponse respuesta) =>',
+            "{",
+            '    respuesta.Headers["X-Rezago"] = (await Rezago(store, "VistaSuspendida:All")).ToString();',
+            "    return await session.Query<VistaSuspendida>().Where(v => v.Suspendida).Select(v => v.Id).ToListAsync();",
+            "});",
+          ],
+        },
+      ],
+      nota: "Con `X-Rezago: 0`, la vista tiene todo lo que el diario tenía al responder. Con más de 0, la pantalla sabe que puede faltarle algo.",
+    },
+    {
       tipo: "reto",
       titulo: "La pantalla vuelve a pedir",
       tarea:
@@ -150,6 +180,28 @@ export const seccion47: Seccion = {
           "    (await session.LoadAsync<VistaSuspendida>(id))?.Suspensiones ?? 0);",
         ],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "rompelo",
+      titulo: "El cero que significa «todavía no»",
+      piezas: [
+        {
+          etiqueta: "La cuenta de suspensiones, en `Program.cs`",
+          lenguaje: "csharp",
+          lineas: [
+            'app.MapGet("/empresas/{id}/suspensiones", async (string id, IQuerySession session, IDocumentStore store, HttpResponse respuesta) =>',
+            "{",
+            '    respuesta.Headers["X-Rezago"] = (await Rezago(store, "VistaSuspendida:All")).ToString();   // un 0 o un 1 también pueden ir atrás',
+            "    var vista = await session.LoadAsync<VistaSuspendida>(id);",
+            "    if (vista is not null) return Results.Ok(vista.Suspensiones);",
+            "    return await session.Events.FetchStreamStateAsync(id) is null",
+            "        ? Results.NotFound()",
+            '        : Results.Accepted(value: new { Id = id, Estado = "en proceso" });',
+            "});",
+          ],
+        },
+      ],
     },
     {
       tipo: "reto",
@@ -205,6 +257,30 @@ export const seccion47: Seccion = {
             "`(pagina, tamaño)`, con `using Marten.Pagination;`: trae solo esa página, con `PageNumber` y `HasNextPage`. Necesita un `OrderBy`.",
         },
       ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Una página de 50",
+      piezas: [
+        {
+          etiqueta: "El listado, en `Program.cs` (con `using Marten.Pagination;`)",
+          lenguaje: "csharp",
+          lineas: [
+            'app.MapGet("/empresas/suspendidas", async (int? pagina, IQuerySession session, IDocumentStore store, HttpResponse respuesta) =>',
+            "{",
+            '    respuesta.Headers["X-Rezago"] = (await Rezago(store, "VistaSuspendida:All")).ToString();',
+            "    var p = await session.Query<VistaSuspendida>()",
+            "        .Where(v => v.Suspendida)",
+            "        .OrderBy(v => v.Id)                          // un orden fijo, sobre la llave del documento",
+            "        .Select(v => v.Id)",
+            "        .ToPagedListAsync(pagina ?? 1, 50);          // el tamaño lo pone el servidor",
+            "    return new { Empresas = p, Pagina = p.PageNumber, HayMas = p.HasNextPage };",
+            "});",
+          ],
+        },
+      ],
+      nota: "El orden va por `Id`, la llave del documento, que ya tiene índice.",
     },
     {
       tipo: "reto",

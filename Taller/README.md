@@ -34,6 +34,7 @@ La presentación es para que el grupo se guíe mientras trabaja, no la guía pas
 | 💥 El problema | la pregunta y el dolor, revelados de a uno | **Abre así** y **Haz sentir el dolor** |
 | 🛠️ Reto | **una pantalla por reto**, a la vista mientras trabajan: *Tu tarea* (qué hay que lograr, en una o dos frases), *Haz esto* (los pasos que la detallan), *Lo logras cuando* (la salida que deben ver y las comprobaciones) y *Tips* (lo nuevo de C#, una pista, un ejemplo de código) | **Dicta los pasos**, las piezas 🆕 y el **Punto de control** |
 | 🛠️ Código | el código que deben copiar, a todo lo ancho, cuando un reto o un 🔨 lo necesita | lo que la guía te pide mostrar en pantalla |
+| 👉 Una forma de hacerlo | después de cada reto: cómo queda el resultado, por piezas y con dónde va cada una. Pasas a ella cuando el grupo ya lo intentó | el `<details>` «Muéstrame una forma de hacerlo» de la sección |
 | 🔨 Rómpelo | igual que un reto | **Rómpelo** |
 | 🧠 Lo que te llevas | la idea, los nombres que aprendieron, la línea de `DECISIONES.md`, el commit con la pregunta de su reflexión y lo que viene | **Cierra con**, los «Nombra:» y el **Puente** |
 

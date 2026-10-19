@@ -143,6 +143,31 @@ export const seccion67: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Volcar, sin confirmar",
+      piezas: [
+        {
+          etiqueta: "En `MartenUnitOfWork`: `Volcar` y el `CommitAsync` que lo usa",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Historia/MartenUnitOfWork.cs: CommitAsync, partido en dos",
+            "public void Volcar()   // los hechos de lo que rastrea, a la sesión, sin confirmar",
+            "{",
+            "    foreach (var a in _nuevos)      _s.Events.StartStream(a.Id, a.SinConfirmar.ToArray());",
+            "    foreach (var a in _modificados) if (a.SinConfirmar.Count > 0) _s.Events.Append(a.Id, a.SinConfirmar.ToArray());",
+            "}",
+            "public async Task CommitAsync()   // fuera de un handler: confirmas tú",
+            "{",
+            "    Volcar();",
+            "    await _s.SaveChangesAsync();",
+            "    foreach (var a in _nuevos.Concat(_modificados)) a.MarcarConfirmados();",
+            "}",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "El middleware que vuelca",
       tarea:
@@ -164,6 +189,33 @@ export const seccion67: Seccion = {
           k: "nota",
           texto:
             "Si el handler y el middleware piden una `MartenUnitOfWork`, Wolverine crea una por mensaje, con la sesión del mensaje, y les pasa la misma. No la registras en el contenedor.",
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El middleware que vuelca",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Historia/UnidadDeTrabajoMiddleware.cs`",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Historia/UnidadDeTrabajoMiddleware.cs: después del handler, antes del SaveChangesAsync de Wolverine",
+            "public class UnidadDeTrabajoMiddleware",
+            "{",
+            "    public void After(MartenUnitOfWork uow) => uow.Volcar();",
+            "}",
+          ],
+        },
+        {
+          etiqueta: "`Empresas.Historia/Configuracion.cs`, en el `AddWolverine` de tu `AgregarEmpresas`",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Historia/Configuracion.cs, en el AddWolverine de tu AgregarEmpresas",
+            "opts.Policies.AddMiddleware<UnidadDeTrabajoMiddleware>();   // NO quitar: sin esto, un handler con la plantilla responde y no guarda nada",
+            "opts.Policies.AutoApplyTransactions();",
+          ],
         },
       ],
     },
@@ -212,6 +264,59 @@ export const seccion67: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Un test que lo fija (1 de 2)",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Tests/LaPlantillaEnElHandler.cs`: la clase y el dado",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Tests/LaPlantillaEnElHandler.cs: la plantilla dentro de un handler, en tu host",
+            "using Marten;",
+            "using Microsoft.Extensions.DependencyInjection;",
+            "using Wolverine;   // IMessageBus",
+            "",
+            "[Collection(\"host\")]",
+            "public class LaPlantillaEnElHandler(HostDePrueba app)",
+            "{",
+            "    [Fact]",
+            "    public async Task El_handler_no_confirma_y_sus_hechos_quedan()",
+            "    {",
+            "        var store = app.Services.GetRequiredService<IDocumentStore>();",
+            "        var id = $\"emp-{Guid.NewGuid():N}\";",
+            "        await using (var s = store.LightweightSession(\"acme\"))   // el dado, fuera de un handler: aquí confirmas tú",
+            "        {",
+            "            var uow = new MartenUnitOfWork(s);",
+            "            uow.Registrar(Empresa.Registrar(id, $\"nit-{id}\", \"Andes\", \"Basico\"));",
+            "            await uow.CommitAsync();",
+            "        }",
+          ],
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Un test que lo fija (2 de 2)",
+      piezas: [
+        {
+          etiqueta: "Sigue dentro del `[Fact]`: el comando por el bus, y sus hechos",
+          lenguaje: "csharp",
+          lineas: [
+            "        using var scope = app.Services.CreateScope();   // el bus es scoped, como la sesión de un endpoint",
+            "        var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();",
+            "        await bus.InvokeForTenantAsync(\"acme\", new SuspenderEmpresa(id, \"mora\"));   // el handler no confirma nada",
+            "",
+            "        await using var q = store.LightweightSession(\"acme\");",
+            "        Assert.Equal(2, (await q.Events.FetchStreamAsync(id)).Count);   // el registro y la suspensión",
+            "    }",
+            "}",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "planteamiento",
       titulo: "El cron no cobra",
       bloques: [
@@ -258,6 +363,22 @@ export const seccion67: Seccion = {
           k: "piensa",
           texto:
             "Filtra por el parámetro, no por el mensaje: así entra en el próximo handler que pida la unidad de trabajo, y no en el próximo trabajo sin tenant.",
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El middleware, solo donde se pide",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Historia/Configuracion.cs`: el mismo `AddMiddleware`, con un filtro",
+          lenguaje: "csharp",
+          lineas: [
+            "// Empresas.Historia/Configuracion.cs, en el AddWolverine de tu AgregarEmpresas: el mismo AddMiddleware, con un filtro",
+            "opts.Policies.AddMiddleware<UnidadDeTrabajoMiddleware>(chain =>   // NO quitar: sin esto, un handler con la plantilla responde y no guarda nada",
+            "    chain.Handlers.Any(h => h.Method.GetParameters().Any(p => p.ParameterType == typeof(MartenUnitOfWork))));   // sin el filtro, el cron deja de cobrar sin un error: su disparo, sin tenant, cae a dead letters",
+          ],
         },
       ],
     },

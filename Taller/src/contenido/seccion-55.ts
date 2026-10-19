@@ -301,6 +301,26 @@ export const seccion55: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El worker dice su tenant",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Worker/Program.cs`",
+          lenguaje: "csharp",
+          lineas: [
+            "var tenant = args[1];   // la organización del archivo",
+            "foreach (var linea in await File.ReadAllLinesAsync(args[0]))",
+            "{",
+            "    var campos = linea.Split(';');",
+            "    await bus.InvokeForTenantAsync(tenant, new CambiarPlanDeEmpresa(campos[0], campos[1]));",
+            '    Console.WriteLine($"{campos[0]}: plan {campos[1]}");',
+            "}",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "El tenant viaja en el sobre",
       tarea:

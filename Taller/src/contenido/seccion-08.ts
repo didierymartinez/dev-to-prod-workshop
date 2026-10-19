@@ -61,6 +61,34 @@ export const seccion08: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Un cajón por empresa",
+      piezas: [
+        {
+          etiqueta: "**Al final** del `Program.cs`: el almacén",
+          lenguaje: "csharp",
+          lineas: [
+            "public class EventStore",
+            "{",
+            "    private readonly Dictionary<string, List<object>> _cajones = new();",
+            "",
+            "    public List<object> GetEvents(string aggregateId)",
+            "        => _cajones.ContainsKey(aggregateId) ? _cajones[aggregateId] : new();",
+            "",
+            "    public void AppendEvent(string aggregateId, object hecho)",
+            "    {",
+            "        if (!_cajones.ContainsKey(aggregateId))   // 1ª vez: crea el cajón EN el diccionario",
+            "            _cajones[aggregateId] = new();",
+            "        _cajones[aggregateId].Add(hecho);",
+            "    }",
+            "}",
+          ],
+        },
+      ],
+      nota: "`_cajones[id]` lanza `KeyNotFoundException` si la llave no existe: por eso `GetEvents` comprueba con `ContainsKey`.",
+    },
+    {
       tipo: "reto",
       titulo: "El stream delega",
       tarea:
@@ -73,6 +101,41 @@ export const seccion08: Seccion = {
       logro: {
         items: ["Solo falla el `new EventStream<Empresa>()` de arriba."],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El stream delega",
+      piezas: [
+        {
+          etiqueta: "Reemplaza tu `EventStream<T>`: ya no guarda la lista",
+          lenguaje: "csharp",
+          lineas: [
+            "// 🔁 Reemplaza el EventStream<T> de «El flujo de vida»: ya no guarda la lista; habla con el almacén",
+            "public class EventStream<T> where T : AggregateRoot, new()",
+            "{",
+            "    private readonly EventStore _store;",
+            "    private readonly string _aggregateId;",
+            "",
+            "    public EventStream(EventStore store, string aggregateId)",
+            "    {",
+            "        _store = store;",
+            "        _aggregateId = aggregateId;",
+            "    }",
+            "",
+            "    public T Get()                       // LEER: trae los hechos del cajón y rehidrata",
+            "    {",
+            "        var entidad = new T();",
+            "        entidad.Load(_store.GetEvents(_aggregateId));",
+            "        return entidad;",
+            "    }",
+            "",
+            "    public void Append(object hecho)     // ESCRIBIR: al cajón de esta empresa",
+            "        => _store.AppendEvent(_aggregateId, hecho);",
+            "}",
+          ],
+        },
+      ],
     },
     {
       tipo: "reto",
@@ -109,6 +172,22 @@ export const seccion08: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El almacén te entrega el stream",
+      piezas: [
+        {
+          etiqueta: "Dentro de `EventStore`",
+          lenguaje: "csharp",
+          lineas: [
+            "// AbrirStream vive en EventStore, así que this = el propio almacén; se lo pasamos al stream para que sepa a quién llamar",
+            "public EventStream<T> AbrirStream<T>(string aggregateId) where T : AggregateRoot, new()",
+            "    => new(this, aggregateId);",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "El comando dice qué empresa",
       tarea:
@@ -119,6 +198,40 @@ export const seccion08: Seccion = {
         "En su `Handle`, abren la empresa con `store.AbrirStream<Empresa>(cmd.EmpresaId)`.",
       ],
       logro: { items: ["Compila."] },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El comando dice qué empresa",
+      piezas: [
+        {
+          etiqueta: "Los comandos, con su id",
+          lenguaje: "csharp",
+          lineas: [
+            "// 🔁 el comando ahora dice de QUÉ empresa habla",
+            "public record CambiarPlanDeEmpresa(string EmpresaId, string NuevoPlan);",
+            "public record SuspenderEmpresa(string EmpresaId, string Motivo);",
+          ],
+        },
+        {
+          etiqueta: "El handler recibe el almacén y abre la empresa por id",
+          lenguaje: "csharp",
+          lineas: [
+            "// 🔁 el handler recibe el almacén y abre el stream por id",
+            "public class SuspenderHandler(EventStore store) : ICommandHandler<SuspenderEmpresa>",
+            "{",
+            "    public void Handle(SuspenderEmpresa cmd)",
+            "    {",
+            "        var stream  = store.AbrirStream<Empresa>(cmd.EmpresaId);   // buscar por id",
+            "        var empresa = stream.Get();",
+            "        var hecho   = empresa.Suspender(cmd.Motivo);",
+            "        if (hecho is not null) stream.Append(hecho);",
+            "    }",
+            "}",
+          ],
+        },
+      ],
+      nota: "`CambiarPlanHandler` cambia **igual**: recibe el `EventStore`, abre por `cmd.EmpresaId` y lee `cmd.NuevoPlan`.",
     },
     {
       tipo: "reto",

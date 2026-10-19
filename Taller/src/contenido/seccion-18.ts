@@ -100,6 +100,36 @@ export const seccion18: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El proyector",
+      piezas: [
+        {
+          etiqueta: "En el código suelto del `Program.cs`: `CorrerProyector`",
+          lenguaje: "csharp",
+          lineas: [
+            "int CorrerProyector()",
+            "{",
+            "    long desde = LeerCursor();                       // SELECT ultimo_seq FROM checkpoint WHERE nombre='empresas_estado'",
+            "    var nuevos = HechosDesde(desde);                 // SELECT seq, stream FROM eventos WHERE seq > desde ORDER BY seq",
+            "    long ultimo = desde;",
+            "    int aplicados = 0;",
+            "    foreach (var (seq, stream) in nuevos)",
+            "    {",
+            "        var empresa = store.AbrirStream<Empresa>(stream).Get();   // rehidrata del diario",
+            "        vista.Actualizar(stream, empresa);                        // la fila completa: suspendida Y plan",
+            "        ultimo = seq;",
+            "        aplicados++;",
+            "    }",
+            "    GuardarCursor(ultimo);                            // UPDATE checkpoint SET ultimo_seq=@ultimo WHERE nombre='empresas_estado'",
+            "    return aplicados;",
+            "}",
+          ],
+        },
+      ],
+      nota: "Los handlers vuelven a una **sola** escritura: `Append`. La vista es problema del proyector.",
+    },
+    {
       tipo: "reto",
       titulo: "Proyecta dos veces",
       tarea:

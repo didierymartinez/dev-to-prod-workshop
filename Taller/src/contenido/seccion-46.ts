@@ -147,6 +147,29 @@ export const seccion46: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Todavía no, o no existe",
+      piezas: [
+        {
+          etiqueta: "Tu `GET /empresas/{id}`, en `Program.cs`",
+          lenguaje: "csharp",
+          lineas: [
+            'app.MapGet("/empresas/{id}", async (string id, IQuerySession session) =>',
+            "{",
+            "    var ficha = await session.LoadAsync<Tablero>(id);",
+            "    if (ficha is not null) return Results.Ok(ficha);                     // la vista ya la tiene",
+            "    var stream = await session.Events.FetchStreamStateAsync(id);         // ¿existe? lo dice el diario",
+            "    return stream is null",
+            "        ? Results.NotFound()",
+            '        : Results.Accepted(value: new { Id = id, Estado = "en proceso" });   // existe, y la vista no ha llegado',
+            "});",
+          ],
+        },
+      ],
+      nota: "La existencia la dice el diario; la vista responde lo que ya proyectó.",
+    },
+    {
       tipo: "rompelo",
       titulo: "Esperar al diario",
       tarea:
@@ -241,6 +264,32 @@ export const seccion46: Seccion = {
           idioma: "Idempotency-Key",
           explicacion:
             "un header que el cliente inventa una vez por pago y repite en cada reintento de ese pago.",
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "La llave la inventa el cliente",
+      piezas: [
+        {
+          etiqueta: "El endpoint de pagos, en `Program.cs` (con `using Microsoft.AspNetCore.Mvc;`)",
+          lenguaje: "csharp",
+          lineas: [
+            'app.MapPost("/empresas/{id}/pagos", async (string id, int monto, [FromHeader(Name = "Idempotency-Key")] string? llave, IMessageBus bus) =>',
+            "{",
+            '    if (string.IsNullOrWhiteSpace(llave)) return Results.BadRequest("Falta el header Idempotency-Key.");',
+            "    await bus.InvokeAsync(new RegistrarPago(id, llave, monto));   // la llave del cliente es la referencia",
+            "    return Results.Ok();",
+            "});",
+          ],
+        },
+        {
+          etiqueta: "Y el pago, con su llave",
+          lenguaje: "bash",
+          lineas: [
+            'curl -i -X POST "http://localhost:5000/empresas/emp-78/pagos?monto=50000" -H "Idempotency-Key: pago-78-1"',
+          ],
         },
       ],
     },

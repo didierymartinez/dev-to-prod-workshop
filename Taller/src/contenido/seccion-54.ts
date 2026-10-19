@@ -154,6 +154,58 @@ export const seccion54: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Avisa lo confirmado (1 de 2)",
+      piezas: [
+        {
+          etiqueta: "En `Contratos`: lo confirmado, para quien quiera saber",
+          lenguaje: "csharp",
+          lineas: [
+            '[MessageIdentity("empresas.suspension-efectiva.v1")]',
+            "public record SuspensionEfectivaV1(string SuspensionId, string Nit);",
+          ],
+        },
+        {
+          etiqueta:
+            "`Empresas.Historia/ProcesoDeSuspensionHandler.cs` (con `using Wolverine;`): `Decidir` y los cinco `Handle` devuelven `Task<OutgoingMessages>`",
+          lenguaje: "csharp",
+          lineas: [
+            "public static Task<OutgoingMessages> Handle(MultaCobradaV2 m, IDocumentSession s, ILogger log) => Decidir(s, log, m.SuspensionId, p => p.ConfirmarCobroDeMulta(m.CobradaEl));",
+            "// … igual en los otros cuatro …",
+            "static async Task<OutgoingMessages> Decidir(IDocumentSession session, ILogger log, string suspensionId, Func<SuspensionDeEmpresa, object[]> decidir)",
+            "    // … como antes, hasta los hechos:",
+            "    var salida = new OutgoingMessages();",
+            "    var hechos = decidir(proceso);",
+            "    if (hechos.Length == 0)",
+            "    {",
+            '        log.LogInformation("{SuspensionId}: el mensaje no cambia el proceso, se descarta", suspensionId);',
+            "        return salida;   // nada nuevo: no sale nada",
+            "    }",
+            "    // … los Append, igual que antes",
+            "    if (hechos.OfType<RestitucionDeAccesosSolicitada>().Any()) salida.Add(new RestituirAccesosV2(suspensionId, proceso.Nit));",
+            "    if (hechos.OfType<SuspensionEfectiva>().Any()) salida.Add(new SuspensionEfectivaV1(suspensionId, proceso.Nit));   // lo confirmado",
+            "    return salida;",
+          ],
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Avisa lo confirmado (2 de 2)",
+      piezas: [
+        {
+          etiqueta: "En `EnVivoHandler`: el productor escucha lo confirmado",
+          lenguaje: "csharp",
+          lineas: [
+            "public static void Handle(SuspensionEfectivaV1 aviso) => EnVivo.Canal.Writer.TryWrite(aviso.Nit);",
+          ],
+        },
+      ],
+      nota: "Solo llega `904100000`, y llega cuando los dos socios contestaron.",
+    },
+    {
       tipo: "rompelo",
       titulo: "El empuje en la proyección",
       tarea:
@@ -251,6 +303,47 @@ export const seccion54: Seccion = {
           "}",
         ],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El contrato fija nombre y forma",
+      piezas: [
+        {
+          etiqueta:
+            "En `Contratos`: la forma del aviso es el record; su nombre, la constante",
+          lenguaje: "csharp",
+          lineas: [
+            '[MessageIdentity("empresas.suspension-efectiva.v1")]',
+            "public record SuspensionEfectivaV1(string SuspensionId, string Nit)",
+            "{",
+            '    public const string Tipo = "suspension-efectiva";   // el nombre del evento en vivo',
+            "}",
+          ],
+        },
+        {
+          etiqueta: "En `EnVivo`: el canal lleva el contrato",
+          lenguaje: "csharp",
+          lineas: [
+            "public static class EnVivo { public static readonly Channel<SuspensionEfectivaV1> Canal = Channel.CreateUnbounded<SuspensionEfectivaV1>(); }",
+            "public static void Handle(SuspensionEfectivaV1 aviso) => EnVivo.Canal.Writer.TryWrite(aviso);   // en EnVivoHandler",
+          ],
+        },
+        {
+          etiqueta: "En `Program.cs`: el endpoint usa la constante",
+          lenguaje: "csharp",
+          lineas: [
+            'app.MapGet("/suspensiones/en-vivo", (CancellationToken ct) =>',
+            "    TypedResults.ServerSentEvents(Leer(ct), eventType: SuspensionEfectivaV1.Tipo));",
+            "",
+            "static async IAsyncEnumerable<SuspensionEfectivaV1> Leer([EnumeratorCancellation] CancellationToken ct)",
+            "{",
+            "    await foreach (var aviso in EnVivo.Canal.Reader.ReadAllAsync(ct))",
+            "        yield return aviso;",
+            "}",
+          ],
+        },
+      ],
     },
     {
       tipo: "reto",

@@ -139,6 +139,34 @@ export const seccion31: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Tu Empresa, para Marten",
+      piezas: [
+        {
+          etiqueta: "Tu `Empresa`: sin base, sin verbos, un `Apply` por hecho",
+          lenguaje: "csharp",
+          lineas: [
+            "public class Empresa",
+            "{",
+            "    public string Id { get; private set; }",
+            "    public string Nit { get; private set; }        // sigue guardando lo que ya guardabas",
+            "    public string Nombre { get; private set; }",
+            "    public string Plan { get; private set; }",
+            "    public bool Suspendida { get; private set; }",
+            "    public int Reactivaciones { get; private set; }",
+            "    // (tu Empresa conserva también DeudaPendiente y su Apply(PagoRegistrado); los omitimos aquí para no alargar)",
+            "",
+            "    public void Apply(EmpresaRegistrada e) { Nit = e.Nit; Nombre = e.Nombre; Plan = e.Plan; }",
+            "    public void Apply(PlanCambiado e)      { Plan = e.NuevoPlan; }",
+            "    public void Apply(EmpresaSuspendida e) { Suspendida = true; }",
+            "    public void Apply(EmpresaReactivada e) { Suspendida = false; Reactivaciones++; }",
+            "}",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "La limpieza",
       tarea:
@@ -197,6 +225,57 @@ export const seccion31: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Escribir y rehidratar (1 de 2)",
+      piezas: [
+        {
+          etiqueta: "En `Program.cs`: nacer un stream nuevo",
+          lenguaje: "csharp",
+          lineas: [
+            "// nacer un stream nuevo (tu registro, menos la fila del localizador) — todo async",
+            "await using (var s = store.LightweightSession())",
+            "{",
+            '    s.Events.StartStream<Empresa>("emp-7",',
+            '        new EmpresaRegistrada("900123", "Andes", "Basico"), new EmpresaSuspendida("mora"));',
+            "    await s.SaveChangesAsync();",
+            "}",
+          ],
+        },
+        {
+          etiqueta: "Debajo: agregar hechos a un stream existente",
+          lenguaje: "csharp",
+          lineas: [
+            "// agregar hechos a un stream existente",
+            "await using (var s = store.LightweightSession())",
+            "{",
+            '    s.Events.Append("emp-7", new EmpresaReactivada());',
+            "    await s.SaveChangesAsync();",
+            "}",
+          ],
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Escribir y rehidratar (2 de 2)",
+      piezas: [
+        {
+          etiqueta: "Debajo: **rehidratar**, tu `AbrirStream(...).Get()`, ahora de Marten",
+          lenguaje: "csharp",
+          lineas: [
+            "// rehidratar (tu AbrirStream(...).Get(), ahora de Marten): reproduce los hechos, respeta tus setters privados",
+            "await using (var s = store.LightweightSession())",
+            "{",
+            '    var e = await s.Events.AggregateStreamAsync<Empresa>("emp-7");',
+            '    Console.WriteLine($"Suspendida={e!.Suspendida} Reactivaciones={e.Reactivaciones} Plan={e.Plan}");   // Suspendida=False Reactivaciones=1 Plan=Basico',
+            "}",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "El choque",
       tarea:
@@ -230,6 +309,31 @@ export const seccion31: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El choque",
+      piezas: [
+        {
+          etiqueta: "En `Program.cs`, debajo: dos sesiones, `a` y `b`",
+          lenguaje: "csharp",
+          lineas: [
+            "// concurrencia optimista, integrada: dos escritores leen la misma versión de emp-7",
+            "await using var a = store.LightweightSession();",
+            "await using var b = store.LightweightSession();",
+            'var estadoA = await a.Events.FetchStreamStateAsync("emp-7");   // Version == 3',
+            'var estadoB = await b.Events.FetchStreamStateAsync("emp-7");   // Version == 3: la misma',
+            "",
+            "// el número es la versión que tendrá el stream TRAS el append: la leída + los hechos que agregas",
+            'a.Events.Append("emp-7", estadoA!.Version + 1, new EmpresaSuspendida("x"));',
+            "await a.SaveChangesAsync();   // el primero entra: emp-7 queda en la versión 4",
+            "",
+            'b.Events.Append("emp-7", estadoB!.Version + 1, new EmpresaSuspendida("x"));',
+            "await b.SaveChangesAsync();   // el segundo lanza EventStreamUnexpectedMaxEventIdException — tu ConcurrencyException, de Marten",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "El NIT, en un documento",
       tarea:
@@ -253,6 +357,36 @@ export const seccion31: Seccion = {
             "`Insert` lanza si el `Id` existe. `Store` sobrescribe **sin avisar**.",
         },
       ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El NIT, en un documento",
+      piezas: [
+        {
+          etiqueta: "En `Empresas.Historia`: el localizador de §23, ahora un documento de Marten",
+          lenguaje: "csharp",
+          lineas: [
+            "public class Localizador",
+            "{",
+            '    public string Id { get; set; } = "";       // el NIT: la llave del documento',
+            '    public string Stream { get; set; } = "";   // el stream de esa empresa',
+            "}",
+          ],
+        },
+        {
+          etiqueta: "En `Empresas.Historia/Program.cs`: el registro con su NIT, en una sola sesión",
+          lenguaje: "csharp",
+          lineas: [
+            "void Sembrar(IDocumentSession session, string id, string nit, string nombre, string plan)",
+            "{",
+            "    session.Insert(new Localizador { Id = nit, Stream = id });                            // reserva el NIT",
+            "    session.Events.StartStream<Empresa>(id, new EmpresaRegistrada(nit, nombre, plan));   // y nace el stream",
+            "}",
+          ],
+        },
+      ],
+      nota: "Es tu `GuardarNuevo` de §23: la `PRIMARY KEY` es el `Id` del documento, y la transacción la abre `SaveChangesAsync`.",
     },
     {
       tipo: "reto",
@@ -335,6 +469,75 @@ export const seccion31: Seccion = {
           ],
         },
       ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Los hechos, en un solo lugar (1 de 2)",
+      piezas: [
+        {
+          etiqueta: "En `Empresas.Historia`, con `using Marten;` arriba: los hechos que Marten conoce, en un solo lugar",
+          lenguaje: "csharp",
+          lineas: [
+            "public static class Hechos",
+            "{",
+            "    public static void Registrar(StoreOptions opts)",
+            "    {",
+            "        opts.Events.AddEventType<EmpresaRegistrada>();",
+            "        opts.Events.AddEventType<PlanCambiado>();",
+            "        opts.Events.AddEventType<EmpresaSuspendida>();",
+            "        opts.Events.AddEventType<EmpresaReactivada>();",
+            "        opts.Events.AddEventType<PagoRegistrado>();",
+            "    }",
+            "}",
+          ],
+        },
+        {
+          etiqueta: "En `Empresas.Historia/Program.cs`: tu store del Paso 1, con la lista",
+          lenguaje: "csharp",
+          lineas: [
+            "var store = DocumentStore.For(opts =>",
+            "{",
+            "    opts.Connection(cadena);",
+            "    opts.Events.StreamIdentity = StreamIdentity.AsString;",
+            "    Hechos.Registrar(opts);   // los mismos hechos que vigila el test",
+            "});",
+          ],
+        },
+      ],
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Los hechos, en un solo lugar (2 de 2)",
+      piezas: [
+        {
+          etiqueta: "`Empresas.Tests/NombresDeLosHechos.cs`, con `using Marten;` arriba y una línea por hecho",
+          lenguaje: "csharp",
+          lineas: [
+            "public class NombresDeLosHechos",
+            "{",
+            "    [Fact]",
+            "    public void Cada_hecho_conserva_su_alias()",
+            "    {",
+            "        using var store = DocumentStore.For(opts =>",
+            "        {",
+            '            opts.Connection("Host=localhost");   // nunca se conecta: leer los alias no toca la base',
+            "            Hechos.Registrar(opts);",
+            "        });",
+            "        var alias = store.Events.AllKnownEventTypes().ToDictionary(t => t.EventType, t => t.EventTypeName);",
+            "",
+            '        Assert.Equal("empresa_registrada", alias[typeof(EmpresaRegistrada)]);',
+            '        Assert.Equal("plan_cambiado",      alias[typeof(PlanCambiado)]);',
+            '        Assert.Equal("empresa_suspendida", alias[typeof(EmpresaSuspendida)]);',
+            '        Assert.Equal("empresa_reactivada", alias[typeof(EmpresaReactivada)]);',
+            '        Assert.Equal("pago_registrado",    alias[typeof(PagoRegistrado)]);',
+            "    }",
+            "}",
+          ],
+        },
+      ],
+      nota: "Desde aquí, cada hecho nuevo gana su línea en `Hechos.Registrar`.",
     },
     {
       tipo: "rompelo",

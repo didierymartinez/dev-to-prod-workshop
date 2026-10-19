@@ -221,6 +221,34 @@ export const seccion58: Seccion = {
       },
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El disparo, aparte del trabajo",
+      piezas: [
+        {
+          etiqueta: "En `Facturacion/CobroDelMes.cs`",
+          lenguaje: "csharp",
+          lineas: [
+            "public record DisparoMensual(DateTimeOffset Mes);   // no cobra: programa",
+            "",
+            "public static class DisparoMensualHandler",
+            "{",
+            "    public static OutgoingMessages Handle(DisparoMensual d)",
+            "    {",
+            "        var salida = new OutgoingMessages();",
+            "        salida.Add(new CobrarElMes(d.Mes));                                              // el trabajo de este mes, en su propio mensaje",
+            "        salida.Add(new DisparoMensual(d.Mes.AddSeconds(10)).DelayedFor(10.Seconds()));   // el mes siguiente, pase lo que pase con este",
+            "        return salida;",
+            "    }",
+            "}",
+            "",
+            "// CobroDelMesHandler: el mismo Handle, ahora async Task y sin el return",
+            "// PrimeraVuelta: PublishAsync(new DisparoMensual(DateTimeOffset.UtcNow))",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "Un mes falla solo",
       tarea:

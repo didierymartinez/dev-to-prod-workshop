@@ -113,6 +113,41 @@ export const seccion33: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "Cobra una sola vez",
+      piezas: [
+        {
+          etiqueta: "`Facturacion/FacturacionHandler.cs`",
+          lenguaje: "csharp",
+          lineas: [
+            "using Contratos;   // EmpresaSuspendidaV1",
+            "using Npgsql;",
+            "using Wolverine;   // Envelope",
+            "",
+            "public static class MundoExterno { public static List<string> Recibidos = new(); }   // de §32, sigue aquí",
+            "",
+            "public static class FacturacionHandler",
+            "{",
+            "    public static void Handle(EmpresaSuspendidaV1 msg, Envelope envelope)",
+            "    {",
+            "        // registra el id del mensaje; si ya estaba, no hago nada (dedup)",
+            "        using var c = new NpgsqlConnection(Conexion.Cadena); c.Open();",
+            "        using var cmd = c.CreateCommand();",
+            '        cmd.CommandText = "INSERT INTO procesados(mensaje_id) VALUES(@id) ON CONFLICT (mensaje_id) DO NOTHING";',
+            '        cmd.Parameters.AddWithValue("id", envelope.Id);',
+            "        if (cmd.ExecuteNonQuery() == 1)          // 1 = era nuevo; 0 = reentrega, ya lo procesé",
+            "            CobrarMulta(msg.Nit);                // el efecto que acumula, una sola vez",
+            "    }",
+            "",
+            '    static void CobrarMulta(string nit) => MundoExterno.Recibidos.Add($"multa NIT {nit}");   // el efecto que acumula',
+            "}",
+          ],
+        },
+      ],
+      nota: "Si el cobro es una escritura tuya, el `INSERT` en `procesados` y el cobro van en la **misma** transacción.",
+    },
+    {
       tipo: "reto",
       titulo: "La reentrega, simulada",
       tarea:
@@ -182,6 +217,34 @@ export const seccion33: Seccion = {
       ],
     },
     {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "La empresa recuerda la referencia",
+      piezas: [
+        {
+          etiqueta: "En `Empresas.Historia`: el hecho gana la referencia",
+          lenguaje: "csharp",
+          lineas: [
+            "public record PagoRegistrado(int Monto, string? Referencia = null);       // los hechos viejos no la traen: se leen con null",
+          ],
+        },
+        {
+          etiqueta: "En tu `Empresa` (lo de siempre se queda; esto se añade o cambia)",
+          lenguaje: "csharp",
+          lineas: [
+            "private readonly HashSet<string> _referenciasDePago = new();",
+            "public bool YaRegistro(string referencia) => _referenciasDePago.Contains(referencia);",
+            "",
+            "public void Apply(PagoRegistrado e)",
+            "{",
+            "    DeudaPendiente = false;",
+            "    if (e.Referencia is not null) _referenciasDePago.Add(e.Referencia);   // la llave del acto, guardada por el Apply",
+            "}",
+          ],
+        },
+      ],
+    },
+    {
       tipo: "reto",
       titulo: "El aviso del banco",
       tarea:
@@ -201,6 +264,37 @@ export const seccion33: Seccion = {
           'await bus.InvokeAsync(new RegistrarPago("emp-7", "BANCO-0001", 50_000));   // el banco avisa otra vez',
         ],
       },
+    },
+    {
+      tipo: "solucion",
+      de: "reto",
+      titulo: "El aviso del banco",
+      piezas: [
+        {
+          etiqueta: "En `Empresas.Historia`: el aviso del banco es un comando",
+          lenguaje: "csharp",
+          lineas: [
+            "public record RegistrarPago(string EmpresaId, string Referencia, int Monto);",
+          ],
+        },
+        {
+          etiqueta: "En `Empresas.Historia`, con `using Marten;`: su handler",
+          lenguaje: "csharp",
+          lineas: [
+            "public static class RegistrarPagoHandler",
+            "{",
+            "    public static async Task Handle(RegistrarPago cmd, IDocumentSession session)",
+            "    {",
+            "        var empresa = await session.Events.AggregateStreamAsync<Empresa>(cmd.EmpresaId)",
+            '            ?? throw new InvalidOperationException($"No existe la empresa {cmd.EmpresaId}");',
+            "        if (empresa.YaRegistro(cmd.Referencia)) return;   // el mismo pago, en otro sobre: no hace nada",
+            "        session.Events.Append(cmd.EmpresaId, new PagoRegistrado(cmd.Monto, cmd.Referencia));",
+            "    }",
+            "}",
+          ],
+        },
+      ],
+      nota: "La llave vive en el diario, dentro del `PagoRegistrado`: el `Apply` la recupera al **rehidratar**, y sobrevive a un reinicio.",
     },
     {
       tipo: "rompelo",
