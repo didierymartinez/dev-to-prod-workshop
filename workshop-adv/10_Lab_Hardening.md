@@ -19,7 +19,7 @@ Si creas el Private Endpoint pero no configuras DNS, cuando la VM hace `az keyva
 
 La solución es la **Private DNS Zone**: una zona DNS privada que sobreescribe la resolución de `*.vault.azure.net` con la IP privada del PE (`10.40.2.X`).
 
-Referencia: **[ADR-005: Private DNS Zones centralizadas](file:///Users/didierymartinez/Documents/Sincosoft/Cosmos/cosmos/architecture/ADRs/005-adr-private-dns-zones-centralizadas.md)**
+Referencia: **ADR-005: Private DNS Zones centralizadas**
 
 ### 🧩 El Flujo con Private Link
 ```mermaid

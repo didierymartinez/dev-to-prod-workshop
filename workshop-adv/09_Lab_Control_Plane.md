@@ -25,7 +25,7 @@ Cosmos separa deliberadamente dos responsabilidades en infraestructuras independ
 
 **La regla más importante:** Sin acoplamiento síncrono entre planos. Si el runtime del ERP necesita datos de un tenant (tier, permisos), los obtiene del **token JWT** — no con una llamada HTTP al Control Plane.
 
-Referencia: **[ADR-009: Separación Application Plane / Control Plane](file:///Users/didierymartinez/Documents/Sincosoft/Cosmos/cosmos/architecture/ADRs/009-adr-separacion-application-plane-y-control-plane.md)**
+Referencia: **ADR-009: Separación Application Plane / Control Plane**
 
 ### 🧩 La Arquitectura Completa de Cosmos
 ```mermaid
@@ -115,7 +115,7 @@ resource "azurerm_role_assignment" "vm_sb_receiver" {
 3. En **Access control (IAM)** → **Role assignments** → verifica que la VM tiene `Azure Service Bus Data Sender` y `Azure Service Bus Data Receiver`.
 
 ### 🌍 Realidad Cosmos
-En producción, la autenticación al Service Bus usa **Managed Identity** exclusivamente — sin SAS/connection strings. Esta es la decisión del ADR-004. Con `disableLocalAuth: true` en el namespace, no es posible conectarse con SAS aunque alguien lo intente. Ver [`ADR-004`](file:///Users/didierymartinez/Documents/Sincosoft/Cosmos/cosmos/architecture/ADRs/004-adr-managed-identity-en-service-bus.md).
+En producción, la autenticación al Service Bus usa **Managed Identity** exclusivamente — sin SAS/connection strings. Esta es la decisión del ADR-004. Con `disableLocalAuth: true` en el namespace, no es posible conectarse con SAS aunque alguien lo intente. Ver `ADR-004`.
 
 ---
 
@@ -239,7 +239,7 @@ terraform apply -var-file=terraform.tfvars
 4. Entra a **Application Insights** `ai-cosmos-dev-eus-001` → **Live Metrics** → debe mostrar el telemetry de las functions.
 
 ### 🌍 Realidad Cosmos
-En producción hay 5 Function Apps en el Control Plane: `onboarding`, `user-management`, `tenant-provisioning`, `tenant-management` y `billing`. Cada una en su propio archivo Terraform. El Service Plan usa SKU `B3` (4 vCPU). El código fuente del Control Plane vive en [`ControlPlane/src/`](file:///Users/didierymartinez/Documents/Sincosoft/Cosmos/cosmos/ControlPlane/src/). Archivos Terraform reales: [`ControlPlane/infraestructura/aplicacion/`](file:///Users/didierymartinez/Documents/Sincosoft/Cosmos/cosmos/ControlPlane/infraestructura/aplicacion/).
+En producción hay 5 Function Apps en el Control Plane: `onboarding`, `user-management`, `tenant-provisioning`, `tenant-management` y `billing`. Cada una en su propio archivo Terraform. El Service Plan usa SKU `B3` (4 vCPU). El código fuente del Control Plane vive en `ControlPlane/src/`. Archivos Terraform reales: `ControlPlane/infraestructura/aplicacion/`.
 
 ---
 

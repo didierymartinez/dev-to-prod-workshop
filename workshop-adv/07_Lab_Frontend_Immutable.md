@@ -70,7 +70,7 @@ terraform apply -var-file=terraform.tfvars
 4. Ve a **Data storage** → **Containers** → verifica que existe el contenedor `$web`.
 
 ### 🌍 Realidad Cosmos
-El Storage Account de fronts en producción vive en un Resource Group transversal `applicationplane` gestionado por el repo `ApplicationPlane`. Todos los fronts del ecosistema coexisten en el mismo Storage Account. Ver [`ApplicationPlane/infraestructure/`](file:///Users/didierymartinez/Documents/Sincosoft/Cosmos/cosmos/ApplicationPlane/infraestructure/).
+El Storage Account de fronts en producción vive en un Resource Group transversal `applicationplane` gestionado por el repo `ApplicationPlane`. Todos los fronts del ecosistema coexisten en el mismo Storage Account. Ver `ApplicationPlane/infraestructure/`.
 
 ---
 
@@ -213,7 +213,7 @@ terraform apply -var-file=terraform.tfvars
 4. El navegador debe mostrar el contenido del `env.js` con los valores reales del KV.
 
 ### 🌍 Realidad Cosmos
-El reusable workflow `_reusable-deploy-front.yml` en `ApplicationPlane` hace exactamente este proceso. La convención de nombres es `front-{app_name}-{variable_name}` donde `variable_name` viene de los placeholders `${VAR_NAME}` del template. Ver [`ObligacionesPorPagar.Infraestructura/README.md §Despliegue de fronts estáticos`](file:///Users/didierymartinez/Documents/Sincosoft/Cosmos/cosmos/ObligacionesPorPagar.Infraestructura/README.md).
+El reusable workflow `_reusable-deploy-front.yml` en `ApplicationPlane` hace exactamente este proceso. La convención de nombres es `front-{app_name}-{variable_name}` donde `variable_name` viene de los placeholders `${VAR_NAME}` del template. Ver `ObligacionesPorPagar.Infraestructura/README.md §Despliegue de fronts estáticos`.
 
 ---
 

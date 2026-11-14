@@ -116,7 +116,7 @@ Terraform has been successfully initialized!
 2. Ejecuta `terraform providers` — debe listar `registry.terraform.io/hashicorp/azurerm` y `registry.terraform.io/hashicorp/random`.
 
 ### 🌍 Realidad Cosmos
-La convención CAF con `base_suffix = "${var.project_name}-${var.environment}-${var.location_short}-${var.instance}"` está declarada en `locals.tf` y se reutiliza en cada módulo. Código real: [`ObligacionesPorPagar.Infraestructura/infra/locals.tf`](file:///Users/didierymartinez/Documents/Sincosoft/Cosmos/cosmos/ObligacionesPorPagar.Infraestructura/infra/locals.tf).
+La convención CAF con `base_suffix = "${var.project_name}-${var.environment}-${var.location_short}-${var.instance}"` está declarada en `locals.tf` y se reutiliza en cada módulo. Código real: `ObligacionesPorPagar.Infraestructura/infra/locals.tf`.
 
 ---
 
@@ -195,7 +195,7 @@ Plan: 2 to add, 0 to change, 0 to destroy.
 4. La columna **Resources** debe mostrar `0 resources` — el contenedor está vacío por ahora.
 
 ### 🌍 Realidad Cosmos
-En producción, los tags incluyen además `owner` (equipo responsable) y `costCenter` (para el chargeback de facturación). Ambos son **requeridos** — el pipeline de CI falla si no se proveen. Ver [`variables.tf L31-L40`](file:///Users/didierymartinez/Documents/Sincosoft/Cosmos/cosmos/ObligacionesPorPagar.Infraestructura/infra/variables.tf).
+En producción, los tags incluyen además `owner` (equipo responsable) y `costCenter` (para el chargeback de facturación). Ambos son **requeridos** — el pipeline de CI falla si no se proveen. Ver `variables.tf L31-L40`.
 
 ---
 
@@ -324,7 +324,7 @@ terraform apply
 4. Verifica que `snet-vms` no tiene ningún **Security group** asociado aún — el NSG se creará en el Lab 7, cuando sepamos exactamente qué tráfico debe permitir.
 
 ### 🌍 Realidad Cosmos
-En el módulo de producción, los rangos están declarados como variables en `variables.tf`. El NSG y sus reglas se crean en el mismo módulo de networking junto con Front Door, porque las reglas del NSG referencian el service tag de Front Door — son dos conceptos que deben definirse juntos. Código real: [`variables.tf L42-L52`](file:///Users/didierymartinez/Documents/Sincosoft/Cosmos/cosmos/ObligacionesPorPagar.Infraestructura/infra/variables.tf).
+En el módulo de producción, los rangos están declarados como variables en `variables.tf`. El NSG y sus reglas se crean en el mismo módulo de networking junto con Front Door, porque las reglas del NSG referencian el service tag de Front Door — son dos conceptos que deben definirse juntos. Código real: `variables.tf L42-L52`.
 
 ---
 

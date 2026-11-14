@@ -95,7 +95,7 @@ terraform apply -var-file=terraform.tfvars
 4. Anota el **Server name** (ej: `psql-cosmos-taller-8xk2m3.postgres.database.azure.com`).
 
 ### 🌍 Realidad Cosmos
-En producción se usa `B_Standard_B2s` en dev y SKUs de producción para prod. El módulo también habilita la extensión `pgvector` para la base de datos de IA. Módulo real: [`ObligacionesPorPagar.Infraestructura/infra/modules/postgres/`](file:///Users/didierymartinez/Documents/Sincosoft/Cosmos/cosmos/ObligacionesPorPagar.Infraestructura/infra/modules/postgres/).
+En producción se usa `B_Standard_B2s` en dev y SKUs de producción para prod. El módulo también habilita la extensión `pgvector` para la base de datos de IA. Módulo real: `ObligacionesPorPagar.Infraestructura/infra/modules/postgres/`.
 
 ---
 
@@ -175,7 +175,7 @@ terraform apply -var-file=terraform.tfvars
    ```
 
 ### 🌍 Realidad Cosmos
-En producción, el módulo `key_vault` recibe `postgres_admin_password`, `pg_fqdn` y `pg_databases` como inputs y crea los secretos para cada bounded context. El `pg_databases` es una lista: `["entradasdb", "radicaciondb", "radicaciondb_vectorial", "reconocimientodb"]`. Ver [`main.tf L80-L93`](file:///Users/didierymartinez/Documents/Sincosoft/Cosmos/cosmos/ObligacionesPorPagar.Infraestructura/infra/main.tf).
+En producción, el módulo `key_vault` recibe `postgres_admin_password`, `pg_fqdn` y `pg_databases` como inputs y crea los secretos para cada bounded context. El `pg_databases` es una lista: `["entradasdb", "radicaciondb", "radicaciondb_vectorial", "reconocimientodb"]`. Ver `main.tf L80-L93`.
 
 ---
 
