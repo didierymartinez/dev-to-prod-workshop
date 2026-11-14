@@ -8,15 +8,15 @@
 
 Este taller existe para responder con código ejecutable las preguntas que definen al Ingeniero de Plataforma de Cosmos:
 
-1. **¿Por qué hay dos Service Buses?** (Lab 8 — ADR-009)
-2. **¿Por qué YARP y no Azure Application Gateway?** (Lab 7 — ADR-003)
+1. **¿Por qué hay dos Service Buses?** (Lab 9 — ADR-009)
+2. **¿Por qué YARP y no Azure Application Gateway?** (Lab 8 — ADR-003)
 3. **¿Por qué la VM tiene SystemAssigned Identity?** (Lab 4)
 4. **¿Cómo el Runner sabe el PAT sin tenerlo en código?** (Lab 4 — cloud-init + KV)
-5. **¿Por qué el NSG solo permite `AzureFrontDoor.Backend:80`?** (Lab 7 — ADR-007)
-6. **¿Cómo el frontend recibe la URL de la API sin recompilarse?** (Lab 6 — env.js desde KV)
+5. **¿Por qué el NSG solo permite `AzureFrontDoor.Backend:80`?** (Lab 8 — ADR-007)
+6. **¿Cómo el frontend recibe la URL de la API sin recompilarse?** (Lab 7 — env.js desde KV)
 7. **¿Qué hace Docker Swarm y por qué no contenedores directos?** (Lab 3)
-8. **¿Qué pasa cuando un nuevo tenant se registra?** (Lab 8 — Control Plane)
-9. **¿Por qué no puedo conectarme a la base de datos desde mi casa?** (Lab 9 — Hardening)
+8. **¿Qué pasa cuando un nuevo tenant se registra?** (Lab 9 — Control Plane)
+9. **¿Por qué no puedo conectarme a la base de datos desde mi casa?** (Lab 10 — Hardening)
 
 ---
 
@@ -31,21 +31,22 @@ graph TD
 
     subgraph "Fase 2: Orquestación y App Real"
         L3["LAB 3: Orquestación\nDocker Swarm + Overlays"]
-        L4["LAB 4: Automatización e ID\nACR + Runner + KV + Identity"]
+        L4["LAB 4: Automatización e ID\nRunner + KV + Identity"]
+        L5["LAB 5: Integración Continua\nACR + Pipeline"]
     end
 
     subgraph "Fase 3: Estado y Perímetro"
-        L5["LAB 5: Persistencia\nPostgreSQL PaaS"]
-        L6["LAB 6: Frontend\nStorage Website + env.js"]
-        L7["LAB 7: Perímetro\nFront Door + YARP + NSG"]
+        L6["LAB 6: Persistencia\nPostgreSQL PaaS"]
+        L7["LAB 7: Frontend\nStorage Website + env.js"]
+        L8["LAB 8: Perímetro\nFront Door + YARP + NSG"]
     end
 
     subgraph "Fase 4: Escalabilidad y Hardening"
-        L8["LAB 8: Dos Planos\nService Bus + Functions"]
-        L9["LAB 9: Hardening\nPrivate Link + Private DNS"]
+        L9["LAB 9: Dos Planos\nService Bus + Functions"]
+        L10["LAB 10: Hardening\nPrivate Link + Private DNS"]
     end
 
-    L1 --> L2 --> L3 --> L4 --> L5 --> L6 --> L7 --> L8 --> L9
+    L1 --> L2 --> L3 --> L4 --> L5 --> L6 --> L7 --> L8 --> L9 --> L10
 ```
 
 ---
@@ -57,12 +58,13 @@ graph TD
 | **1** | [Cimentación](01_Lab_Foundation.md) | VNet + Subnets | Segmentación de red |
 | **2** | [Cómputo Básico](02_Lab_Basic_Compute.md) | VM + Docker | El contenedor como unidad |
 | **3** | [Orquestación](03_Lab_Orchestration.md) | Swarm + Overlays | Redes internas y Service Discovery |
-| **4** | [Automatización e ID](04_Lab_Automation_and_Identity.md) | ACR + Runner + KV | Zero Secrets & Managed Identity |
-| **5** | [Persistencia](05_Lab_Persistence_DB.md) | PostgreSQL Flexible | Desacoplamiento de estado |
-| **6** | [Frontend](06_Lab_Frontend_Immutable.md) | Storage Static Website | Configuración de runtime (env.js) |
-| **7** | [Perímetro](07_Lab_Edge_Gateway.md) | Front Door + YARP | Sello de seguridad NSG |
-| **8** | [Dos Planos](08_Lab_Control_Plane.md) | Service Bus + Functions | App Plane vs Control Plane |
-| **9** | [Hardening](09_Lab_Hardening.md) | Private Endpoints | Tráfico 100% privado |
+| **4** | [Automatización e ID](04_Lab_Automation_and_Identity.md) | Runner + KV + Identity | Zero Secrets & Managed Identity |
+| **5** | [Integración Continua](05_Lab_CICD_Pipeline.md) | ACR + Pipeline | Build y despliegue automático al clúster |
+| **6** | [Persistencia](06_Lab_Persistence_DB.md) | PostgreSQL Flexible | Desacoplamiento de estado |
+| **7** | [Frontend](07_Lab_Frontend_Immutable.md) | Storage Static Website | Configuración de runtime (env.js) |
+| **8** | [Perímetro](08_Lab_Edge_Gateway.md) | Front Door + YARP | Sello de seguridad NSG |
+| **9** | [Dos Planos](09_Lab_Control_Plane.md) | Service Bus + Functions | App Plane vs Control Plane |
+| **10** | [Hardening](10_Lab_Hardening.md) | Private Endpoints | Tráfico 100% privado |
 
 ---
 
