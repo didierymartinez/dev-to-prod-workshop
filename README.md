@@ -63,7 +63,7 @@ Cada taller declara su **prerequisito**. Sigue la ruta que te interese; todas pa
 | ① | [Básico — El ciclo de vida del software](workshop-basics/README.md) | ✅ Completo | `workshop-basics/` |
 | ② | [DevOps — Operar en producción](workshop-devops/README.md) | ✅ Completo | `workshop-devops/` |
 | ③ | Estilos y diseño arquitectónico | 📋 Planeado | — |
-| ④ | [EDA + Event Sourcing (Critter Stack)](workshop-event-sourcing/README.md) | ✅ Completo | `workshop-event-sourcing/` (37 secciones; la vieja `eventsourcing-workshops-basics/` quedó como guía) |
+| ④ | [EDA + Event Sourcing (Critter Stack)](workshop-event-sourcing/README.md) | ✅ Completo | `workshop-event-sourcing/` (70 secciones; la vieja `eventsourcing-workshops-basics/` quedó como guía) |
 | ⑤ | Microservicios | 📋 Planeado | — |
 | ⑥ | Observabilidad | 📋 Planeado | — |
 | ⑦ | DevOps avanzado | 📋 Planeado | — |
@@ -71,9 +71,9 @@ Cada taller declara su **prerequisito**. Sigue la ruta que te interese; todas pa
 
 > Los enlaces aparecen a medida que cada taller queda listo y validado.
 
-> **Enlace entre talleres — requerimiento sembrado desde ④ hacia ⑤:** la sección [*Diseñar con eventos*](workshop-event-sourcing/secciones/disenar-con-eventos.md) del taller ④ introduce el **criterio** de diseño EDA —evento vs comando (eventual vs gRPC/request-reply), dependencia circular / acoplamiento entre servicios, coreografía vs orquestación, granularidad de topics— y **deja a ⑤ Microservicios el tratamiento a fondo** (sagas y orquestadores, transacciones distribuidas, comunicación y resiliencia entre N servicios). **Al construir ⑤, recoger este requerimiento** y enlazar de vuelta a esa sección.
+> **Enlace entre talleres — requerimiento sembrado desde ④ hacia ⑤:** el taller ④ introduce el **criterio** de diseño EDA en tres secciones —[*El contrato lleva lo justo*](workshop-event-sourcing/secciones/el-contrato-lleva-lo-justo.md) (anunciar un hecho sin esperar nada vs preguntarle al dueño y esperar su respuesta), [*El proceso tiene dueño*](workshop-event-sourcing/secciones/el-proceso-tiene-dueno.md) (coreografía vs orquestación, el process manager y la saga) y [*El broker de verdad*](workshop-event-sourcing/secciones/el-broker-de-verdad.md) (un exchange por contexto, no por proceso)— y **deja a ⑤ Microservicios el tratamiento a fondo** (sagas y orquestadores, transacciones distribuidas, acoplamiento y dependencias circulares entre servicios, comunicación y resiliencia entre N servicios). **Al construir ⑤, recoger este requerimiento** y enlazar de vuelta a esas secciones.
 
-> **Enlace entre talleres — sembrado desde ④ hacia ③:** `el-almacen-directo` y `disenar-con-eventos` (taller ④) introducen, a nivel *razonar*, la regla **`1 transacción = 1 agregado`** (Evans/Vernon) y la **frontera del agregado como frontera de consistencia**. **③ Estilos y diseño arquitectónico** debe cubrir a fondo el **diseño táctico de DDD** (invariantes, tamaño y frontera del agregado, referencias por id, agregados vs entidades/value objects) — recoger este requerimiento al construirlo.
+> **Enlace entre talleres — sembrado desde ④ hacia ③:** [*El árbol de empresas*](workshop-event-sourcing/secciones/el-arbol-de-empresas.md) y [*La rama entera*](workshop-event-sourcing/secciones/la-rama-entera.md) (taller ④) introducen, a nivel *razonar*, la **frontera del agregado como frontera de consistencia**: elegir la frontera es elegir qué reglas puedes garantizar. **③ Estilos y diseño arquitectónico** debe cubrir a fondo el **diseño táctico de DDD** (la regla **`1 transacción = 1 agregado`** de Evans/Vernon, invariantes, tamaño y frontera del agregado, referencias por id, agregados vs entidades/value objects) — recoger este requerimiento al construirlo.
 
 ---
 

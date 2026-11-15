@@ -1,0 +1,13 @@
+# Estado de Terraform: puede llevar secretos y datos de la infraestructura real
+*.tfstate
+*.tfstate.*
+
+# Variables locales: cada quien pone las suyas
+*.tfvars
+*.tfvars.json
+
+# Proveedores y módulos descargados por `terraform init`
+.terraform/
+
+# macOS
+.DS_Store

@@ -24,7 +24,7 @@ Si la URL del Storage Account es pública, cualquiera puede accederla directamen
 
 **El sello de seguridad**: El NSG de la VM solo acepta tráfico del service tag `AzureFrontDoor.Backend` en el puerto 80. Si alguien intenta conectarse a la IP pública de la VM directamente, el NSG lo bloquea. YARP además valida el header `X-Azure-FDID` para rechazar tráfico de otros tenants de Front Door.
 
-Referencia: **[ADR-003: YARP como Application Gateway](file:///Users/didierymartinez/Documents/Sincosoft/Cosmos/cosmos/architecture/ADRs/003-adr-yarp-como-application-gateway.md)**
+Referencia: **ADR-003: YARP como Application Gateway**
 
 ---
 
@@ -258,7 +258,7 @@ terraform apply -var-file=terraform.tfvars
 > ⏱️ Front Door puede tardar hasta **10 minutos** en propagar la configuración globalmente.
 
 ### 🌍 Realidad Cosmos
-El código Terraform de producción es prácticamente idéntico a este. La única diferencia: el SKU es `Premium_AzureFrontDoor` (incluye WAF policies) y hay una validación pendiente del header `X-Azure-FDID` en YARP (documentada como gap #8 en el código real). Archivo real: [`ApplicationPlane/infraestructure/front-door.tf`](file:///Users/didierymartinez/Documents/Sincosoft/Cosmos/cosmos/ApplicationPlane/infraestructure/front-door.tf).
+El código Terraform de producción es prácticamente idéntico a este. La única diferencia: el SKU es `Premium_AzureFrontDoor` (incluye WAF policies) y hay una validación pendiente del header `X-Azure-FDID` en YARP (documentada como gap #8 en el código real). Archivo real: `ApplicationPlane/infraestructure/front-door.tf`.
 
 ---
 
@@ -286,7 +286,7 @@ terraform apply -var-file=terraform.tfvars
 > ⏱️ Front Door puede tardar hasta **10 minutos** en propagar la configuración globalmente.
 
 ### 🌍 Realidad Cosmos
-El código Terraform de producción es prácticamente idéntico a este. La única diferencia: el SKU es `Premium_AzureFrontDoor` (incluye WAF policies) y hay una validación pendiente del header `X-Azure-FDID` en YARP (documentada como gap #8 en el código real). Archivo real: [`ApplicationPlane/infraestructure/front-door.tf`](file:///Users/didierymartinez/Documents/Sincosoft/Cosmos/cosmos/ApplicationPlane/infraestructure/front-door.tf).
+El código Terraform de producción es prácticamente idéntico a este. La única diferencia: el SKU es `Premium_AzureFrontDoor` (incluye WAF policies) y hay una validación pendiente del header `X-Azure-FDID` en YARP (documentada como gap #8 en el código real). Archivo real: `ApplicationPlane/infraestructure/front-door.tf`.
 
 ---
 
