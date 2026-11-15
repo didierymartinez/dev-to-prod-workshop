@@ -42,8 +42,8 @@ PROFUNDIZACIÓN / SRE
        Kubernetes · GitOps · multi-entorno · service mesh
 
 CAPSTONE
-  ⑧  El producto real (Cosmos)                         ♻️ a reconstruir
-       integra todo en un ERP SaaS multi-tenant
+  ⑧  El producto real (Cosmos)                         🔒 interno (Misión Cosmos)
+       el mapa del sistema real y rutas cortas para construirlo
 ```
 
 ## Rutas según tu objetivo
@@ -67,7 +67,7 @@ Cada taller declara su **prerequisito**. Sigue la ruta que te interese; todas pa
 | ⑤ | Microservicios | 📋 Planeado | — |
 | ⑥ | Observabilidad | 📋 Planeado | — |
 | ⑦ | DevOps avanzado | 📋 Planeado | — |
-| ⑧ | El producto real (Cosmos) | ♻️ A reconstruir | carpeta nueva (la actual `workshop-adv/` queda como guía) |
+| ⑧ | El producto real (Cosmos) | 🔒 Interno | Para quien trabaja en Cosmos: el mapa del sistema real y rutas cortas para construirlo con las manos viven en un repo interno del equipo (Misión Cosmos). Cada paso de esas rutas enlaza aquí su lección larga. `workshop-adv/` queda como guía |
 
 > Los enlaces aparecen a medida que cada taller queda listo y validado.
 
